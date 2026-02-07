@@ -89,12 +89,31 @@ None! The png crate API worked smoothly on first try.
 - Simplified to use `decode()` without stop token support (TODO: add adapter for Stop trait)
 - Marked 16-bit and grayscale support as unsupported for now
 
+## ravif (external crate)
+
+**Date:** 2026-02-06
+**Adapter:** src/codecs/avif_enc.rs
+**API Issues:**
+
+None! The ravif API worked smoothly on first try.
+
+**Implementation notes:**
+- Uses builder pattern: `Encoder::new()` → `with_quality()` / `with_speed()` → `encode_rgba/rgb()`
+- Takes `Img<&[RGBA<u8>]>` or `Img<&[RGB<u8>]>` from rgb + imgref crates
+- Used `rgb::bytemuck::cast_slice()` to convert &[u8] to &[RGBA<u8>]/&[RGB<u8>]
+- Quality scale 0-100 matches zencodecs (100 is near-lossless, not truly lossless)
+- Speed parameter 0-10 (0=slowest/best, 10=fastest/worst), defaulted to 4
+
+**Resolution:** No issues encountered. Clean API with good builder pattern.
+
 ## Summary
 
-The most friction came from zenjpeg where the API has multiple layers (Config, Request, etc.) but no clear examples for simple use cases. zenwebp was smooth except for minor method name differences. zengif requires type conversions because it uses a structured `Rgba` type instead of flat byte arrays. png crate (external) worked perfectly on first try with clear API and good documentation.
+The most friction came from zenjpeg where the API has multiple layers (Config, Request, etc.) but no clear examples for simple use cases. zenwebp was smooth except for minor method name differences. zengif requires type conversions because it uses a structured `Rgba` type instead of flat byte arrays. zenavif needs probe-only function and better metadata exposure. png and ravif (external crates) worked perfectly on first try with clear APIs and good documentation.
 
 **Recommendations:**
 - zenjpeg: Add simple usage examples to docs, unify PixelFormat/PixelLayout types
 - zenwebp: Consider aliasing `frame_count()` → `num_frames()` for consistency with other codecs
 - zengif: Consider providing flat byte array convenience methods alongside `Vec<Rgba>` API
+- zenavif: Add probe-only function, expose animation/ICC metadata, improve Stop trait compatibility
 - png: No changes needed - exemplary API design
+- ravif: No changes needed - exemplary API design

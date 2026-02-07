@@ -21,6 +21,7 @@ zenwebp = { path = "../zenwebp", optional = true }
 zengif = { path = "../zengif", optional = true }
 zenavif = { path = "../zenavif", optional = true }
 rgb = { version = "0.8.52", optional = true, default-features = false, features = ["as-bytes"] }
+imgref = { version = "1.12", optional = true }
 png = { version = "0.18", optional = true }
 ravif = { version = "0.13", optional = true }
 
@@ -39,7 +40,7 @@ webp = ["dep:zenwebp"]
 gif = ["dep:zengif"]
 png = ["dep:png"]
 avif-decode = ["dep:zenavif", "dep:rgb"]
-avif-encode = ["dep:ravif"]
+avif-encode = ["dep:ravif", "dep:rgb", "dep:imgref"]
 
 # Color management
 moxcms = []  # Disabled for now
