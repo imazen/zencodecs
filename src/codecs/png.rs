@@ -4,7 +4,6 @@
 
 extern crate std;
 
-use alloc::vec::Vec;
 use std::io::Cursor;
 
 use crate::{
@@ -153,31 +152,12 @@ pub(crate) fn encode(
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    // Convert BGR/BGRA to RGB/RGBA if needed
-    let (final_pixels, color_type) = match layout {
-        PixelLayout::Rgb8 => (pixels.to_vec(), png::ColorType::Rgb),
-        PixelLayout::Rgba8 => (pixels.to_vec(), png::ColorType::Rgba),
-        PixelLayout::Bgr8 => {
-            // Convert BGR to RGB
-            let mut rgb = Vec::with_capacity(pixels.len());
-            for chunk in pixels.chunks_exact(3) {
-                rgb.push(chunk[2]); // R
-                rgb.push(chunk[1]); // G
-                rgb.push(chunk[0]); // B
-            }
-            (rgb, png::ColorType::Rgb)
-        }
-        PixelLayout::Bgra8 => {
-            // Convert BGRA to RGBA
-            let mut rgba = Vec::with_capacity(pixels.len());
-            for chunk in pixels.chunks_exact(4) {
-                rgba.push(chunk[2]); // R
-                rgba.push(chunk[1]); // G
-                rgba.push(chunk[0]); // B
-                rgba.push(chunk[3]); // A
-            }
-            (rgba, png::ColorType::Rgba)
-        }
+    // Swap BGR→RGB if needed (PNG only supports RGB-order)
+    let (final_pixels, rgb_layout) = crate::pixel::to_rgb_order(pixels, layout);
+    let color_type = if rgb_layout.has_alpha() {
+        png::ColorType::Rgba
+    } else {
+        png::ColorType::Rgb
     };
 
     // Create output buffer

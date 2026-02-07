@@ -46,6 +46,79 @@ impl PixelLayout {
     }
 }
 
+impl PixelLayout {
+    /// Whether this layout uses BGR channel order.
+    pub fn is_bgr(self) -> bool {
+        matches!(self, PixelLayout::Bgr8 | PixelLayout::Bgra8)
+    }
+}
+
+/// Convert pixel data to RGB-order layout, swapping B and R channels if needed.
+///
+/// Returns `(converted_bytes, new_layout)`. If already RGB-order, returns a copy.
+/// BGR8 → RGB8, BGRA8 → RGBA8, RGB8/RGBA8 → unchanged (cloned).
+pub(crate) fn to_rgb_order(pixels: &[u8], layout: PixelLayout) -> (alloc::vec::Vec<u8>, PixelLayout) {
+    match layout {
+        PixelLayout::Rgb8 | PixelLayout::Rgba8 => (pixels.to_vec(), layout),
+        PixelLayout::Bgr8 => {
+            let mut rgb = alloc::vec::Vec::with_capacity(pixels.len());
+            for chunk in pixels.chunks_exact(3) {
+                rgb.push(chunk[2]); // R
+                rgb.push(chunk[1]); // G
+                rgb.push(chunk[0]); // B
+            }
+            (rgb, PixelLayout::Rgb8)
+        }
+        PixelLayout::Bgra8 => {
+            let mut rgba = alloc::vec::Vec::with_capacity(pixels.len());
+            for chunk in pixels.chunks_exact(4) {
+                rgba.push(chunk[2]); // R
+                rgba.push(chunk[1]); // G
+                rgba.push(chunk[0]); // B
+                rgba.push(chunk[3]); // A
+            }
+            (rgba, PixelLayout::Rgba8)
+        }
+    }
+}
+
+/// Convert pixel data to RGBA8, adding alpha=255 and swapping channels as needed.
+///
+/// All layouts produce RGBA8 output.
+pub(crate) fn to_rgba(pixels: &[u8], layout: PixelLayout) -> alloc::vec::Vec<u8> {
+    match layout {
+        PixelLayout::Rgba8 => pixels.to_vec(),
+        PixelLayout::Rgb8 => {
+            let mut rgba = alloc::vec::Vec::with_capacity(pixels.len() / 3 * 4);
+            for chunk in pixels.chunks_exact(3) {
+                rgba.extend_from_slice(chunk);
+                rgba.push(255);
+            }
+            rgba
+        }
+        PixelLayout::Bgra8 => {
+            let mut rgba = alloc::vec::Vec::with_capacity(pixels.len());
+            for chunk in pixels.chunks_exact(4) {
+                rgba.push(chunk[2]); // R
+                rgba.push(chunk[1]); // G
+                rgba.push(chunk[0]); // B
+                rgba.push(chunk[3]); // A
+            }
+            rgba
+        }
+        PixelLayout::Bgr8 => {
+            let mut rgba = alloc::vec::Vec::with_capacity(pixels.len() / 3 * 4);
+            for chunk in pixels.chunks_exact(3) {
+                rgba.push(chunk[2]); // R
+                rgba.push(chunk[1]); // G
+                rgba.push(chunk[0]); // B
+                rgba.push(255);
+            }
+            rgba
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

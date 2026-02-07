@@ -1,7 +1,5 @@
 //! GIF codec adapter using zengif.
 
-use alloc::vec::Vec;
-
 use crate::{
     CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelLayout, Stop,
 };
@@ -94,28 +92,11 @@ pub(crate) fn encode(
         .try_into()
         .map_err(|_| CodecError::InvalidInput("height exceeds GIF maximum (65535)".into()))?;
 
-    // Convert pixel data to Vec<Rgba> (zengif requires Vec<Rgba>)
-    let rgba_pixels: Vec<zengif::Rgba> = match layout {
-        PixelLayout::Rgba8 => pixels
-            .chunks_exact(4)
-            .map(|c| zengif::Rgba::new(c[0], c[1], c[2], c[3]))
-            .collect(),
-        PixelLayout::Rgb8 => pixels
-            .chunks_exact(3)
-            .map(|c| zengif::Rgba::new(c[0], c[1], c[2], 255))
-            .collect(),
-        PixelLayout::Bgra8 => pixels
-            .chunks_exact(4)
-            .map(|c| zengif::Rgba::new(c[2], c[1], c[0], c[3]))
-            .collect(),
-        PixelLayout::Bgr8 => pixels
-            .chunks_exact(3)
-            .map(|c| zengif::Rgba::new(c[2], c[1], c[0], 255))
-            .collect(),
-    };
+    // Convert to RGBA bytes, then use zengif's from_bytes constructor
+    let rgba_bytes = crate::pixel::to_rgba(pixels, layout);
 
-    // Create frame input
-    let frame = zengif::FrameInput::new(width_u16, height_u16, 10, rgba_pixels); // 10 = 100ms delay
+    // Create frame input (zengif's from_bytes takes RGBA &[u8] directly)
+    let frame = zengif::FrameInput::from_bytes(width_u16, height_u16, 10, &rgba_bytes); // 10 = 100ms delay
 
     // Create encoder config
     let config = zengif::EncoderConfig::new();
