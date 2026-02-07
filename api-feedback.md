@@ -49,11 +49,30 @@ This document tracks API issues encountered while implementing codec adapters fo
 - Encode: Convert flat bytes to `Vec<Rgba>` using `chunks_exact(4).map(|c| Rgba::new(...))`
 - Fixed zengif compilation error upstream
 
+## png (external crate)
+
+**Date:** 2026-02-06
+**Adapter:** src/codecs/png.rs
+**API Issues:**
+
+None! The png crate API worked smoothly on first try.
+
+**Implementation notes:**
+- Uses `Decoder::new(Cursor::new(data))` → `read_info()` → `next_frame(&mut buf)` pattern
+- Encoder uses builder: `Encoder::new()` → `set_color()` / `set_depth()` → `write_header()` → `write_image_data()`
+- Decoder automatically handles transformations (indexed → RGB, grayscale expansion)
+- Requires `extern crate std` due to std::io traits
+- APNG support exposed via `info.animation_control`
+- ICC profile extraction works: `info.icc_profile`
+
+**Resolution:** No issues encountered. Implementation was straightforward based on documentation examples.
+
 ## Summary
 
-The most friction came from zenjpeg where the API has multiple layers (Config, Request, etc.) but no clear examples for simple use cases. zenwebp was smooth except for minor method name differences. zengif requires type conversions because it uses a structured `Rgba` type instead of flat byte arrays.
+The most friction came from zenjpeg where the API has multiple layers (Config, Request, etc.) but no clear examples for simple use cases. zenwebp was smooth except for minor method name differences. zengif requires type conversions because it uses a structured `Rgba` type instead of flat byte arrays. png crate (external) worked perfectly on first try with clear API and good documentation.
 
 **Recommendations:**
 - zenjpeg: Add simple usage examples to docs, unify PixelFormat/PixelLayout types
 - zenwebp: Consider aliasing `frame_count()` → `num_frames()` for consistency with other codecs
 - zengif: Consider providing flat byte array convenience methods alongside `Vec<Rgba>` API
+- png: No changes needed - exemplary API design
