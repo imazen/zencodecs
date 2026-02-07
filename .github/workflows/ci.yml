@@ -115,6 +115,8 @@ jobs:
   test-wasm:
     name: WASM (wasm32-wasip1)
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-C target-feature=+simd128"
     steps:
       - uses: actions/checkout@v6
 
@@ -204,3 +206,27 @@ jobs:
 
       - name: Check MSRV (png feature)
         run: cargo check ${{ env.CI_FEATURES }}
+
+  # ==========================================================================
+  # Code coverage
+  # ==========================================================================
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: Swatinem/rust-cache@v2
+      - name: Generate coverage
+        run: cargo llvm-cov ${{ env.CI_FEATURES }} --lcov --output-path lcov.info
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
