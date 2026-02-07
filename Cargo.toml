@@ -23,8 +23,10 @@ zenavif = { path = "../zenavif", optional = true, default-features = false }
 png = { version = "0.18", optional = true }
 ravif = { version = "0.13", optional = true }
 
+# Color management (optional)
+moxcms = { version = "0.8", optional = true, default-features = false }
+
 [dev-dependencies]
-# For testing
 
 [features]
 default = ["jpeg", "webp", "gif", "avif-decode", "png"]
@@ -42,5 +44,8 @@ png = ["dep:png"]
 avif-decode = ["dep:zenavif"]
 avif-encode = ["dep:ravif"]
 
+# Color management
+moxcms = ["dep:moxcms"]
+
 # All codecs
-all = ["jpeg", "webp", "gif", "png", "avif-decode", "avif-encode"]
+all = ["jpeg", "webp", "gif", "png", "avif-decode", "avif-encode", "moxcms"]

@@ -1,23 +1,31 @@
 # zencodecs
 
 Unified image codec abstraction over zenjpeg, zenwebp, zengif, zenavif, png, and ravif.
+Optional color management via moxcms.
 
 See `/home/lilith/work/codec-design/README.md` for API design guidelines.
 See `/home/lilith/work/zendiff/API_COMPARISON.md` for per-codec convergence status.
 
 ## Purpose
 
-A thin dispatch layer that lets callers encode/decode images without knowing which
-format-specific crate to call. Used by image proxies, CLI tools, and batch processors
-that handle multiple formats.
+A codec dispatch layer for image proxies, CLI tools, and batch processors that handle
+multiple formats. Provides:
 
-**This is NOT a kitchen-sink image library.** It does format detection, codec dispatch,
-and pixel format normalization. It does NOT do resizing, color management, compositing,
-or any image processing. Those belong in higher-level crates.
+- **Format detection** and codec dispatch
+- **Pixel format normalization** (RGBA8/BGRA8 everywhere)
+- **Runtime codec registry** — callers control which codecs are available at runtime
+- **Color management** via moxcms (feature-gated)
+- **Streaming decode/encode** — delegates to codec when supported, buffers when not
+- **Animation** — frame iteration for animated formats (GIF, animated WebP)
+- **Auto-selection** — pick optimal encoder based on image stats and allowed formats
+- **Re-export of codec configs** — callers can use format-specific config types for
+  fine-grained control, feature-gated behind each codec's feature
+
+Does NOT do resizing, compositing, or image processing — that's `zenimage`.
 
 ## Design Rules
 
-**No backwards compatibility required** — we have no external users. Just bump the 0.x major version for breaking changes. No deprecation shims or legacy aliases — delete old APIs. Prefer one obvious way to do things — no duplicate entry points. Minimize API surface for forwards compatibility. Avoid free functions — use methods on types (Config, Request, Decoder) instead.
+**No backwards compatibility required** — we have no external users. Just bump the 0.x major version for breaking changes. No deprecation shims or legacy aliases — delete old APIs. Prefer one obvious way to do things — no duplicate entry points. Minimize API surface for forwards compatibility. Avoid free functions — use methods on types instead.
 
 **Builder convention**: `with_` prefix for consuming builder setters, bare-name for getters.
 
@@ -28,21 +36,25 @@ or any image processing. Those belong in higher-level crates.
 ```
 zencodecs/
 ├── src/
-│   ├── lib.rs          # Public API, re-exports
-│   ├── format.rs       # ImageFormat enum, detection (magic bytes)
-│   ├── error.rs        # CodecError (unified error type)
-│   ├── decode.rs       # DecodeRequest, DecodeOutput
-│   ├── encode.rs       # EncodeRequest, EncodeOutput
-│   ├── info.rs         # ImageInfo (unified probe)
-│   ├── pixel.rs        # PixelLayout re-export or local definition
+│   ├── lib.rs            # Public API, re-exports
+│   ├── format.rs         # ImageFormat enum, detection (magic bytes)
+│   ├── error.rs          # CodecError (unified error type)
+│   ├── pixel.rs          # PixelLayout (Rgb8, Rgba8, Bgr8, Bgra8)
+│   ├── limits.rs         # Limits, ImageMetadata
+│   ├── info.rs           # ImageInfo (unified probe)
+│   ├── registry.rs       # CodecRegistry — runtime enable/disable
+│   ├── decode.rs         # DecodeRequest, DecodeOutput, streaming
+│   ├── encode.rs         # EncodeRequest, auto-selection
+│   ├── animation.rs      # AnimationDecoder, frame iteration
+│   ├── color.rs          # Color management via moxcms (feature-gated)
 │   └── codecs/
-│       ├── mod.rs      # Codec trait + registry
-│       ├── jpeg.rs     # #[cfg(feature = "jpeg")] zenjpeg adapter
-│       ├── webp.rs     # #[cfg(feature = "webp")] zenwebp adapter
-│       ├── gif.rs      # #[cfg(feature = "gif")] zengif adapter
-│       ├── png.rs      # #[cfg(feature = "png")] png crate adapter
-│       ├── avif_dec.rs # #[cfg(feature = "avif-decode")] zenavif adapter
-│       └── avif_enc.rs # #[cfg(feature = "avif-encode")] ravif adapter
+│       ├── mod.rs        # Codec adapter trait
+│       ├── jpeg.rs       # zenjpeg adapter
+│       ├── webp.rs       # zenwebp adapter
+│       ├── gif.rs        # zengif adapter
+│       ├── png.rs        # png crate adapter
+│       ├── avif_dec.rs   # zenavif adapter
+│       └── avif_enc.rs   # ravif adapter
 ├── Cargo.toml
 ├── CLAUDE.md
 ├── justfile
@@ -50,6 +62,46 @@ zencodecs/
 ```
 
 ## Public API Spec
+
+### Runtime Codec Registry
+
+Compile-time features control which codecs are *available*. The registry controls
+which are *enabled* for a given operation. This lets image proxies restrict codecs
+per-request (e.g., disable AVIF for clients that don't support it).
+
+```rust
+#[derive(Clone, Debug)]
+pub struct CodecRegistry {
+    // Bitflags or small vec of enabled formats
+    decode_enabled: FormatSet,
+    encode_enabled: FormatSet,
+}
+
+impl CodecRegistry {
+    /// All compiled-in codecs enabled.
+    pub fn all() -> Self;
+
+    /// Nothing enabled — caller must opt in.
+    pub fn none() -> Self;
+
+    pub fn with_decode(self, format: ImageFormat, enabled: bool) -> Self;
+    pub fn with_encode(self, format: ImageFormat, enabled: bool) -> Self;
+
+    /// Is this format available (compiled in) AND enabled?
+    pub fn can_decode(&self, format: ImageFormat) -> bool;
+    pub fn can_encode(&self, format: ImageFormat) -> bool;
+
+    /// Formats that are both compiled in and enabled.
+    pub fn decodable_formats(&self) -> impl Iterator<Item = ImageFormat>;
+    pub fn encodable_formats(&self) -> impl Iterator<Item = ImageFormat>;
+}
+
+impl Default for CodecRegistry {
+    fn default() -> Self { Self::all() }
+}
+```
+
+Requests accept an optional registry. When omitted, all compiled-in codecs are used.
 
 ### Format Detection
 
@@ -68,7 +120,7 @@ impl ImageFormat {
     /// Detect format from magic bytes. Returns None if unrecognized.
     pub fn detect(data: &[u8]) -> Option<Self>;
 
-    /// Detect format from file extension.
+    /// Detect format from file extension (case-insensitive).
     pub fn from_extension(ext: &str) -> Option<Self>;
 
     /// MIME type string.
@@ -77,62 +129,91 @@ impl ImageFormat {
     /// Common file extensions.
     pub fn extensions(&self) -> &'static [&'static str];
 
-    /// Whether this format can be decoded with current features.
-    pub fn can_decode(&self) -> bool;
+    /// Whether this format supports lossy encoding.
+    pub fn supports_lossy(&self) -> bool;
 
-    /// Whether this format can be encoded with current features.
-    pub fn can_encode(&self) -> bool;
+    /// Whether this format supports lossless encoding.
+    pub fn supports_lossless(&self) -> bool;
+
+    /// Whether this format supports animation.
+    pub fn supports_animation(&self) -> bool;
+
+    /// Whether this format supports alpha channel.
+    pub fn supports_alpha(&self) -> bool;
 }
 ```
 
 ### Probing
 
 ```rust
-/// Unified image metadata from header parsing.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct ImageInfo {
     pub width: u32,
     pub height: u32,
     pub format: ImageFormat,
     pub has_alpha: bool,
     pub has_animation: bool,
+    pub frame_count: Option<u32>,  // None if unknown without full parse
     pub icc_profile: Option<alloc::vec::Vec<u8>>,
-    // non_exhaustive via private field or #[non_exhaustive]
 }
 
 impl ImageInfo {
     /// Probe image metadata without decoding pixels.
-    /// Dispatches to the appropriate codec's probe based on detected format.
+    /// Uses the registry to restrict which formats are attempted.
     pub fn from_bytes(data: &[u8]) -> Result<Self, CodecError>;
+
+    pub fn from_bytes_with_registry(
+        data: &[u8],
+        registry: &CodecRegistry,
+    ) -> Result<Self, CodecError>;
 }
 ```
 
-### Decoding
+### Decoding (One-Shot)
 
 ```rust
 pub struct DecodeRequest<'a> {
     data: &'a [u8],
-    format: Option<ImageFormat>,  // None = auto-detect
-    output_layout: PixelLayout,   // default: Rgba8
+    format: Option<ImageFormat>,   // None = auto-detect
+    output_layout: PixelLayout,    // default: Rgba8
     limits: Option<&'a Limits>,
     stop: Option<&'a dyn Stop>,
+    registry: Option<&'a CodecRegistry>,
+    color_management: ColorIntent, // default: PreserveBytes
+    // Format-specific config overrides (feature-gated)
+    #[cfg(feature = "jpeg")]
+    jpeg_config: Option<&'a zenjpeg::DecoderConfig>,
+    #[cfg(feature = "webp")]
+    webp_config: Option<&'a zenwebp::DecodeConfig>,
+    // ... etc
 }
 
 impl<'a> DecodeRequest<'a> {
     pub fn new(data: &'a [u8]) -> Self;
 
-    /// Override auto-detection (e.g., caller already knows the format).
     pub fn with_format(self, format: ImageFormat) -> Self;
-
     pub fn with_output_layout(self, layout: PixelLayout) -> Self;
     pub fn with_limits(self, limits: &'a Limits) -> Self;
     pub fn with_stop(self, stop: &'a dyn Stop) -> Self;
+    pub fn with_registry(self, registry: &'a CodecRegistry) -> Self;
+    pub fn with_color_intent(self, intent: ColorIntent) -> Self;
 
-    /// Decode to pixels.
+    /// Use a format-specific decoder config for fine-grained control.
+    #[cfg(feature = "jpeg")]
+    pub fn with_jpeg_config(self, config: &'a zenjpeg::DecoderConfig) -> Self;
+    #[cfg(feature = "webp")]
+    pub fn with_webp_config(self, config: &'a zenwebp::DecodeConfig) -> Self;
+    // ... etc for each codec
+
+    /// Decode first frame to pixels.
     pub fn decode(self) -> Result<DecodeOutput, CodecError>;
 
     /// Decode into a pre-allocated buffer.
     pub fn decode_into(self, output: &mut [u8]) -> Result<ImageInfo, CodecError>;
+
+    /// Start streaming decode (for animated or progressive).
+    pub fn build(self) -> Result<StreamingDecoder<'a>, CodecError>;
 }
 
 pub struct DecodeOutput {
@@ -144,44 +225,88 @@ pub struct DecodeOutput {
 }
 ```
 
+### Streaming Decode
+
+```rust
+pub struct StreamingDecoder<'a> {
+    // Internal: wraps format-specific decoder or buffers for codecs
+    // that don't support streaming
+}
+
+impl<'a> StreamingDecoder<'a> {
+    /// Image metadata (available after build).
+    pub fn info(&self) -> &ImageInfo;
+
+    /// Decode next frame. Returns None when all frames consumed.
+    /// For single-frame formats, returns one frame then None.
+    pub fn next_frame(&mut self) -> Result<Option<Frame>, CodecError>;
+}
+
+pub struct Frame {
+    pub pixels: alloc::vec::Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+    pub layout: PixelLayout,
+    pub delay_ms: u32,       // 0 for still images
+    pub frame_index: u32,
+}
+```
+
 ### Encoding
 
 ```rust
 pub struct EncodeRequest<'a> {
-    format: ImageFormat,
-    quality: Option<f32>,         // 0-100, format-mapped
-    effort: Option<u32>,          // speed/quality tradeoff
+    format: Option<ImageFormat>,   // None = auto-select
+    quality: Option<f32>,          // 0-100, format-mapped
+    effort: Option<u32>,           // speed/quality tradeoff
     lossless: bool,
     limits: Option<&'a Limits>,
     stop: Option<&'a dyn Stop>,
     metadata: Option<&'a ImageMetadata<'a>>,
+    registry: Option<&'a CodecRegistry>,
+    color_management: ColorIntent,
+    // Format-specific config overrides (feature-gated)
+    #[cfg(feature = "jpeg")]
+    jpeg_config: Option<&'a zenjpeg::EncoderConfig>,
+    #[cfg(feature = "webp")]
+    webp_lossy_config: Option<&'a zenwebp::LossyConfig>,
+    #[cfg(feature = "webp")]
+    webp_lossless_config: Option<&'a zenwebp::LosslessConfig>,
+    // ... etc
 }
 
 impl<'a> EncodeRequest<'a> {
+    /// Encode to a specific format.
     pub fn new(format: ImageFormat) -> Self;
 
-    /// Quality 0-100. Mapped to each codec's native scale.
-    /// Not all formats support this (GIF, lossless PNG ignore it).
+    /// Auto-select best format based on image stats and allowed encoders.
+    /// Uses the registry to determine which formats are candidates.
+    pub fn auto() -> Self;
+
     pub fn with_quality(self, quality: f32) -> Self;
-
-    /// Speed/quality tradeoff. Higher = faster, lower quality.
     pub fn with_effort(self, effort: u32) -> Self;
-
-    /// Request lossless encoding (formats that support it).
     pub fn with_lossless(self, lossless: bool) -> Self;
-
     pub fn with_limits(self, limits: &'a Limits) -> Self;
     pub fn with_stop(self, stop: &'a dyn Stop) -> Self;
     pub fn with_metadata(self, meta: &'a ImageMetadata<'a>) -> Self;
+    pub fn with_registry(self, registry: &'a CodecRegistry) -> Self;
+    pub fn with_color_intent(self, intent: ColorIntent) -> Self;
 
-    /// Encode pixels to the target format.
+    /// Format-specific config for fine-grained control.
+    #[cfg(feature = "jpeg")]
+    pub fn with_jpeg_config(self, config: &'a zenjpeg::EncoderConfig) -> Self;
+    #[cfg(feature = "webp")]
+    pub fn with_webp_lossy_config(self, config: &'a zenwebp::LossyConfig) -> Self;
+    // ... etc
+
+    /// Encode pixels.
     pub fn encode(
         self,
         pixels: &[u8],
         width: u32,
         height: u32,
         layout: PixelLayout,
-    ) -> Result<alloc::vec::Vec<u8>, CodecError>;
+    ) -> Result<EncodeOutput, CodecError>;
 
     /// Encode into a pre-allocated buffer.
     pub fn encode_into(
@@ -191,23 +316,101 @@ impl<'a> EncodeRequest<'a> {
         height: u32,
         layout: PixelLayout,
         output: &mut alloc::vec::Vec<u8>,
-    ) -> Result<(), CodecError>;
+    ) -> Result<EncodeOutput, CodecError>;
+
+    /// Start streaming encode (for animation or row-push).
+    pub fn build(self, width: u32, height: u32, layout: PixelLayout)
+        -> Result<StreamingEncoder<'a>, CodecError>;
+}
+
+pub struct EncodeOutput {
+    pub data: alloc::vec::Vec<u8>,
+    pub format: ImageFormat,  // Useful when auto-selected
+}
+
+pub struct StreamingEncoder<'a> {
+    // Wraps format-specific streaming encoder, or buffers internally
+    // for codecs that require full image (like WebP)
+}
+
+impl<'a> StreamingEncoder<'a> {
+    /// Push a frame (for animation encoding).
+    pub fn add_frame(&mut self, frame: &Frame) -> Result<(), CodecError>;
+
+    /// Finish and return encoded bytes.
+    pub fn finish(self) -> Result<EncodeOutput, CodecError>;
+
+    /// Finish into pre-allocated buffer.
+    pub fn finish_into(self, output: &mut alloc::vec::Vec<u8>)
+        -> Result<EncodeOutput, CodecError>;
 }
 ```
+
+### Auto-Selection
+
+When `EncodeRequest::auto()` is used, the encoder picks the best format based on:
+
+1. **Registry**: Only formats enabled in the registry are candidates.
+2. **Image stats**: Has alpha? → exclude JPEG. Is photographic? → prefer JPEG/WebP/AVIF.
+   Is flat color / screenshots? → prefer WebP lossless or PNG.
+3. **Lossless flag**: If lossless requested, exclude lossy-only formats.
+4. **Quality target**: Some formats are better at low quality (AVIF) vs high (JPEG).
+
+The selection logic should be simple, deterministic, and documented. It is NOT a
+quality optimizer — it picks a reasonable default, not the optimal format. Callers
+who need optimal selection should use `codec-eval` or their own heuristics.
+
+```rust
+// Auto-select: "give me a good lossy encoding"
+let output = EncodeRequest::auto()
+    .with_quality(80.0)
+    .with_registry(&registry)  // only JPEG and WebP allowed
+    .encode(&pixels, w, h, PixelLayout::Rgba8)?;
+println!("Selected: {:?}", output.format);
+
+// Auto-select with lossless preference
+let output = EncodeRequest::auto()
+    .with_lossless(true)
+    .encode(&pixels, w, h, PixelLayout::Rgba8)?;
+```
+
+### Color Management
+
+```rust
+/// How to handle ICC profiles during decode/encode.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, Default)]
+pub enum ColorIntent {
+    /// Don't touch pixel data. Pass ICC profile through as metadata.
+    #[default]
+    PreserveBytes,
+
+    /// Convert to sRGB during decode, embed sRGB profile on encode.
+    /// Requires the `moxcms` feature.
+    #[cfg(feature = "moxcms")]
+    ConvertToSrgb,
+
+    /// Convert to a specific ICC profile during decode.
+    /// Requires the `moxcms` feature.
+    #[cfg(feature = "moxcms")]
+    ConvertTo { profile: &'static [u8] }, // TODO: lifetime design
+}
+```
+
+Color management is opt-in. Default is `PreserveBytes` — pixel bytes are untouched,
+ICC profiles are passed through as metadata. When `moxcms` feature is enabled, callers
+can request conversion to sRGB or a specific profile.
 
 ### Shared Types
 
 ```rust
-/// Re-export or define locally — must match underlying codecs.
 #[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PixelLayout {
     Rgb8,
     Rgba8,
     Bgr8,
     Bgra8,
-    // Only layouts ALL codecs can handle via the unified API.
-    // Format-specific layouts (Yuv420, Gray8, etc.) require
-    // using the codec directly.
 }
 
 #[derive(Clone, Debug, Default)]
@@ -225,16 +428,18 @@ pub struct ImageMetadata<'a> {
     pub xmp: Option<&'a [u8]>,
 }
 
-/// Unified error type. Wraps format-specific errors.
+/// Unified error type.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum CodecError {
     /// Format not recognized from magic bytes.
     UnrecognizedFormat,
-    /// Format recognized but codec not enabled (missing feature flag).
+    /// Format recognized but codec not compiled in or not enabled in registry.
     UnsupportedFormat(ImageFormat),
-    /// Format doesn't support requested operation (e.g., encode GIF as lossless).
+    /// Format doesn't support requested operation.
     UnsupportedOperation { format: ImageFormat, detail: &'static str },
+    /// Codec not enabled in the provided registry.
+    DisabledFormat(ImageFormat),
     /// Input validation failed.
     InvalidInput(alloc::string::String),
     /// Resource limit exceeded.
@@ -243,98 +448,153 @@ pub enum CodecError {
     Cancelled,
     /// Allocation failure.
     Oom,
+    /// No suitable encoder found for auto-selection.
+    NoSuitableEncoder,
+    /// Color management error.
+    #[cfg(feature = "moxcms")]
+    ColorManagement(alloc::string::String),
     /// Underlying codec error.
     Codec { format: ImageFormat, source: alloc::boxed::Box<dyn core::error::Error + Send + Sync> },
 }
 ```
 
-## Internal Codec Adapter Pattern
+### Re-exports (Feature-Gated)
 
-Each `codecs/*.rs` file implements a thin adapter between the unified API and the
-format-specific crate. The adapter is responsible for:
-
-1. **Pixel format conversion**: Convert between zencodecs PixelLayout and the codec's
-   native pixel format enum. RGBA8/BGRA8 must always work (set A=255 on decode for
-   alpha-less formats, ignore A on encode).
-
-2. **Quality mapping**: Map the 0-100 quality scale to the codec's native scale.
-   Document the mapping. For formats without quality (GIF, lossless PNG), ignore it.
-
-3. **Error wrapping**: Wrap codec-specific errors into `CodecError::Codec { format, source }`.
-
-4. **Limits forwarding**: Pass Limits through to the underlying codec's Limits type.
-
-5. **Cancellation forwarding**: Pass `&dyn Stop` through.
-
-Example adapter skeleton:
+Each codec's public config types are re-exported so callers can use them for
+fine-grained control without adding the codec crate as a direct dependency:
 
 ```rust
-// codecs/jpeg.rs
+/// Format-specific config types for advanced usage.
+/// These are re-exports from the underlying codec crates.
 #[cfg(feature = "jpeg")]
-pub(crate) fn decode_jpeg(
-    data: &[u8],
-    output_layout: PixelLayout,
-    limits: Option<&Limits>,
-    stop: Option<&dyn Stop>,
-) -> Result<DecodeOutput, CodecError> {
-    // 1. Map PixelLayout to zenjpeg's layout enum
-    // 2. Create zenjpeg DecoderConfig + DecodeRequest
-    // 3. Forward limits and stop
-    // 4. Decode
-    // 5. Wrap output into DecodeOutput
-    todo!()
+pub mod jpeg {
+    pub use zenjpeg::{EncoderConfig, DecoderConfig, EncodeRequest, Limits as JpegLimits};
+}
+
+#[cfg(feature = "webp")]
+pub mod webp {
+    pub use zenwebp::{LossyConfig, LosslessConfig, DecodeConfig, PixelLayout as WebpPixelLayout};
+}
+
+#[cfg(feature = "gif")]
+pub mod gif {
+    pub use zengif::{EncoderConfig, EncodeRequest as GifEncodeRequest};
+}
+
+#[cfg(feature = "avif-decode")]
+pub mod avif {
+    pub use zenavif::{DecoderConfig as AvifDecoderConfig};
+}
+
+#[cfg(feature = "avif-encode")]
+pub mod avif_enc {
+    pub use ravif::Encoder as RavifEncoder;
+}
+
+#[cfg(feature = "png")]
+pub mod png_codec {
+    // Relevant png crate types
 }
 ```
+
+## Internal Codec Adapter Pattern
+
+Each `codecs/*.rs` file implements a thin adapter. The adapter is responsible for:
+
+1. **Pixel format conversion**: RGBA8/BGRA8 always works. A=255 on decode for
+   alpha-less formats, ignore A on encode.
+
+2. **Quality mapping**: Map 0-100 to codec's native scale. Document the mapping.
+
+3. **Error wrapping**: `CodecError::Codec { format, source }`.
+
+4. **Limits/Stop forwarding**: Pass through to underlying codec.
+
+5. **Streaming**: If codec supports streaming natively, delegate. If not (e.g., WebP
+   needs full image), buffer internally in the StreamingEncoder/StreamingDecoder and
+   flush on finish. Document which codecs buffer.
+
+6. **Animation**: GIF and animated WebP support frame iteration natively.
+   JPEG/PNG/AVIF return a single frame then None.
+
+### Streaming Buffering Policy
+
+| Codec | Decode Streaming | Encode Streaming |
+|-------|-----------------|-----------------|
+| JPEG (zenjpeg) | Native row-push | Native row-push |
+| WebP (zenwebp) | Buffered (needs full data) | Buffered (needs full image) |
+| GIF (zengif) | Native frame iteration | Native frame-push |
+| PNG (png) | Native row-push | Native row-push |
+| AVIF (zenavif) | Buffered | Buffered |
+
+"Buffered" means zencodecs accumulates data/frames internally and dispatches to the
+codec's one-shot API when `finish()` is called. This is transparent to the caller.
 
 ## Quality Mapping Table
 
 | zencodecs quality | JPEG (zenjpeg) | WebP lossy (zenwebp) | AVIF (ravif) | PNG | GIF |
 |-------------------|----------------|----------------------|--------------|-----|-----|
-| 0-100 | 0-100 (native) | 0-100 (native) | mapped to distance | N/A (lossless) | N/A (palette) |
-| lossless=true | N/A (error) | WebP lossless | N/A | Default | Default |
+| 0-100 | 0-100 (native) | 0-100 (native) | 0-100 (ravif native) | N/A | N/A |
+| lossless=true | Error | WebP lossless | Error (no lossless) | Default | Default |
 
-Quality mapping for AVIF needs care — ravif uses 0-100 quality where 100=lossless,
-but the underlying metric is butteraugli distance. Document the mapping precisely.
+## Auto-Selection Logic
 
-## What This Crate Does NOT Do
+```
+fn select_format(pixels, w, h, layout, quality, lossless, registry) -> ImageFormat:
+    if lossless:
+        candidates = [WebP, Png].filter(|f| registry.can_encode(f))
+        if has_alpha: prefer WebP lossless (better compression)
+        else: prefer PNG for screenshots, WebP lossless for photos
+        return first available candidate
 
-- **No image processing**: No resize, crop, rotate, sharpen, blur. Use `zenimage` or similar.
-- **No color management**: No ICC profile application. That's a higher-level concern.
-- **No format conversion logic**: It dispatches to codecs. The caller decides source→dest.
-- **No streaming API**: The unified layer is one-shot only. For streaming, use codecs directly.
-- **No animation**: First frame only for animated formats. For animation, use codecs directly.
+    candidates = [Jpeg, WebP, Avif, Png].filter(|f| registry.can_encode(f))
 
-These boundaries are intentional. This crate is a thin dispatch layer, not a framework.
+    if has_alpha:
+        remove Jpeg from candidates
+        prefer WebP > Avif > Png
+
+    if is_photographic (high entropy, many colors):
+        prefer Avif > WebP > Jpeg (by quality/size)
+    else (flat, few colors):
+        prefer WebP > Png
+
+    return first match from preference order
+```
+
+The `is_photographic` heuristic should be simple — unique color count, edge density,
+or similar. Not a full classifier. Document the heuristic precisely.
 
 ## Implementation Order
 
-1. **format.rs**: Magic byte detection, format enum — no codec deps needed
+1. **format.rs**: Magic byte detection, format enum — no codec deps
 2. **error.rs**: CodecError enum
-3. **pixel.rs**: PixelLayout (minimal subset: Rgb8, Rgba8, Bgr8, Bgra8)
-4. **info.rs**: ImageInfo + probe (can start with just magic bytes, add per-codec probe later)
-5. **decode.rs**: DecodeRequest + DecodeOutput structs
-6. **encode.rs**: EncodeRequest struct
-7. **codecs/jpeg.rs**: First adapter (zenjpeg is closest to target API)
-8. **codecs/webp.rs**: Second adapter (zenwebp also close)
-9. **codecs/png.rs**: Third adapter (png crate is external, different API style)
-10. **codecs/gif.rs**: Fourth adapter (zengif, animation = first frame only)
-11. **codecs/avif_dec.rs**: Fifth (zenavif — decode only)
-12. **codecs/avif_enc.rs**: Sixth (ravif — encode only, external crate)
+3. **pixel.rs**: PixelLayout
+4. **limits.rs**: Limits, ImageMetadata
+5. **registry.rs**: CodecRegistry with compile-time + runtime gating
+6. **info.rs**: ImageInfo + probe
+7. **decode.rs**: DecodeRequest + DecodeOutput (one-shot first)
+8. **encode.rs**: EncodeRequest + EncodeOutput (one-shot first)
+9. **codecs/jpeg.rs**: First adapter (zenjpeg closest to target API)
+10. **codecs/webp.rs**: Second adapter
+11. **codecs/png.rs**: Third adapter
+12. **codecs/gif.rs**: Fourth adapter
+13. **codecs/avif_dec.rs**: Fifth
+14. **codecs/avif_enc.rs**: Sixth
+15. **animation.rs**: StreamingDecoder with frame iteration
+16. **Streaming encode**: StreamingEncoder with buffering for non-streaming codecs
+17. **Auto-selection**: `EncodeRequest::auto()` with simple heuristics
+18. **color.rs**: moxcms integration (feature-gated)
 
 ## Underlying Codec Status
 
-| Codec | Crate | API Maturity | Notes |
-|-------|-------|-------------|-------|
-| JPEG | zenjpeg | High | Three-layer pattern, EncodeRequest, Limits, EncodeStats |
-| WebP | zenwebp | High | All API convergence complete (2026-02-06) |
-| GIF | zengif | Medium | EncodeRequest migration complete, modularized |
-| PNG | png 0.18 | External | Well-maintained, different API style |
-| AVIF decode | zenavif | Low | Decode works, API needs convergence |
-| AVIF encode | ravif 0.13 | External | Well-maintained, own API |
-
-For zenjpeg and zenwebp, the adapter can use their native Request/Config APIs directly.
-For png and ravif, the adapter wraps their existing APIs.
-For zenavif and zengif, the adapter may need to handle API gaps.
+| Codec | Crate | API Maturity | Streaming | Animation | Notes |
+|-------|-------|-------------|-----------|-----------|-------|
+| JPEG | zenjpeg | High | Encode: row-push | No | Three-layer, Limits, EncodeStats |
+| WebP | zenwebp | High | No (full image) | Encode+Decode | All convergence done 2026-02-06 |
+| GIF | zengif | Medium | Encode: frame-push | Yes | EncodeRequest done, modularized |
+| PNG | png 0.18 | External | Row-push both | No (APNG?) | Well-maintained |
+| AVIF decode | zenavif | Low | No | No | Needs API convergence |
+| AVIF encode | ravif 0.13 | External | No | No | Own API, quality mapping needed |
 
 ## Known Issues
 
