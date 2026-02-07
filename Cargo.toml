@@ -16,36 +16,34 @@ whereat = "0.1"
 thiserror = { version = "2.0", default-features = false }
 
 # Codecs (all optional, feature-gated)
-zenjpeg = { path = "../zenjpeg", optional = true, default-features = false }
-zenwebp = { path = "../zenwebp", optional = true, default-features = false }
-zengif = { path = "../zengif", optional = true, default-features = false }
-zenavif = { path = "../zenavif", optional = true, default-features = false }
+zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true }
+zenwebp = { path = "../zenwebp", optional = true }
+# zengif = { path = "../zengif", optional = true }  # Disabled: compilation error
+# zenavif = { path = "../zenavif", optional = true, default-features = false }  # Disabled: rgb version conflict
 png = { version = "0.18", optional = true }
-ravif = { version = "0.13", optional = true }
+# ravif = { version = "0.13", optional = true }  # Disabled for now
 
 # Color management (optional)
-moxcms = { version = "0.8", optional = true, default-features = false }
+# moxcms = { version = "0.8", optional = true, default-features = false }  # Disabled for now
 
 [dev-dependencies]
 
 [features]
-default = ["jpeg", "webp", "gif", "avif-decode", "png"]
-std = [
-    "zenjpeg?/std",
-    "zenwebp?/std",
-    "zengif?/std",
-]
+default = ["jpeg", "webp", "png"]
+std = []
 
 # Individual codec features
 jpeg = ["dep:zenjpeg"]
 webp = ["dep:zenwebp"]
-gif = ["dep:zengif"]
 png = ["dep:png"]
-avif-decode = ["dep:zenavif"]
-avif-encode = ["dep:ravif"]
+
+# Disabled features (defined for check-cfg but not usable)
+gif = []  # Disabled: compilation error in zengif
+avif-decode = []  # Disabled: zenavif has rgb version conflict
+avif-encode = []  # Disabled: ravif not yet integrated
 
 # Color management
-moxcms = ["dep:moxcms"]
+moxcms = []  # Disabled for now
 
-# All codecs
-all = ["jpeg", "webp", "gif", "png", "avif-decode", "avif-encode", "moxcms"]
+# All codecs (currently only enabled ones)
+all = ["jpeg", "webp", "png"]
