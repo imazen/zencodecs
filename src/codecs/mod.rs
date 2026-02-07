@@ -1,0 +1,22 @@
+//! Codec adapters for format-specific implementations.
+//!
+//! Each module provides a thin adapter between zencodecs' unified API and
+//! the format-specific codec crate.
+
+#[cfg(feature = "jpeg")]
+pub(crate) mod jpeg;
+
+#[cfg(feature = "webp")]
+pub(crate) mod webp;
+
+#[cfg(feature = "gif")]
+pub(crate) mod gif;
+
+#[cfg(feature = "png")]
+pub(crate) mod png;
+
+#[cfg(feature = "avif-decode")]
+pub(crate) mod avif_dec;
+
+#[cfg(feature = "avif-encode")]
+pub(crate) mod avif_enc;

@@ -300,76 +300,101 @@ impl<'a> EncodeRequest<'a> {
     #[cfg(feature = "jpeg")]
     fn encode_jpeg(
         self,
-        _pixels: &[u8],
-        _width: u32,
-        _height: u32,
-        _layout: PixelLayout,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        layout: PixelLayout,
     ) -> Result<EncodeOutput, CodecError> {
-        // TODO: implement with zenjpeg adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Jpeg,
-            detail: "encode not yet implemented",
-        })
+        crate::codecs::jpeg::encode(
+            pixels,
+            width,
+            height,
+            layout,
+            self.quality,
+            self.lossless,
+            self.limits,
+            self.stop,
+        )
     }
 
     #[cfg(feature = "webp")]
     fn encode_webp(
         self,
-        _pixels: &[u8],
-        _width: u32,
-        _height: u32,
-        _layout: PixelLayout,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        layout: PixelLayout,
     ) -> Result<EncodeOutput, CodecError> {
-        // TODO: implement with zenwebp adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::WebP,
-            detail: "encode not yet implemented",
-        })
+        crate::codecs::webp::encode(
+            pixels,
+            width,
+            height,
+            layout,
+            self.quality,
+            self.lossless,
+            self.limits,
+            self.stop,
+        )
     }
 
     #[cfg(feature = "gif")]
     fn encode_gif(
         self,
-        _pixels: &[u8],
-        _width: u32,
-        _height: u32,
-        _layout: PixelLayout,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        layout: PixelLayout,
     ) -> Result<EncodeOutput, CodecError> {
-        // TODO: implement with zengif adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Gif,
-            detail: "encode not yet implemented",
-        })
+        crate::codecs::gif::encode(
+            pixels,
+            width,
+            height,
+            layout,
+            self.quality,
+            self.lossless,
+            self.limits,
+            self.stop,
+        )
     }
 
     #[cfg(feature = "png")]
     fn encode_png(
         self,
-        _pixels: &[u8],
-        _width: u32,
-        _height: u32,
-        _layout: PixelLayout,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        layout: PixelLayout,
     ) -> Result<EncodeOutput, CodecError> {
-        // TODO: implement with png adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Png,
-            detail: "encode not yet implemented",
-        })
+        crate::codecs::png::encode(
+            pixels,
+            width,
+            height,
+            layout,
+            self.quality,
+            self.lossless,
+            self.limits,
+            self.stop,
+        )
     }
 
     #[cfg(feature = "avif-encode")]
     fn encode_avif(
         self,
-        _pixels: &[u8],
-        _width: u32,
-        _height: u32,
-        _layout: PixelLayout,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        layout: PixelLayout,
     ) -> Result<EncodeOutput, CodecError> {
-        // TODO: implement with ravif adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Avif,
-            detail: "encode not yet implemented",
-        })
+        crate::codecs::avif_enc::encode(
+            pixels,
+            width,
+            height,
+            layout,
+            self.quality,
+            self.lossless,
+            self.limits,
+            self.stop,
+        )
     }
 }
 

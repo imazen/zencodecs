@@ -165,47 +165,27 @@ impl<'a> DecodeRequest<'a> {
 
     #[cfg(feature = "jpeg")]
     fn decode_jpeg(self) -> Result<DecodeOutput, CodecError> {
-        // TODO: implement with zenjpeg adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Jpeg,
-            detail: "decode not yet implemented",
-        })
+        crate::codecs::jpeg::decode(self.data, self.output_layout, self.limits, self.stop)
     }
 
     #[cfg(feature = "webp")]
     fn decode_webp(self) -> Result<DecodeOutput, CodecError> {
-        // TODO: implement with zenwebp adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::WebP,
-            detail: "decode not yet implemented",
-        })
+        crate::codecs::webp::decode(self.data, self.output_layout, self.limits, self.stop)
     }
 
     #[cfg(feature = "gif")]
     fn decode_gif(self) -> Result<DecodeOutput, CodecError> {
-        // TODO: implement with zengif adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Gif,
-            detail: "decode not yet implemented",
-        })
+        crate::codecs::gif::decode(self.data, self.output_layout, self.limits, self.stop)
     }
 
     #[cfg(feature = "png")]
     fn decode_png(self) -> Result<DecodeOutput, CodecError> {
-        // TODO: implement with png adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Png,
-            detail: "decode not yet implemented",
-        })
+        crate::codecs::png::decode(self.data, self.output_layout, self.limits, self.stop)
     }
 
     #[cfg(feature = "avif-decode")]
     fn decode_avif(self) -> Result<DecodeOutput, CodecError> {
-        // TODO: implement with zenavif adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Avif,
-            detail: "decode not yet implemented",
-        })
+        crate::codecs::avif_dec::decode(self.data, self.output_layout, self.limits, self.stop)
     }
 }
 

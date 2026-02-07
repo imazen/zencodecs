@@ -16,7 +16,7 @@ whereat = "0.1"
 thiserror = { version = "2.0", default-features = false }
 
 # Codecs (all optional, feature-gated)
-zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true }
+zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder"] }
 zenwebp = { path = "../zenwebp", optional = true }
 zengif = { path = "../zengif", optional = true }
 zenavif = { path = "../zenavif", optional = true }

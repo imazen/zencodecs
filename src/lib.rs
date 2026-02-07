@@ -126,6 +126,7 @@
 
 extern crate alloc;
 
+mod codecs;
 mod decode;
 mod encode;
 mod error;

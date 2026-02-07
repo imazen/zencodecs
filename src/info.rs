@@ -92,48 +92,28 @@ impl ImageInfo {
     // Codec-specific probe implementations (stubs for now, will be implemented with adapters)
 
     #[cfg(feature = "jpeg")]
-    fn probe_jpeg(_data: &[u8]) -> Result<Self, CodecError> {
-        // TODO: implement with zenjpeg adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Jpeg,
-            detail: "probe not yet implemented",
-        })
+    fn probe_jpeg(data: &[u8]) -> Result<Self, CodecError> {
+        crate::codecs::jpeg::probe(data)
     }
 
     #[cfg(feature = "webp")]
-    fn probe_webp(_data: &[u8]) -> Result<Self, CodecError> {
-        // TODO: implement with zenwebp adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::WebP,
-            detail: "probe not yet implemented",
-        })
+    fn probe_webp(data: &[u8]) -> Result<Self, CodecError> {
+        crate::codecs::webp::probe(data)
     }
 
     #[cfg(feature = "gif")]
-    fn probe_gif(_data: &[u8]) -> Result<Self, CodecError> {
-        // TODO: implement with zengif adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Gif,
-            detail: "probe not yet implemented",
-        })
+    fn probe_gif(data: &[u8]) -> Result<Self, CodecError> {
+        crate::codecs::gif::probe(data)
     }
 
     #[cfg(feature = "png")]
-    fn probe_png(_data: &[u8]) -> Result<Self, CodecError> {
-        // TODO: implement with png adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Png,
-            detail: "probe not yet implemented",
-        })
+    fn probe_png(data: &[u8]) -> Result<Self, CodecError> {
+        crate::codecs::png::probe(data)
     }
 
     #[cfg(feature = "avif-decode")]
-    fn probe_avif(_data: &[u8]) -> Result<Self, CodecError> {
-        // TODO: implement with zenavif adapter
-        Err(CodecError::UnsupportedOperation {
-            format: ImageFormat::Avif,
-            detail: "probe not yet implemented",
-        })
+    fn probe_avif(data: &[u8]) -> Result<Self, CodecError> {
+        crate::codecs::avif_dec::probe(data)
     }
 }
 
