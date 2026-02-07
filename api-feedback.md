@@ -67,6 +67,28 @@ None! The png crate API worked smoothly on first try.
 
 **Resolution:** No issues encountered. Implementation was straightforward based on documentation examples.
 
+## zenavif
+
+**Date:** 2026-02-06
+**Adapter:** src/codecs/avif_dec.rs
+**API Issues:**
+
+1. **No probe-only function:** To get image metadata (width, height, alpha), had to fully decode the image. No way to get metadata without decoding pixels.
+
+2. **Stop trait incompatibility:** zenavif uses `enough::Stop` trait, but zencodecs has its own `Stop` trait. Couldn't pass stop tokens through. Used simple `decode()` without cancellation support.
+
+3. **rgb crate dependency:** zenavif returns `DecodedImage::Rgb8(ImgVec<Rgb<u8>>)` and `Rgba8(ImgVec<Rgba<u8>>)`. Had to add `rgb` crate as dependency to use `ComponentBytes::as_bytes()` for converting to flat byte arrays.
+
+4. **No animation metadata exposure:** zenavif doesn't expose whether the AVIF has multiple frames or animation info. Hardcoded `has_animation: false`.
+
+5. **No ICC profile extraction:** zenavif doesn't expose ICC profile from the AVIF container. Hardcoded `icc_profile: None`.
+
+**Resolution:**
+- Added `rgb` crate (0.8.52) as dependency with "as-bytes" feature for the avif-decode feature
+- Used `ComponentBytes::as_bytes()` to safely convert Vec<Rgb<u8>>/Vec<Rgba<u8>> to Vec<u8>
+- Simplified to use `decode()` without stop token support (TODO: add adapter for Stop trait)
+- Marked 16-bit and grayscale support as unsupported for now
+
 ## Summary
 
 The most friction came from zenjpeg where the API has multiple layers (Config, Request, etc.) but no clear examples for simple use cases. zenwebp was smooth except for minor method name differences. zengif requires type conversions because it uses a structured `Rgba` type instead of flat byte arrays. png crate (external) worked perfectly on first try with clear API and good documentation.
