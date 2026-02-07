@@ -11,17 +11,6 @@ use crate::{
     CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelLayout, Stop,
 };
 
-/// Convert zencodecs PixelLayout to PNG encoder ColorType.
-fn to_png_color_type(layout: PixelLayout) -> png::ColorType {
-    match layout {
-        PixelLayout::Rgb8 => png::ColorType::Rgb,
-        PixelLayout::Rgba8 => png::ColorType::Rgba,
-        // PNG doesn't have native BGR/BGRA, will need conversion
-        PixelLayout::Bgr8 => png::ColorType::Rgb,
-        PixelLayout::Bgra8 => png::ColorType::Rgba,
-    }
-}
-
 /// Probe PNG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     let cursor = Cursor::new(data);

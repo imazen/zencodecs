@@ -1,7 +1,5 @@
 //! AVIF decode adapter using zenavif.
 
-use alloc::vec::Vec;
-
 use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, PixelLayout, Stop};
 
 /// Probe AVIF metadata without decoding pixels.

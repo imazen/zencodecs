@@ -410,7 +410,7 @@ mod tests {
 
         assert_eq!(request.format, Some(ImageFormat::Jpeg));
         assert_eq!(request.quality, Some(85.0));
-        assert_eq!(request.lossless, false);
+        assert!(!request.lossless);
     }
 
     #[test]
