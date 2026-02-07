@@ -18,7 +18,7 @@ thiserror = { version = "2.0", default-features = false }
 # Codecs (all optional, feature-gated)
 zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true }
 zenwebp = { path = "../zenwebp", optional = true }
-# zengif = { path = "../zengif", optional = true }  # Disabled: compilation error
+zengif = { path = "../zengif", optional = true }
 zenavif = { path = "../zenavif", optional = true }
 png = { version = "0.18", optional = true }
 ravif = { version = "0.13", optional = true }
@@ -29,21 +29,19 @@ ravif = { version = "0.13", optional = true }
 [dev-dependencies]
 
 [features]
-default = ["jpeg", "webp", "png", "avif-decode"]
+default = ["jpeg", "webp", "gif", "png", "avif-decode"]
 std = []
 
 # Individual codec features
 jpeg = ["dep:zenjpeg"]
 webp = ["dep:zenwebp"]
+gif = ["dep:zengif"]
 png = ["dep:png"]
 avif-decode = ["dep:zenavif"]
 avif-encode = ["dep:ravif"]
-
-# Disabled features (defined for check-cfg but not usable)
-gif = []  # Disabled: compilation error in zengif
 
 # Color management
 moxcms = []  # Disabled for now
 
 # All codecs
-all = ["jpeg", "webp", "png", "avif-decode", "avif-encode"]
+all = ["jpeg", "webp", "gif", "png", "avif-decode", "avif-encode"]
