@@ -23,3 +23,12 @@ check-no-std:
 
 outdated:
     cargo outdated
+
+# Cross-compilation targets (use --no-default-features --features png to avoid path deps)
+test-i686:
+    cross test --no-default-features --features png --target i686-unknown-linux-gnu
+
+test-armv7:
+    cross test --no-default-features --features png --target armv7-unknown-linux-gnueabihf
+
+test-cross: test-i686 test-armv7
