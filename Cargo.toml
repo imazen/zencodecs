@@ -1,0 +1,46 @@
+[package]
+name = "zencodecs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Unified image codec abstraction over zenjpeg, zenwebp, zengif, zenavif, png, and ravif"
+categories = ["multimedia::images"]
+keywords = ["image", "codec", "jpeg", "webp", "avif"]
+repository = "https://github.com/imazen/zencodecs"
+
+[dependencies]
+# Core (always available)
+enough = "0.3"
+whereat = "0.1"
+thiserror = { version = "2.0", default-features = false }
+
+# Codecs (all optional, feature-gated)
+zenjpeg = { path = "../zenjpeg", optional = true, default-features = false }
+zenwebp = { path = "../zenwebp", optional = true, default-features = false }
+zengif = { path = "../zengif", optional = true, default-features = false }
+zenavif = { path = "../zenavif", optional = true, default-features = false }
+png = { version = "0.18", optional = true }
+ravif = { version = "0.13", optional = true }
+
+[dev-dependencies]
+# For testing
+
+[features]
+default = ["jpeg", "webp", "gif", "avif-decode", "png"]
+std = [
+    "zenjpeg?/std",
+    "zenwebp?/std",
+    "zengif?/std",
+]
+
+# Individual codec features
+jpeg = ["dep:zenjpeg"]
+webp = ["dep:zenwebp"]
+gif = ["dep:zengif"]
+png = ["dep:png"]
+avif-decode = ["dep:zenavif"]
+avif-encode = ["dep:ravif"]
+
+# All codecs
+all = ["jpeg", "webp", "gif", "png", "avif-decode", "avif-encode"]
