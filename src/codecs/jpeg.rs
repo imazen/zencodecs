@@ -9,7 +9,7 @@ use crate::{
 
 /// Probe JPEG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    let decoder = zenjpeg::decoder::Decoder::new();
+    let decoder = zenjpeg::decoder::DecodeConfig::new();
     let info = decoder
         .read_info(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
@@ -31,7 +31,7 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
 fn build_decoder(
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
-) -> zenjpeg::decoder::Decoder {
+) -> zenjpeg::decoder::DecodeConfig {
     let mut decoder = codec_config
         .and_then(|c| c.jpeg_decoder.as_ref())
         .map(|d| d.as_ref().clone())
