@@ -75,12 +75,7 @@ pub(crate) fn decode(
     let rgba_pixels: alloc::vec::Vec<Rgba<u8>> = frame
         .pixels
         .into_iter()
-        .map(|p| Rgba {
-            r: p.r,
-            g: p.g,
-            b: p.b,
-            a: p.a,
-        })
+        .map(Rgba::from)
         .collect();
 
     let img = ImgVec::new(rgba_pixels, width, height);
@@ -169,9 +164,9 @@ pub(crate) fn encode_rgba8(
         .map_err(|_| CodecError::InvalidInput("height exceeds GIF maximum (65535)".into()))?;
 
     let (buf, _, _) = img.to_contiguous_buf();
-    let rgba_bytes: alloc::vec::Vec<u8> = buf.iter().flat_map(|p| [p.r, p.g, p.b, p.a]).collect();
+    let rgba_bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
 
-    let frame = zengif::FrameInput::from_bytes(width, height, 10, &rgba_bytes);
+    let frame = zengif::FrameInput::from_bytes(width, height, 10, rgba_bytes);
 
     let config = codec_config
         .and_then(|c| c.gif_encoder.as_ref())
