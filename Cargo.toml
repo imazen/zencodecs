@@ -32,7 +32,7 @@ ravif = { version = "0.13", optional = true }
 [dev-dependencies]
 
 [features]
-default = ["jpeg", "webp", "gif", "png", "avif-decode"]
+default = ["jpeg", "webp", "gif", "png"]
 std = []
 
 # Individual codec features
