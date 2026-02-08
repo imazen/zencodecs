@@ -36,6 +36,7 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
 
     let icc_profile = info.icc_profile.as_ref().map(|p| p.to_vec());
     let exif = info.exif_metadata.as_ref().map(|p| p.to_vec());
+    let xmp = extract_xmp_from_itxt(info);
 
     Ok(ImageInfo {
         width: info.width,
@@ -46,7 +47,7 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         frame_count: Some(frame_count),
         icc_profile,
         exif,
-        xmp: None,
+        xmp,
     })
 }
 
@@ -78,6 +79,7 @@ pub(crate) fn decode(
     };
     let icc_profile = info.icc_profile.as_ref().map(|p| p.to_vec());
     let exif = info.exif_metadata.as_ref().map(|p| p.to_vec());
+    let xmp = extract_xmp_from_itxt(info);
 
     let buffer_size = reader.output_buffer_size().ok_or_else(|| {
         CodecError::InvalidInput("cannot determine PNG output buffer size".into())
@@ -142,7 +144,7 @@ pub(crate) fn decode(
             frame_count: Some(frame_count),
             icc_profile,
             exif,
-            xmp: None,
+            xmp,
         },
         #[cfg(feature = "jpeg")]
         jpeg_extras: None,
@@ -233,8 +235,30 @@ fn make_png_info<'a>(
         if let Some(exif) = meta.exif {
             info.exif_metadata = Some(exif.into());
         }
-        // XMP: PNG doesn't have a standard XMP chunk. Silently ignored.
+        if let Some(xmp) = meta.xmp {
+            let xmp_str = core::str::from_utf8(xmp).unwrap_or_default();
+            if !xmp_str.is_empty() {
+                info.utf8_text.push(png::text_metadata::ITXtChunk::new(
+                    "XML:com.adobe.xmp",
+                    xmp_str,
+                ));
+            }
+        }
     }
 
     info
+}
+
+/// Extract XMP from iTXt chunks with keyword "XML:com.adobe.xmp".
+fn extract_xmp_from_itxt(info: &png::Info<'_>) -> Option<alloc::vec::Vec<u8>> {
+    for chunk in &info.utf8_text {
+        if chunk.keyword == "XML:com.adobe.xmp" {
+            if let Ok(text) = chunk.get_text() {
+                if !text.is_empty() {
+                    return Some(text.into_bytes());
+                }
+            }
+        }
+    }
+    None
 }

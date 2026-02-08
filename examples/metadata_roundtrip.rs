@@ -52,7 +52,7 @@ fn main() {
     let formats = [
         ("JPEG", ImageFormat::Jpeg, "ICC+EXIF+XMP"),
         ("WebP", ImageFormat::WebP, "ICC+EXIF+XMP"),
-        ("PNG", ImageFormat::Png, "ICC+EXIF"),
+        ("PNG", ImageFormat::Png, "ICC+EXIF+XMP"),
     ];
 
     println!("\nRoundtrip results:");
