@@ -15,6 +15,8 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         has_animation: false,
         frame_count: Some(1),
         icc_profile: None,
+        exif: None,
+        xmp: None,
     })
 }
 
@@ -60,6 +62,8 @@ pub(crate) fn decode(
             has_animation: false,
             frame_count: Some(1),
             icc_profile: None,
+            exif: None,
+            xmp: None,
         },
     })
 }

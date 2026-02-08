@@ -14,10 +14,10 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         .decode(data, enough::Unstoppable)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
-    let icc_profile = result
-        .extras()
-        .and_then(|e| e.icc_profile())
-        .map(|p| p.to_vec());
+    let extras = result.extras();
+    let icc_profile = extras.and_then(|e| e.icc_profile()).map(|p| p.to_vec());
+    let exif = extras.and_then(|e| e.exif()).map(|p| p.to_vec());
+    let xmp = extras.and_then(|e| e.xmp()).map(|s| s.as_bytes().to_vec());
 
     Ok(ImageInfo {
         width: result.width(),
@@ -27,6 +27,8 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         has_animation: false,
         frame_count: Some(1),
         icc_profile,
+        exif,
+        xmp,
     })
 }
 
@@ -47,10 +49,10 @@ pub(crate) fn decode(
     let width = decoded.width();
     let height = decoded.height();
 
-    let icc_profile = decoded
-        .extras()
-        .and_then(|e| e.icc_profile())
-        .map(|p| p.to_vec());
+    let extras = decoded.extras();
+    let icc_profile = extras.and_then(|e| e.icc_profile()).map(|p| p.to_vec());
+    let exif = extras.and_then(|e| e.exif()).map(|p| p.to_vec());
+    let xmp = extras.and_then(|e| e.xmp()).map(|s| s.as_bytes().to_vec());
 
     let raw_pixels = decoded
         .pixels_u8()
@@ -69,6 +71,8 @@ pub(crate) fn decode(
             has_animation: false,
             frame_count: Some(1),
             icc_profile,
+            exif,
+            xmp,
         },
     })
 }

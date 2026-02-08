@@ -20,6 +20,8 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     let has_animation = demuxer.is_animated();
     let frame_count = demuxer.num_frames();
     let icc_profile = demuxer.icc_profile().map(|p| p.to_vec());
+    let exif = demuxer.exif().map(|p| p.to_vec());
+    let xmp = demuxer.xmp().map(|p| p.to_vec());
 
     Ok(ImageInfo {
         width,
@@ -29,6 +31,8 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         has_animation,
         frame_count: Some(frame_count),
         icc_profile,
+        exif,
+        xmp,
     })
 }
 
@@ -46,6 +50,8 @@ pub(crate) fn decode(
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
     let has_animation = demuxer.is_animated();
     let icc_profile = demuxer.icc_profile().map(|p| p.to_vec());
+    let exif = demuxer.exif().map(|p| p.to_vec());
+    let xmp = demuxer.xmp().map(|p| p.to_vec());
 
     let pixels = if has_alpha {
         let (raw, width, height) =
@@ -80,6 +86,8 @@ pub(crate) fn decode(
             has_animation,
             frame_count: Some(demuxer.num_frames()),
             icc_profile,
+            exif,
+            xmp,
         },
     })
 }

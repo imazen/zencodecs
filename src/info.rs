@@ -24,6 +24,10 @@ pub struct ImageInfo {
     pub frame_count: Option<u32>,
     /// Embedded ICC color profile.
     pub icc_profile: Option<Vec<u8>>,
+    /// Embedded EXIF metadata.
+    pub exif: Option<Vec<u8>>,
+    /// Embedded XMP metadata.
+    pub xmp: Option<Vec<u8>>,
 }
 
 impl ImageInfo {

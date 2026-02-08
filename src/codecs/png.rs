@@ -35,6 +35,7 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     };
 
     let icc_profile = info.icc_profile.as_ref().map(|p| p.to_vec());
+    let exif = info.exif_metadata.as_ref().map(|p| p.to_vec());
 
     Ok(ImageInfo {
         width: info.width,
@@ -44,6 +45,8 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         has_animation,
         frame_count: Some(frame_count),
         icc_profile,
+        exif,
+        xmp: None,
     })
 }
 
@@ -74,6 +77,7 @@ pub(crate) fn decode(
         1
     };
     let icc_profile = info.icc_profile.as_ref().map(|p| p.to_vec());
+    let exif = info.exif_metadata.as_ref().map(|p| p.to_vec());
 
     let buffer_size = reader.output_buffer_size().ok_or_else(|| {
         CodecError::InvalidInput("cannot determine PNG output buffer size".into())
@@ -137,6 +141,8 @@ pub(crate) fn decode(
             has_animation,
             frame_count: Some(frame_count),
             icc_profile,
+            exif,
+            xmp: None,
         },
     })
 }
