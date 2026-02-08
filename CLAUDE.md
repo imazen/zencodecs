@@ -12,7 +12,7 @@ A codec dispatch layer for image proxies, CLI tools, and batch processors that h
 multiple formats. Provides:
 
 - **Format detection** and codec dispatch
-- **Pixel format normalization** (RGBA8/BGRA8 everywhere)
+- **Typed pixel buffers** via `ImgVec<Rgb<u8>>`, `ImgVec<Rgba<u8>>`, etc. (rgb + imgref crates)
 - **Runtime codec registry** — callers control which codecs are available at runtime
 - **Color management** via moxcms (feature-gated)
 - **Streaming decode/encode** — delegates to codec when supported, buffers when not
@@ -39,14 +39,15 @@ zencodecs/
 │   ├── lib.rs            # Public API, re-exports
 │   ├── format.rs         # ImageFormat enum, detection (magic bytes)
 │   ├── error.rs          # CodecError (unified error type)
-│   ├── pixel.rs          # PixelLayout (Rgb8, Rgba8, Bgr8, Bgra8)
-│   ├── limits.rs         # Limits, ImageMetadata
+│   ├── pixel.rs          # PixelData enum (Rgb8, Rgba8, Rgb16, Rgba16, RgbF32, RgbaF32, Gray8)
+│   ├── config.rs         # CodecConfig struct, format-specific config re-exports
+│   ├── limits.rs         # Limits, ImageMetadata (ICC/EXIF/XMP)
 │   ├── info.rs           # ImageInfo (unified probe)
 │   ├── registry.rs       # CodecRegistry — runtime enable/disable
-│   ├── decode.rs         # DecodeRequest, DecodeOutput, streaming
-│   ├── encode.rs         # EncodeRequest, auto-selection
-│   ├── animation.rs      # AnimationDecoder, frame iteration
-│   ├── color.rs          # Color management via moxcms (feature-gated)
+│   ├── decode.rs         # DecodeRequest, DecodeOutput (returns PixelData)
+│   ├── encode.rs         # EncodeRequest with encode_rgb8/encode_rgba8
+│   ├── animation.rs      # AnimationDecoder, frame iteration (planned)
+│   ├── color.rs          # Color management via moxcms (planned)
 │   └── codecs/
 │       ├── mod.rs        # Codec adapter trait
 │       ├── jpeg.rs       # zenjpeg adapter
@@ -61,7 +62,32 @@ zencodecs/
 └── README.md
 ```
 
-## Public API Spec
+## Current Implementation (as of 2026-02-07)
+
+### Pixel Handling
+- `rgb` and `imgref` are mandatory dependencies (not feature-gated)
+- `PixelData` enum replaces old `PixelLayout`: `Rgb8(ImgVec<Rgb<u8>>)`, `Rgba8`, `Rgb16`, `Rgba16`, `RgbF32`, `RgbaF32`, `Gray8`
+- `DecodeOutput` contains `pixels: PixelData` + `info: ImageInfo` (no separate width/height/layout)
+- Encode uses typed methods: `encode_rgb8(ImgRef<Rgb<u8>>)`, `encode_rgba8(ImgRef<Rgba<u8>>)`
+
+### Codec Configs
+- `config.rs` re-exports format-specific config types behind feature gates
+- `CodecConfig` struct with `Option<Box<T>>` for each codec's config
+- Passed to `EncodeRequest::with_codec_config(&config)`
+
+### Metadata (ICC/EXIF/XMP)
+- `ImageMetadata<'a>` with `icc_profile`, `exif`, `xmp` fields (all `Option<&'a [u8]>`)
+- Passed to `EncodeRequest::with_metadata(&meta)`
+- Per-codec support: JPEG (all three), WebP (all three via mux), PNG (ICC+EXIF), AVIF (EXIF only), GIF (none)
+
+### What's NOT implemented yet
+- Streaming decode/encode
+- Animation frame iteration
+- Color management (moxcms)
+- `decode_into()` pre-allocated buffer
+- Format-specific decode configs (only encode configs wired up)
+
+## Public API Spec (Design Intent)
 
 ### Runtime Codec Registry
 
@@ -172,15 +198,16 @@ impl ImageInfo {
 
 ### Decoding (One-Shot)
 
+**Note: Implemented API differs — no output_layout (decoder returns native format), no color_management yet.**
+
 ```rust
 pub struct DecodeRequest<'a> {
     data: &'a [u8],
     format: Option<ImageFormat>,   // None = auto-detect
-    output_layout: PixelLayout,    // default: Rgba8
     limits: Option<&'a Limits>,
     stop: Option<&'a dyn Stop>,
     registry: Option<&'a CodecRegistry>,
-    color_management: ColorIntent, // default: PreserveBytes
+    // color_management: ColorIntent, // planned
     // Format-specific config overrides (feature-gated)
     #[cfg(feature = "jpeg")]
     jpeg_config: Option<&'a zenjpeg::DecoderConfig>,
