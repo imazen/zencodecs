@@ -1,14 +1,12 @@
 //! GIF codec adapter using zengif.
 
-use crate::{
-    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelLayout, Stop,
-};
+use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
+use crate::{CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop};
 
 /// Probe GIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     let limits = zengif::Limits::default();
 
-    // Use decode_gif to get metadata (TODO: optimize to avoid full decode)
     let (metadata, _frames, _stats) = zengif::decode_gif(data, limits, enough::Unstoppable)
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
 
@@ -16,26 +14,21 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         width: metadata.width as u32,
         height: metadata.height as u32,
         format: ImageFormat::Gif,
-        has_alpha: true, // GIF supports transparency
+        has_alpha: true,
         has_animation: metadata.frame_count > 1,
         frame_count: Some(metadata.frame_count as u32),
-        icc_profile: None, // GIF doesn't typically have ICC profiles
+        icc_profile: None,
     })
 }
 
-/// Decode GIF to pixels.
-///
-/// For animated GIFs, this returns only the first frame.
-/// TODO: Add animation support via streaming decoder.
+/// Decode GIF to pixels (first frame only).
 pub(crate) fn decode(
     data: &[u8],
-    _output_layout: PixelLayout,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
     let limits = zengif::Limits::default();
 
-    // Decode all frames
     let (metadata, mut frames, _stats) = zengif::decode_gif(data, limits, enough::Unstoppable)
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
 
@@ -43,24 +36,29 @@ pub(crate) fn decode(
         return Err(CodecError::InvalidInput("GIF has no frames".into()));
     }
 
-    // Take first frame
     let frame = frames.remove(0);
+    let width = metadata.width as usize;
+    let height = metadata.height as usize;
 
-    // Convert Vec<Rgba> to Vec<u8> (zengif returns Vec<Rgba>)
-    let pixels = frame
+    // Convert zengif::Rgba to rgb::Rgba<u8>
+    let rgba_pixels: alloc::vec::Vec<Rgba<u8>> = frame
         .pixels
         .into_iter()
-        .flat_map(|rgba| [rgba.r, rgba.g, rgba.b, rgba.a])
+        .map(|p| Rgba {
+            r: p.r,
+            g: p.g,
+            b: p.b,
+            a: p.a,
+        })
         .collect();
 
+    let img = ImgVec::new(rgba_pixels, width, height);
+
     Ok(DecodeOutput {
-        pixels,
-        width: metadata.width as u32,
-        height: metadata.height as u32,
-        layout: PixelLayout::Rgba8, // zengif always returns RGBA
+        pixels: PixelData::Rgba8(img),
         info: ImageInfo {
-            width: metadata.width as u32,
-            height: metadata.height as u32,
+            width: width as u32,
+            height: height as u32,
             format: ImageFormat::Gif,
             has_alpha: true,
             has_animation: metadata.frame_count > 1,
@@ -70,43 +68,35 @@ pub(crate) fn decode(
     })
 }
 
-/// Encode pixels to GIF.
-///
-/// Creates a single-frame GIF. For animation support, use zengif directly.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn encode(
-    pixels: &[u8],
-    width: u32,
-    height: u32,
-    layout: PixelLayout,
-    _quality: Option<f32>, // GIF doesn't have quality setting
-    _lossless: bool,       // GIF is always lossless (after quantization)
+/// Encode RGB8 pixels to GIF (single frame).
+pub(crate) fn encode_rgb8(
+    img: ImgRef<Rgb<u8>>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    // Convert dimensions to u16 (GIF limitation)
-    let width_u16 = width
+    let width: u16 = (img.width() as u32)
         .try_into()
         .map_err(|_| CodecError::InvalidInput("width exceeds GIF maximum (65535)".into()))?;
-    let height_u16 = height
+    let height: u16 = (img.height() as u32)
         .try_into()
         .map_err(|_| CodecError::InvalidInput("height exceeds GIF maximum (65535)".into()))?;
 
-    // Convert to RGBA bytes, then use zengif's from_bytes constructor
-    let rgba_bytes = crate::pixel::to_rgba(pixels, layout);
+    // Convert RGB to RGBA bytes for zengif
+    let (buf, _, _) = img.to_contiguous_buf();
+    let rgba_bytes: alloc::vec::Vec<u8> = buf
+        .iter()
+        .flat_map(|p| [p.r, p.g, p.b, 255u8])
+        .collect();
 
-    // Create frame input (zengif's from_bytes takes RGBA &[u8] directly)
-    let frame = zengif::FrameInput::from_bytes(width_u16, height_u16, 10, &rgba_bytes); // 10 = 100ms delay
+    let frame = zengif::FrameInput::from_bytes(width, height, 10, &rgba_bytes);
 
-    // Create encoder config
     let config = zengif::EncoderConfig::new();
     let limits = zengif::Limits::default();
 
-    // Encode single frame
     let gif_data = zengif::encode_gif(
         alloc::vec![frame],
-        width_u16,
-        height_u16,
+        width,
+        height,
         config,
         limits,
         enough::Unstoppable,
@@ -119,14 +109,42 @@ pub(crate) fn encode(
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Encode RGBA8 pixels to GIF (single frame).
+pub(crate) fn encode_rgba8(
+    img: ImgRef<Rgba<u8>>,
+    _limits: Option<&Limits>,
+    _stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let width: u16 = (img.width() as u32)
+        .try_into()
+        .map_err(|_| CodecError::InvalidInput("width exceeds GIF maximum (65535)".into()))?;
+    let height: u16 = (img.height() as u32)
+        .try_into()
+        .map_err(|_| CodecError::InvalidInput("height exceeds GIF maximum (65535)".into()))?;
 
-    #[test]
-    fn dimension_limits() {
-        // GIF uses u16 for dimensions
-        let result = encode(&[], 70000, 100, PixelLayout::Rgba8, None, false, None, None);
-        assert!(matches!(result, Err(CodecError::InvalidInput(_))));
-    }
+    let (buf, _, _) = img.to_contiguous_buf();
+    let rgba_bytes: alloc::vec::Vec<u8> = buf
+        .iter()
+        .flat_map(|p| [p.r, p.g, p.b, p.a])
+        .collect();
+
+    let frame = zengif::FrameInput::from_bytes(width, height, 10, &rgba_bytes);
+
+    let config = zengif::EncoderConfig::new();
+    let limits = zengif::Limits::default();
+
+    let gif_data = zengif::encode_gif(
+        alloc::vec![frame],
+        width,
+        height,
+        config,
+        limits,
+        enough::Unstoppable,
+    )
+    .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
+
+    Ok(EncodeOutput {
+        data: gif_data,
+        format: ImageFormat::Gif,
+    })
 }

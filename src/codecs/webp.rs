@@ -1,18 +1,7 @@
 //! WebP codec adapter using zenwebp.
 
-use crate::{
-    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelLayout, Stop,
-};
-
-/// Convert zencodecs PixelLayout to zenwebp PixelLayout.
-fn to_webp_layout(layout: PixelLayout) -> zenwebp::PixelLayout {
-    match layout {
-        PixelLayout::Rgb8 => zenwebp::PixelLayout::Rgb8,
-        PixelLayout::Rgba8 => zenwebp::PixelLayout::Rgba8,
-        PixelLayout::Bgr8 => zenwebp::PixelLayout::Bgr8,
-        PixelLayout::Bgra8 => zenwebp::PixelLayout::Bgra8,
-    }
-}
+use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
+use crate::{CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop};
 
 /// Probe WebP metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -22,13 +11,10 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     let (width, height) = decoder.dimensions();
     let has_alpha = decoder.has_alpha();
 
-    // Check if it's animated
     let demuxer = zenwebp::WebPDemuxer::new(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
     let has_animation = demuxer.is_animated();
     let frame_count = demuxer.num_frames();
-
-    // Get ICC profile if present
     let icc_profile = demuxer.icc_profile().map(|p| p.to_vec());
 
     Ok(ImageInfo {
@@ -45,38 +31,36 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
 /// Decode WebP to pixels.
 pub(crate) fn decode(
     data: &[u8],
-    output_layout: PixelLayout,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    // Decode based on requested layout
-    let (pixels, width, height) = match output_layout {
-        PixelLayout::Rgb8 => zenwebp::decode_rgb(data)
-            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?,
-        PixelLayout::Rgba8 => zenwebp::decode_rgba(data)
-            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?,
-        PixelLayout::Bgr8 => zenwebp::decode_bgr(data)
-            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?,
-        PixelLayout::Bgra8 => zenwebp::decode_bgra(data)
-            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?,
-    };
-
-    // Get additional info
+    // Detect alpha to decide RGB vs RGBA decode
     let decoder = zenwebp::WebPDecoder::new(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
     let has_alpha = decoder.has_alpha();
 
-    // Check animation status
     let demuxer = zenwebp::WebPDemuxer::new(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
     let has_animation = demuxer.is_animated();
     let icc_profile = demuxer.icc_profile().map(|p| p.to_vec());
 
+    let pixels = if has_alpha {
+        let (raw, width, height) = zenwebp::decode_rgba(data)
+            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
+        let rgba_pixels: &[Rgba<u8>] = bytemuck::cast_slice(&raw);
+        PixelData::Rgba8(ImgVec::new(rgba_pixels.to_vec(), width as usize, height as usize))
+    } else {
+        let (raw, width, height) = zenwebp::decode_rgb(data)
+            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
+        let rgb_pixels: &[Rgb<u8>] = bytemuck::cast_slice(&raw);
+        PixelData::Rgb8(ImgVec::new(rgb_pixels.to_vec(), width as usize, height as usize))
+    };
+
+    let width = pixels.width();
+    let height = pixels.height();
+
     Ok(DecodeOutput {
         pixels,
-        width,
-        height,
-        layout: output_layout,
         info: ImageInfo {
             width,
             height,
@@ -89,31 +73,28 @@ pub(crate) fn decode(
     })
 }
 
-/// Encode pixels to WebP.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn encode(
-    pixels: &[u8],
-    width: u32,
-    height: u32,
-    layout: PixelLayout,
+/// Encode RGB8 pixels to WebP.
+pub(crate) fn encode_rgb8(
+    img: ImgRef<Rgb<u8>>,
     quality: Option<f32>,
     lossless: bool,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let webp_layout = to_webp_layout(layout);
+    let width = img.width() as u32;
+    let height = img.height() as u32;
+    let (buf, _, _) = img.to_contiguous_buf();
+    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
 
     let webp_data = if lossless {
-        // Lossless encoding
         let config = zenwebp::LosslessConfig::new();
-        zenwebp::EncodeRequest::lossless(&config, pixels, webp_layout, width, height)
+        zenwebp::EncodeRequest::lossless(&config, bytes, zenwebp::PixelLayout::Rgb8, width, height)
             .encode()
             .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
     } else {
-        // Lossy encoding
         let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0);
         let config = zenwebp::LossyConfig::new().with_quality(quality);
-        zenwebp::EncodeRequest::lossy(&config, pixels, webp_layout, width, height)
+        zenwebp::EncodeRequest::lossy(&config, bytes, zenwebp::PixelLayout::Rgb8, width, height)
             .encode()
             .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
     };
@@ -124,20 +105,34 @@ pub(crate) fn encode(
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Encode RGBA8 pixels to WebP.
+pub(crate) fn encode_rgba8(
+    img: ImgRef<Rgba<u8>>,
+    quality: Option<f32>,
+    lossless: bool,
+    _limits: Option<&Limits>,
+    _stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let width = img.width() as u32;
+    let height = img.height() as u32;
+    let (buf, _, _) = img.to_contiguous_buf();
+    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
 
-    #[test]
-    fn pixel_layout_conversion() {
-        // Verify all formats can be converted
-        for layout in [
-            PixelLayout::Rgb8,
-            PixelLayout::Rgba8,
-            PixelLayout::Bgr8,
-            PixelLayout::Bgra8,
-        ] {
-            let _webp_layout = to_webp_layout(layout);
-        }
-    }
+    let webp_data = if lossless {
+        let config = zenwebp::LosslessConfig::new();
+        zenwebp::EncodeRequest::lossless(&config, bytes, zenwebp::PixelLayout::Rgba8, width, height)
+            .encode()
+            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
+    } else {
+        let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0);
+        let config = zenwebp::LossyConfig::new().with_quality(quality);
+        zenwebp::EncodeRequest::lossy(&config, bytes, zenwebp::PixelLayout::Rgba8, width, height)
+            .encode()
+            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
+    };
+
+    Ok(EncodeOutput {
+        data: webp_data,
+        format: ImageFormat::WebP,
+    })
 }

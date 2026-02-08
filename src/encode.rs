@@ -2,7 +2,8 @@
 
 use alloc::vec::Vec;
 
-use crate::{CodecError, CodecRegistry, ImageFormat, ImageMetadata, Limits, PixelLayout, Stop};
+use crate::pixel::{ImgRef, Rgb, Rgba};
+use crate::{CodecError, CodecRegistry, ImageFormat, ImageMetadata, Limits, Stop};
 
 /// Encoded image output.
 #[derive(Clone, Debug)]
@@ -15,17 +16,16 @@ pub struct EncodeOutput {
 
 /// Image encode request builder.
 ///
-/// Use this to encode pixels to various image formats.
-///
 /// # Example
 ///
 /// ```no_run
-/// use zencodecs::{EncodeRequest, ImageFormat, PixelLayout};
+/// use zencodecs::{EncodeRequest, ImageFormat};
+/// use zencodecs::pixel::{ImgVec, Rgba};
 ///
-/// let pixels: &[u8] = &[]; // your pixel data
+/// let pixels = ImgVec::new(vec![Rgba { r: 0u8, g: 0, b: 0, a: 255 }; 100*100], 100, 100);
 /// let output = EncodeRequest::new(ImageFormat::WebP)
 ///     .with_quality(85.0)
-///     .encode(pixels, 100, 100, PixelLayout::Rgba8)?;
+///     .encode_rgba8(pixels.as_ref())?;
 /// # Ok::<(), zencodecs::CodecError>(())
 /// ```
 pub struct EncodeRequest<'a> {
@@ -55,12 +55,9 @@ impl<'a> EncodeRequest<'a> {
     }
 
     /// Auto-select best format based on image stats and allowed encoders.
-    ///
-    /// Uses the registry to determine which formats are candidates.
-    /// The selection logic is simple and deterministic (not optimal).
     pub fn auto() -> Self {
         Self {
-            format: None, // Will be selected during encode()
+            format: None,
             quality: None,
             effort: None,
             lossless: false,
@@ -72,27 +69,18 @@ impl<'a> EncodeRequest<'a> {
     }
 
     /// Set quality (0-100).
-    ///
-    /// Mapped to each codec's native scale. Not all formats support this
-    /// (GIF and lossless PNG ignore it).
     pub fn with_quality(mut self, quality: f32) -> Self {
         self.quality = Some(quality);
         self
     }
 
     /// Set encoding effort (speed/quality tradeoff).
-    ///
-    /// Higher effort = slower encoding, better quality/compression.
-    /// Exact interpretation varies by codec.
     pub fn with_effort(mut self, effort: u32) -> Self {
         self.effort = Some(effort);
         self
     }
 
     /// Request lossless encoding.
-    ///
-    /// Only formats that support lossless will be used.
-    /// For lossy-only formats, returns an error.
     pub fn with_lossless(mut self, lossless: bool) -> Self {
         self.lossless = lossless;
         self
@@ -117,284 +105,179 @@ impl<'a> EncodeRequest<'a> {
     }
 
     /// Set a codec registry to control which formats are enabled.
-    ///
-    /// Required when using `auto()` to restrict candidates.
-    /// If not set, all compiled-in codecs are available.
     pub fn with_registry(mut self, registry: &'a CodecRegistry) -> Self {
         self.registry = Some(registry);
         self
     }
 
-    /// Encode pixels to the target format.
-    pub fn encode(
-        self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        layout: PixelLayout,
-    ) -> Result<EncodeOutput, CodecError> {
-        // Get the registry (default to all if not specified)
+    /// Encode RGB8 pixels.
+    pub fn encode_rgb8(self, img: ImgRef<Rgb<u8>>) -> Result<EncodeOutput, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+        let has_alpha = false;
+
+        let format = match self.format {
+            Some(f) => f,
+            None => self.auto_select_format(has_alpha, registry)?,
+        };
+
+        self.validate_and_dispatch_rgb8(format, img, registry)
+    }
+
+    /// Encode RGBA8 pixels.
+    pub fn encode_rgba8(self, img: ImgRef<Rgba<u8>>) -> Result<EncodeOutput, CodecError> {
         let default_registry = CodecRegistry::all();
         let registry = self.registry.unwrap_or(&default_registry);
 
-        // Determine format (auto-select if needed)
+        // Check if any pixel actually has transparency
+        let has_alpha = img.pixels().any(|p| p.a < 255);
+
         let format = match self.format {
             Some(f) => f,
-            None => self.auto_select_format(pixels, width, height, layout, registry)?,
+            None => self.auto_select_format(has_alpha, registry)?,
         };
 
-        // Check if format is enabled
+        self.validate_and_dispatch_rgba8(format, img, registry)
+    }
+
+    fn validate_and_dispatch_rgb8(
+        self,
+        format: ImageFormat,
+        img: ImgRef<Rgb<u8>>,
+        registry: &CodecRegistry,
+    ) -> Result<EncodeOutput, CodecError> {
         if !registry.can_encode(format) {
             return Err(CodecError::DisabledFormat(format));
         }
-
-        // Check if lossless is requested but format doesn't support it
         if self.lossless && !format.supports_lossless() {
             return Err(CodecError::UnsupportedOperation {
                 format,
                 detail: "lossless encoding not supported",
             });
         }
-
-        // Validate input buffer size
-        let expected_size = layout
-            .min_buffer_size(width, height)
-            .ok_or_else(|| CodecError::InvalidInput("dimensions too large".into()))?;
-
-        if pixels.len() < expected_size {
-            return Err(CodecError::InvalidInput("pixel buffer too small".into()));
-        }
-
-        // Dispatch to format-specific encoder
-        self.encode_format(format, pixels, width, height, layout)
+        self.encode_format_rgb8(format, img)
     }
 
-    /// Encode into a pre-allocated buffer.
-    ///
-    /// The buffer will be resized to fit the encoded data.
-    pub fn encode_into(
+    fn validate_and_dispatch_rgba8(
         self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        layout: PixelLayout,
-        output: &mut Vec<u8>,
+        format: ImageFormat,
+        img: ImgRef<Rgba<u8>>,
+        registry: &CodecRegistry,
     ) -> Result<EncodeOutput, CodecError> {
-        let result = self.encode(pixels, width, height, layout)?;
-        output.clear();
-        output.extend_from_slice(&result.data);
-        Ok(EncodeOutput {
-            data: output.clone(),
-            format: result.format,
-        })
+        if !registry.can_encode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        if self.lossless && !format.supports_lossless() {
+            return Err(CodecError::UnsupportedOperation {
+                format,
+                detail: "lossless encoding not supported",
+            });
+        }
+        self.encode_format_rgba8(format, img)
     }
 
-    /// Auto-select format based on image characteristics.
+    /// Auto-select format.
     fn auto_select_format(
         &self,
-        pixels: &[u8],
-        _width: u32,
-        _height: u32,
-        layout: PixelLayout,
+        has_alpha: bool,
         registry: &CodecRegistry,
     ) -> Result<ImageFormat, CodecError> {
-        // TODO: implement smart selection based on image stats
-        // For now, simple fallback logic
-
         if self.lossless {
-            // Prefer lossless formats
             if registry.can_encode(ImageFormat::WebP) {
                 return Ok(ImageFormat::WebP);
             }
             if registry.can_encode(ImageFormat::Png) {
                 return Ok(ImageFormat::Png);
             }
+        } else if has_alpha {
+            if registry.can_encode(ImageFormat::WebP) {
+                return Ok(ImageFormat::WebP);
+            }
+            if registry.can_encode(ImageFormat::Avif) {
+                return Ok(ImageFormat::Avif);
+            }
+            if registry.can_encode(ImageFormat::Png) {
+                return Ok(ImageFormat::Png);
+            }
         } else {
-            // Prefer lossy formats
-            let has_alpha = layout.has_alpha() && self.has_alpha_pixels(pixels, layout);
-
-            if has_alpha {
-                // Can't use JPEG with alpha
-                if registry.can_encode(ImageFormat::WebP) {
-                    return Ok(ImageFormat::WebP);
-                }
-                if registry.can_encode(ImageFormat::Avif) {
-                    return Ok(ImageFormat::Avif);
-                }
-                if registry.can_encode(ImageFormat::Png) {
-                    return Ok(ImageFormat::Png);
-                }
-            } else {
-                // No alpha, can use any format
-                if registry.can_encode(ImageFormat::Jpeg) {
-                    return Ok(ImageFormat::Jpeg);
-                }
-                if registry.can_encode(ImageFormat::WebP) {
-                    return Ok(ImageFormat::WebP);
-                }
-                if registry.can_encode(ImageFormat::Avif) {
-                    return Ok(ImageFormat::Avif);
-                }
+            if registry.can_encode(ImageFormat::Jpeg) {
+                return Ok(ImageFormat::Jpeg);
+            }
+            if registry.can_encode(ImageFormat::WebP) {
+                return Ok(ImageFormat::WebP);
+            }
+            if registry.can_encode(ImageFormat::Avif) {
+                return Ok(ImageFormat::Avif);
             }
         }
 
         Err(CodecError::NoSuitableEncoder)
     }
 
-    /// Quick check if pixels have any transparency.
-    fn has_alpha_pixels(&self, pixels: &[u8], layout: PixelLayout) -> bool {
-        if !layout.has_alpha() {
-            return false;
-        }
-
-        let stride = layout.bytes_per_pixel();
-        let alpha_offset = match layout {
-            PixelLayout::Rgba8 | PixelLayout::Bgra8 => 3,
-            _ => return false,
-        };
-
-        pixels
-            .chunks_exact(stride)
-            .any(|pixel| pixel[alpha_offset] < 255)
-    }
-
-    /// Dispatch to format-specific encoder.
-    fn encode_format(
+    fn encode_format_rgb8(
         self,
         format: ImageFormat,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        layout: PixelLayout,
+        img: ImgRef<Rgb<u8>>,
     ) -> Result<EncodeOutput, CodecError> {
         match format {
             #[cfg(feature = "jpeg")]
-            ImageFormat::Jpeg => self.encode_jpeg(pixels, width, height, layout),
+            ImageFormat::Jpeg => crate::codecs::jpeg::encode_rgb8(img, self.quality, self.limits, self.stop),
             #[cfg(not(feature = "jpeg"))]
             ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "webp")]
-            ImageFormat::WebP => self.encode_webp(pixels, width, height, layout),
+            ImageFormat::WebP => crate::codecs::webp::encode_rgb8(img, self.quality, self.lossless, self.limits, self.stop),
             #[cfg(not(feature = "webp"))]
             ImageFormat::WebP => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "gif")]
-            ImageFormat::Gif => self.encode_gif(pixels, width, height, layout),
+            ImageFormat::Gif => crate::codecs::gif::encode_rgb8(img, self.limits, self.stop),
             #[cfg(not(feature = "gif"))]
             ImageFormat::Gif => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "png")]
-            ImageFormat::Png => self.encode_png(pixels, width, height, layout),
+            ImageFormat::Png => crate::codecs::png::encode_rgb8(img, self.limits, self.stop),
             #[cfg(not(feature = "png"))]
             ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "avif-encode")]
-            ImageFormat::Avif => self.encode_avif(pixels, width, height, layout),
+            ImageFormat::Avif => crate::codecs::avif_enc::encode_rgb8(img, self.quality, self.limits, self.stop),
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
         }
     }
 
-    // Codec-specific encode implementations (stubs for now)
-
-    #[cfg(feature = "jpeg")]
-    fn encode_jpeg(
+    fn encode_format_rgba8(
         self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        layout: PixelLayout,
+        format: ImageFormat,
+        img: ImgRef<Rgba<u8>>,
     ) -> Result<EncodeOutput, CodecError> {
-        crate::codecs::jpeg::encode(
-            pixels,
-            width,
-            height,
-            layout,
-            self.quality,
-            self.lossless,
-            self.limits,
-            self.stop,
-        )
-    }
+        match format {
+            #[cfg(feature = "jpeg")]
+            ImageFormat::Jpeg => crate::codecs::jpeg::encode_rgba8(img, self.quality, self.limits, self.stop),
+            #[cfg(not(feature = "jpeg"))]
+            ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
 
-    #[cfg(feature = "webp")]
-    fn encode_webp(
-        self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        layout: PixelLayout,
-    ) -> Result<EncodeOutput, CodecError> {
-        crate::codecs::webp::encode(
-            pixels,
-            width,
-            height,
-            layout,
-            self.quality,
-            self.lossless,
-            self.limits,
-            self.stop,
-        )
-    }
+            #[cfg(feature = "webp")]
+            ImageFormat::WebP => crate::codecs::webp::encode_rgba8(img, self.quality, self.lossless, self.limits, self.stop),
+            #[cfg(not(feature = "webp"))]
+            ImageFormat::WebP => Err(CodecError::UnsupportedFormat(format)),
 
-    #[cfg(feature = "gif")]
-    fn encode_gif(
-        self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        layout: PixelLayout,
-    ) -> Result<EncodeOutput, CodecError> {
-        crate::codecs::gif::encode(
-            pixels,
-            width,
-            height,
-            layout,
-            self.quality,
-            self.lossless,
-            self.limits,
-            self.stop,
-        )
-    }
+            #[cfg(feature = "gif")]
+            ImageFormat::Gif => crate::codecs::gif::encode_rgba8(img, self.limits, self.stop),
+            #[cfg(not(feature = "gif"))]
+            ImageFormat::Gif => Err(CodecError::UnsupportedFormat(format)),
 
-    #[cfg(feature = "png")]
-    fn encode_png(
-        self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        layout: PixelLayout,
-    ) -> Result<EncodeOutput, CodecError> {
-        crate::codecs::png::encode(
-            pixels,
-            width,
-            height,
-            layout,
-            self.quality,
-            self.lossless,
-            self.limits,
-            self.stop,
-        )
-    }
+            #[cfg(feature = "png")]
+            ImageFormat::Png => crate::codecs::png::encode_rgba8(img, self.limits, self.stop),
+            #[cfg(not(feature = "png"))]
+            ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
 
-    #[cfg(feature = "avif-encode")]
-    fn encode_avif(
-        self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        layout: PixelLayout,
-    ) -> Result<EncodeOutput, CodecError> {
-        crate::codecs::avif_enc::encode(
-            pixels,
-            width,
-            height,
-            layout,
-            self.quality,
-            self.lossless,
-            self.limits,
-            self.stop,
-        )
+            #[cfg(feature = "avif-encode")]
+            ImageFormat::Avif => crate::codecs::avif_enc::encode_rgba8(img, self.quality, self.limits, self.stop),
+            #[cfg(not(feature = "avif-encode"))]
+            ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
+        }
     }
 }
 
@@ -415,23 +298,18 @@ mod tests {
 
     #[test]
     fn lossless_with_jpeg_error() {
-        let pixels = vec![255u8; 100 * 100 * 3];
+        let img = imgref::ImgVec::new(
+            vec![Rgb { r: 255u8, g: 255, b: 255 }; 100 * 100],
+            100,
+            100,
+        );
         let result = EncodeRequest::new(ImageFormat::Jpeg)
             .with_lossless(true)
-            .encode(&pixels, 100, 100, PixelLayout::Rgb8);
+            .encode_rgb8(img.as_ref());
 
         assert!(matches!(
             result,
             Err(CodecError::UnsupportedOperation { .. })
         ));
-    }
-
-    #[test]
-    fn buffer_too_small_error() {
-        let pixels = vec![255u8; 100]; // Too small for 100x100
-        let result =
-            EncodeRequest::new(ImageFormat::Jpeg).encode(&pixels, 100, 100, PixelLayout::Rgb8);
-
-        assert!(matches!(result, Err(CodecError::InvalidInput(_))));
     }
 }

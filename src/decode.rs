@@ -1,43 +1,43 @@
 //! Image decoding.
 
-use alloc::vec::Vec;
-
-use crate::{CodecError, CodecRegistry, ImageFormat, ImageInfo, Limits, PixelLayout, Stop};
+use crate::{CodecError, CodecRegistry, ImageFormat, ImageInfo, Limits, PixelData, Stop};
 
 /// Decoded image output.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct DecodeOutput {
-    /// Decoded pixel data in the requested layout.
-    pub pixels: Vec<u8>,
-    /// Image width in pixels.
-    pub width: u32,
-    /// Image height in pixels.
-    pub height: u32,
-    /// Pixel layout of the decoded data.
-    pub layout: PixelLayout,
+    /// Decoded pixel data in a typed buffer.
+    pub pixels: PixelData,
     /// Image metadata.
     pub info: ImageInfo,
 }
 
+impl DecodeOutput {
+    /// Image width in pixels (convenience accessor).
+    pub fn width(&self) -> u32 {
+        self.pixels.width()
+    }
+
+    /// Image height in pixels (convenience accessor).
+    pub fn height(&self) -> u32 {
+        self.pixels.height()
+    }
+}
+
 /// Image decode request builder.
-///
-/// Use this to decode images from various formats to a unified pixel layout.
 ///
 /// # Example
 ///
 /// ```no_run
-/// use zencodecs::{DecodeRequest, PixelLayout};
+/// use zencodecs::DecodeRequest;
 ///
 /// let data: &[u8] = &[]; // your image bytes
-/// let output = DecodeRequest::new(data)
-///     .with_output_layout(PixelLayout::Rgba8)
-///     .decode()?;
+/// let output = DecodeRequest::new(data).decode()?;
+/// println!("{}x{}", output.width(), output.height());
 /// # Ok::<(), zencodecs::CodecError>(())
 /// ```
 pub struct DecodeRequest<'a> {
     data: &'a [u8],
     format: Option<ImageFormat>,
-    output_layout: PixelLayout,
     limits: Option<&'a Limits>,
     stop: Option<&'a dyn Stop>,
     registry: Option<&'a CodecRegistry>,
@@ -47,12 +47,11 @@ impl<'a> DecodeRequest<'a> {
     /// Create a new decode request.
     ///
     /// Format will be auto-detected from magic bytes.
-    /// Default output layout is RGBA8.
+    /// The decoder returns its native pixel format.
     pub fn new(data: &'a [u8]) -> Self {
         Self {
             data,
             format: None,
-            output_layout: PixelLayout::default(),
             limits: None,
             stop: None,
             registry: None,
@@ -60,18 +59,8 @@ impl<'a> DecodeRequest<'a> {
     }
 
     /// Override format auto-detection.
-    ///
-    /// Use this when you already know the format and want to skip detection.
     pub fn with_format(mut self, format: ImageFormat) -> Self {
         self.format = Some(format);
-        self
-    }
-
-    /// Set the output pixel layout.
-    ///
-    /// The decoder will convert to this layout regardless of the source format.
-    pub fn with_output_layout(mut self, layout: PixelLayout) -> Self {
-        self.output_layout = layout;
         self
     }
 
@@ -88,8 +77,6 @@ impl<'a> DecodeRequest<'a> {
     }
 
     /// Set a codec registry to control which formats are enabled.
-    ///
-    /// If not set, all compiled-in codecs are available.
     pub fn with_registry(mut self, registry: &'a CodecRegistry) -> Self {
         self.registry = Some(registry);
         self
@@ -97,38 +84,19 @@ impl<'a> DecodeRequest<'a> {
 
     /// Decode the image to pixels.
     pub fn decode(self) -> Result<DecodeOutput, CodecError> {
-        // Get the registry (default to all if not specified)
         let default_registry = CodecRegistry::all();
         let registry = self.registry.unwrap_or(&default_registry);
 
-        // Detect format if not specified
         let format = match self.format {
             Some(f) => f,
             None => ImageFormat::detect(self.data).ok_or(CodecError::UnrecognizedFormat)?,
         };
 
-        // Check if format is enabled
         if !registry.can_decode(format) {
             return Err(CodecError::DisabledFormat(format));
         }
 
-        // Dispatch to format-specific decoder
         self.decode_format(format)
-    }
-
-    /// Decode into a pre-allocated buffer.
-    ///
-    /// The buffer must be large enough for the output (width × height × bpp).
-    /// Returns the image info on success.
-    pub fn decode_into(self, output: &mut [u8]) -> Result<ImageInfo, CodecError> {
-        let decoded = self.decode()?;
-
-        if output.len() < decoded.pixels.len() {
-            return Err(CodecError::InvalidInput("output buffer too small".into()));
-        }
-
-        output[..decoded.pixels.len()].copy_from_slice(&decoded.pixels);
-        Ok(decoded.info)
     }
 
     /// Dispatch to format-specific decoder.
@@ -161,31 +129,29 @@ impl<'a> DecodeRequest<'a> {
         }
     }
 
-    // Codec-specific decode implementations (stubs for now)
-
     #[cfg(feature = "jpeg")]
     fn decode_jpeg(self) -> Result<DecodeOutput, CodecError> {
-        crate::codecs::jpeg::decode(self.data, self.output_layout, self.limits, self.stop)
+        crate::codecs::jpeg::decode(self.data, self.limits, self.stop)
     }
 
     #[cfg(feature = "webp")]
     fn decode_webp(self) -> Result<DecodeOutput, CodecError> {
-        crate::codecs::webp::decode(self.data, self.output_layout, self.limits, self.stop)
+        crate::codecs::webp::decode(self.data, self.limits, self.stop)
     }
 
     #[cfg(feature = "gif")]
     fn decode_gif(self) -> Result<DecodeOutput, CodecError> {
-        crate::codecs::gif::decode(self.data, self.output_layout, self.limits, self.stop)
+        crate::codecs::gif::decode(self.data, self.limits, self.stop)
     }
 
     #[cfg(feature = "png")]
     fn decode_png(self) -> Result<DecodeOutput, CodecError> {
-        crate::codecs::png::decode(self.data, self.output_layout, self.limits, self.stop)
+        crate::codecs::png::decode(self.data, self.limits, self.stop)
     }
 
     #[cfg(feature = "avif-decode")]
     fn decode_avif(self) -> Result<DecodeOutput, CodecError> {
-        crate::codecs::avif_dec::decode(self.data, self.output_layout, self.limits, self.stop)
+        crate::codecs::avif_dec::decode(self.data, self.limits, self.stop)
     }
 }
 
@@ -196,12 +162,8 @@ mod tests {
     #[test]
     fn builder_pattern() {
         let data = b"test";
-        let request = DecodeRequest::new(data)
-            .with_format(ImageFormat::Jpeg)
-            .with_output_layout(PixelLayout::Rgb8);
-
+        let request = DecodeRequest::new(data).with_format(ImageFormat::Jpeg);
         assert_eq!(request.format, Some(ImageFormat::Jpeg));
-        assert_eq!(request.output_layout, PixelLayout::Rgb8);
     }
 
     #[test]

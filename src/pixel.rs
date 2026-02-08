@@ -1,121 +1,202 @@
-//! Pixel layout definitions.
+//! Typed pixel buffer definitions.
+//!
+//! Uses `imgref::ImgVec` for 2D pixel data with typed pixels from the `rgb` crate.
 
-/// Pixel memory layout.
+pub use imgref::{Img, ImgRef, ImgVec};
+pub use rgb::{Gray, Rgb, Rgba};
+
+/// Decoded pixel data in a typed buffer.
 ///
-/// All layouts are 8-bit per channel. Only layouts that ALL codecs can handle
-/// via the unified API are included here. Format-specific layouts (like YUV420
-/// or Gray8) require using the codec directly.
+/// The variant determines both the pixel format and precision.
+/// Width and height are embedded in the `ImgVec`.
 #[non_exhaustive]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum PixelLayout {
-    /// RGB, 8 bits per channel, 24 bits per pixel.
-    Rgb8,
-    /// RGBA, 8 bits per channel, 32 bits per pixel.
-    #[default]
-    Rgba8,
-    /// BGR, 8 bits per channel, 24 bits per pixel.
-    Bgr8,
-    /// BGRA, 8 bits per channel, 32 bits per pixel.
-    Bgra8,
+pub enum PixelData {
+    Rgb8(ImgVec<Rgb<u8>>),
+    Rgba8(ImgVec<Rgba<u8>>),
+    Rgb16(ImgVec<Rgb<u16>>),
+    Rgba16(ImgVec<Rgba<u16>>),
+    RgbF32(ImgVec<Rgb<f32>>),
+    RgbaF32(ImgVec<Rgba<f32>>),
+    Gray8(ImgVec<Gray<u8>>),
 }
 
-impl PixelLayout {
-    /// Number of bytes per pixel.
-    pub fn bytes_per_pixel(self) -> usize {
+impl PixelData {
+    /// Image width in pixels.
+    pub fn width(&self) -> u32 {
         match self {
-            PixelLayout::Rgb8 | PixelLayout::Bgr8 => 3,
-            PixelLayout::Rgba8 | PixelLayout::Bgra8 => 4,
+            PixelData::Rgb8(img) => img.width() as u32,
+            PixelData::Rgba8(img) => img.width() as u32,
+            PixelData::Rgb16(img) => img.width() as u32,
+            PixelData::Rgba16(img) => img.width() as u32,
+            PixelData::RgbF32(img) => img.width() as u32,
+            PixelData::RgbaF32(img) => img.width() as u32,
+            PixelData::Gray8(img) => img.width() as u32,
         }
     }
 
-    /// Whether this layout includes an alpha channel.
-    pub fn has_alpha(self) -> bool {
+    /// Image height in pixels.
+    pub fn height(&self) -> u32 {
         match self {
-            PixelLayout::Rgb8 | PixelLayout::Bgr8 => false,
-            PixelLayout::Rgba8 | PixelLayout::Bgra8 => true,
+            PixelData::Rgb8(img) => img.height() as u32,
+            PixelData::Rgba8(img) => img.height() as u32,
+            PixelData::Rgb16(img) => img.height() as u32,
+            PixelData::Rgba16(img) => img.height() as u32,
+            PixelData::RgbF32(img) => img.height() as u32,
+            PixelData::RgbaF32(img) => img.height() as u32,
+            PixelData::Gray8(img) => img.height() as u32,
         }
     }
 
-    /// Minimum buffer size required for an image with this layout.
+    /// Whether this pixel data has an alpha channel.
+    pub fn has_alpha(&self) -> bool {
+        matches!(
+            self,
+            PixelData::Rgba8(_) | PixelData::Rgba16(_) | PixelData::RgbaF32(_)
+        )
+    }
+
+    /// Convert to RGBA8, allocating a new buffer.
     ///
-    /// Returns None on overflow.
-    pub fn min_buffer_size(self, width: u32, height: u32) -> Option<usize> {
-        let pixels = (width as u64).checked_mul(height as u64)?;
-        let bytes = pixels.checked_mul(self.bytes_per_pixel() as u64)?;
-        bytes.try_into().ok()
+    /// Gray8 is expanded to RGBA with R=G=B=gray, A=255.
+    /// Rgb8 gets A=255 added. Rgba8 is cloned.
+    /// Higher-precision formats are clamped/truncated to 8-bit.
+    pub fn to_rgba8(&self) -> ImgVec<Rgba<u8>> {
+        match self {
+            PixelData::Rgba8(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                ImgVec::new(buf.into_owned(), w, h)
+            }
+            PixelData::Rgb8(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                let rgba: alloc::vec::Vec<Rgba<u8>> = buf
+                    .iter()
+                    .map(|p| Rgba {
+                        r: p.r,
+                        g: p.g,
+                        b: p.b,
+                        a: 255,
+                    })
+                    .collect();
+                ImgVec::new(rgba, w, h)
+            }
+            PixelData::Gray8(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                let rgba: alloc::vec::Vec<Rgba<u8>> = buf
+                    .iter()
+                    .map(|p| Rgba {
+                        r: p.value(),
+                        g: p.value(),
+                        b: p.value(),
+                        a: 255,
+                    })
+                    .collect();
+                ImgVec::new(rgba, w, h)
+            }
+            PixelData::Rgba16(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                let rgba: alloc::vec::Vec<Rgba<u8>> = buf
+                    .iter()
+                    .map(|p| Rgba {
+                        r: (p.r >> 8) as u8,
+                        g: (p.g >> 8) as u8,
+                        b: (p.b >> 8) as u8,
+                        a: (p.a >> 8) as u8,
+                    })
+                    .collect();
+                ImgVec::new(rgba, w, h)
+            }
+            PixelData::Rgb16(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                let rgba: alloc::vec::Vec<Rgba<u8>> = buf
+                    .iter()
+                    .map(|p| Rgba {
+                        r: (p.r >> 8) as u8,
+                        g: (p.g >> 8) as u8,
+                        b: (p.b >> 8) as u8,
+                        a: 255,
+                    })
+                    .collect();
+                ImgVec::new(rgba, w, h)
+            }
+            PixelData::RgbF32(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                let rgba: alloc::vec::Vec<Rgba<u8>> = buf
+                    .iter()
+                    .map(|p| Rgba {
+                        r: (p.r.clamp(0.0, 1.0) * 255.0) as u8,
+                        g: (p.g.clamp(0.0, 1.0) * 255.0) as u8,
+                        b: (p.b.clamp(0.0, 1.0) * 255.0) as u8,
+                        a: 255,
+                    })
+                    .collect();
+                ImgVec::new(rgba, w, h)
+            }
+            PixelData::RgbaF32(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                let rgba: alloc::vec::Vec<Rgba<u8>> = buf
+                    .iter()
+                    .map(|p| Rgba {
+                        r: (p.r.clamp(0.0, 1.0) * 255.0) as u8,
+                        g: (p.g.clamp(0.0, 1.0) * 255.0) as u8,
+                        b: (p.b.clamp(0.0, 1.0) * 255.0) as u8,
+                        a: (p.a.clamp(0.0, 1.0) * 255.0) as u8,
+                    })
+                    .collect();
+                ImgVec::new(rgba, w, h)
+            }
+        }
+    }
+
+    /// Get the raw pixel data as a byte slice.
+    ///
+    /// Returns the underlying contiguous buffer as bytes.
+    pub fn as_bytes(&self) -> alloc::vec::Vec<u8> {
+        use rgb::ComponentBytes;
+        match self {
+            PixelData::Rgb8(img) => {
+                let (buf, _, _) = img.as_ref().to_contiguous_buf();
+                buf.as_bytes().to_vec()
+            }
+            PixelData::Rgba8(img) => {
+                let (buf, _, _) = img.as_ref().to_contiguous_buf();
+                buf.as_bytes().to_vec()
+            }
+            PixelData::Rgb16(img) => {
+                let (buf, _, _) = img.as_ref().to_contiguous_buf();
+                buf.as_bytes().to_vec()
+            }
+            PixelData::Rgba16(img) => {
+                let (buf, _, _) = img.as_ref().to_contiguous_buf();
+                buf.as_bytes().to_vec()
+            }
+            PixelData::RgbF32(img) => {
+                let (buf, _, _) = img.as_ref().to_contiguous_buf();
+                buf.as_bytes().to_vec()
+            }
+            PixelData::RgbaF32(img) => {
+                let (buf, _, _) = img.as_ref().to_contiguous_buf();
+                buf.as_bytes().to_vec()
+            }
+            PixelData::Gray8(img) => {
+                let (buf, _, _) = img.as_ref().to_contiguous_buf();
+                buf.as_bytes().to_vec()
+            }
+        }
     }
 }
 
-impl PixelLayout {
-    /// Whether this layout uses BGR channel order.
-    pub fn is_bgr(self) -> bool {
-        matches!(self, PixelLayout::Bgr8 | PixelLayout::Bgra8)
-    }
-}
-
-/// Convert pixel data to RGB-order layout, swapping B and R channels if needed.
-///
-/// Returns `(converted_bytes, new_layout)`. If already RGB-order, returns a copy.
-/// BGR8 → RGB8, BGRA8 → RGBA8, RGB8/RGBA8 → unchanged (cloned).
-pub(crate) fn to_rgb_order(pixels: &[u8], layout: PixelLayout) -> (alloc::vec::Vec<u8>, PixelLayout) {
-    match layout {
-        PixelLayout::Rgb8 | PixelLayout::Rgba8 => (pixels.to_vec(), layout),
-        PixelLayout::Bgr8 => {
-            let mut rgb = alloc::vec::Vec::with_capacity(pixels.len());
-            for chunk in pixels.chunks_exact(3) {
-                rgb.push(chunk[2]); // R
-                rgb.push(chunk[1]); // G
-                rgb.push(chunk[0]); // B
-            }
-            (rgb, PixelLayout::Rgb8)
-        }
-        PixelLayout::Bgra8 => {
-            let mut rgba = alloc::vec::Vec::with_capacity(pixels.len());
-            for chunk in pixels.chunks_exact(4) {
-                rgba.push(chunk[2]); // R
-                rgba.push(chunk[1]); // G
-                rgba.push(chunk[0]); // B
-                rgba.push(chunk[3]); // A
-            }
-            (rgba, PixelLayout::Rgba8)
-        }
-    }
-}
-
-/// Convert pixel data to RGBA8, adding alpha=255 and swapping channels as needed.
-///
-/// All layouts produce RGBA8 output.
-pub(crate) fn to_rgba(pixels: &[u8], layout: PixelLayout) -> alloc::vec::Vec<u8> {
-    match layout {
-        PixelLayout::Rgba8 => pixels.to_vec(),
-        PixelLayout::Rgb8 => {
-            let mut rgba = alloc::vec::Vec::with_capacity(pixels.len() / 3 * 4);
-            for chunk in pixels.chunks_exact(3) {
-                rgba.extend_from_slice(chunk);
-                rgba.push(255);
-            }
-            rgba
-        }
-        PixelLayout::Bgra8 => {
-            let mut rgba = alloc::vec::Vec::with_capacity(pixels.len());
-            for chunk in pixels.chunks_exact(4) {
-                rgba.push(chunk[2]); // R
-                rgba.push(chunk[1]); // G
-                rgba.push(chunk[0]); // B
-                rgba.push(chunk[3]); // A
-            }
-            rgba
-        }
-        PixelLayout::Bgr8 => {
-            let mut rgba = alloc::vec::Vec::with_capacity(pixels.len() / 3 * 4);
-            for chunk in pixels.chunks_exact(3) {
-                rgba.push(chunk[2]); // R
-                rgba.push(chunk[1]); // G
-                rgba.push(chunk[0]); // B
-                rgba.push(255);
-            }
-            rgba
-        }
+impl core::fmt::Debug for PixelData {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let variant = match self {
+            PixelData::Rgb8(_) => "Rgb8",
+            PixelData::Rgba8(_) => "Rgba8",
+            PixelData::Rgb16(_) => "Rgb16",
+            PixelData::Rgba16(_) => "Rgba16",
+            PixelData::RgbF32(_) => "RgbF32",
+            PixelData::RgbaF32(_) => "RgbaF32",
+            PixelData::Gray8(_) => "Gray8",
+        };
+        write!(f, "PixelData::{}({}x{})", variant, self.width(), self.height())
     }
 }
 
@@ -124,26 +205,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bytes_per_pixel() {
-        assert_eq!(PixelLayout::Rgb8.bytes_per_pixel(), 3);
-        assert_eq!(PixelLayout::Rgba8.bytes_per_pixel(), 4);
-        assert_eq!(PixelLayout::Bgr8.bytes_per_pixel(), 3);
-        assert_eq!(PixelLayout::Bgra8.bytes_per_pixel(), 4);
+    fn pixel_data_dimensions() {
+        let img = ImgVec::new(vec![Rgb { r: 0u8, g: 0, b: 0 }; 100], 10, 10);
+        let data = PixelData::Rgb8(img);
+        assert_eq!(data.width(), 10);
+        assert_eq!(data.height(), 10);
+        assert!(!data.has_alpha());
     }
 
     #[test]
-    fn has_alpha() {
-        assert!(!PixelLayout::Rgb8.has_alpha());
-        assert!(PixelLayout::Rgba8.has_alpha());
-        assert!(!PixelLayout::Bgr8.has_alpha());
-        assert!(PixelLayout::Bgra8.has_alpha());
+    fn pixel_data_rgba_has_alpha() {
+        let img = ImgVec::new(
+            vec![Rgba { r: 0u8, g: 0, b: 0, a: 255 }; 4],
+            2,
+            2,
+        );
+        let data = PixelData::Rgba8(img);
+        assert!(data.has_alpha());
     }
 
     #[test]
-    fn min_buffer_size() {
-        assert_eq!(PixelLayout::Rgba8.min_buffer_size(100, 100), Some(40000));
-        assert_eq!(PixelLayout::Rgb8.min_buffer_size(100, 100), Some(30000));
-        // Overflow check
-        assert_eq!(PixelLayout::Rgba8.min_buffer_size(u32::MAX, u32::MAX), None);
+    fn rgb8_to_rgba8() {
+        let img = ImgVec::new(
+            vec![Rgb { r: 10u8, g: 20, b: 30 }; 4],
+            2,
+            2,
+        );
+        let data = PixelData::Rgb8(img);
+        let rgba = data.to_rgba8();
+        assert_eq!(rgba.width(), 2);
+        assert_eq!(rgba.height(), 2);
+        let px = &rgba.buf()[0];
+        assert_eq!(px.r, 10);
+        assert_eq!(px.g, 20);
+        assert_eq!(px.b, 30);
+        assert_eq!(px.a, 255);
     }
 }

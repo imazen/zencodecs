@@ -6,9 +6,8 @@ extern crate std;
 
 use std::io::Cursor;
 
-use crate::{
-    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelLayout, Stop,
-};
+use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
+use crate::{CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop};
 
 /// Probe PNG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -25,7 +24,6 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         png::ColorType::Rgba | png::ColorType::GrayscaleAlpha
     );
 
-    // Check for animation (APNG)
     let has_animation = info.animation_control.is_some();
     let frame_count = if let Some(actl) = &info.animation_control {
         actl.num_frames
@@ -33,7 +31,6 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         1
     };
 
-    // Extract ICC profile if present
     let icc_profile = info.icc_profile.as_ref().map(|p| p.to_vec());
 
     Ok(ImageInfo {
@@ -50,7 +47,6 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
 /// Decode PNG to pixels.
 pub(crate) fn decode(
     data: &[u8],
-    output_layout: PixelLayout,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
@@ -61,7 +57,6 @@ pub(crate) fn decode(
         .read_info()
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
 
-    // Get info for output
     let info = reader.info();
     let width = info.width;
     let height = info.height;
@@ -77,57 +72,64 @@ pub(crate) fn decode(
     };
     let icc_profile = info.icc_profile.as_ref().map(|p| p.to_vec());
 
-    // Allocate buffer
     let buffer_size = reader
         .output_buffer_size()
         .ok_or_else(|| CodecError::InvalidInput("cannot determine PNG output buffer size".into()))?;
-    let mut pixels = alloc::vec![0u8; buffer_size];
+    let mut raw_pixels = alloc::vec![0u8; buffer_size];
 
-    // Decode frame
     let output_info = reader
-        .next_frame(&mut pixels)
+        .next_frame(&mut raw_pixels)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
 
-    // Truncate to actual size
-    pixels.truncate(output_info.buffer_size());
+    raw_pixels.truncate(output_info.buffer_size());
 
-    // Get actual output color type from decoder
     let (decoded_color_type, _bit_depth) = reader.output_color_type();
-    let decoded_layout = match decoded_color_type {
-        png::ColorType::Rgb => PixelLayout::Rgb8,
-        png::ColorType::Rgba => PixelLayout::Rgba8,
-        png::ColorType::Grayscale | png::ColorType::GrayscaleAlpha => {
-            // PNG decoder expands grayscale to RGB/RGBA
-            if has_alpha {
-                PixelLayout::Rgba8
-            } else {
-                PixelLayout::Rgb8
-            }
+    let w = width as usize;
+    let h = height as usize;
+
+    let pixels = match decoded_color_type {
+        png::ColorType::Rgba => {
+            let rgba: &[Rgba<u8>] = bytemuck::cast_slice(&raw_pixels);
+            PixelData::Rgba8(ImgVec::new(rgba.to_vec(), w, h))
+        }
+        png::ColorType::Rgb => {
+            let rgb: &[Rgb<u8>] = bytemuck::cast_slice(&raw_pixels);
+            PixelData::Rgb8(ImgVec::new(rgb.to_vec(), w, h))
+        }
+        png::ColorType::GrayscaleAlpha => {
+            // GA → RGBA
+            let rgba: alloc::vec::Vec<Rgba<u8>> = raw_pixels
+                .chunks_exact(2)
+                .map(|ga| Rgba {
+                    r: ga[0],
+                    g: ga[0],
+                    b: ga[0],
+                    a: ga[1],
+                })
+                .collect();
+            PixelData::Rgba8(ImgVec::new(rgba, w, h))
+        }
+        png::ColorType::Grayscale => {
+            let gray: alloc::vec::Vec<rgb::Gray<u8>> = raw_pixels
+                .iter()
+                .map(|&g| rgb::Gray(g))
+                .collect();
+            PixelData::Gray8(ImgVec::new(gray, w, h))
         }
         png::ColorType::Indexed => {
-            // Indexed color is expanded to RGB/RGBA
+            // png crate expands indexed to RGB/RGBA
             if has_alpha {
-                PixelLayout::Rgba8
+                let rgba: &[Rgba<u8>] = bytemuck::cast_slice(&raw_pixels);
+                PixelData::Rgba8(ImgVec::new(rgba.to_vec(), w, h))
             } else {
-                PixelLayout::Rgb8
+                let rgb: &[Rgb<u8>] = bytemuck::cast_slice(&raw_pixels);
+                PixelData::Rgb8(ImgVec::new(rgb.to_vec(), w, h))
             }
         }
-    };
-
-    // Convert to requested layout if needed
-    let (final_pixels, final_layout) = if decoded_layout == output_layout {
-        (pixels, decoded_layout)
-    } else {
-        // TODO: Implement pixel format conversion
-        // For now, return what the decoder gave us
-        (pixels, decoded_layout)
     };
 
     Ok(DecodeOutput {
-        pixels: final_pixels,
-        width,
-        height,
-        layout: final_layout,
+        pixels,
         info: ImageInfo {
             width,
             height,
@@ -140,43 +142,62 @@ pub(crate) fn decode(
     })
 }
 
-/// Encode pixels to PNG.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn encode(
-    pixels: &[u8],
-    width: u32,
-    height: u32,
-    layout: PixelLayout,
-    _quality: Option<f32>, // PNG is lossless, no quality setting
-    _lossless: bool,       // PNG is always lossless
+/// Encode RGB8 pixels to PNG.
+pub(crate) fn encode_rgb8(
+    img: ImgRef<Rgb<u8>>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    // Swap BGR→RGB if needed (PNG only supports RGB-order)
-    let (final_pixels, rgb_layout) = crate::pixel::to_rgb_order(pixels, layout);
-    let color_type = if rgb_layout.has_alpha() {
-        png::ColorType::Rgba
-    } else {
-        png::ColorType::Rgb
-    };
+    let width = img.width() as u32;
+    let height = img.height() as u32;
+    let (buf, _, _) = img.to_contiguous_buf();
+    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
 
-    // Create output buffer
     let mut output = Vec::new();
     let mut encoder = png::Encoder::new(&mut output, width, height);
-    encoder.set_color(color_type);
+    encoder.set_color(png::ColorType::Rgb);
     encoder.set_depth(png::BitDepth::Eight);
 
-    // Write header and get writer
     let mut writer = encoder
         .write_header()
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
 
-    // Write pixel data
     writer
-        .write_image_data(&final_pixels)
+        .write_image_data(bytes)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
 
-    // Drop writer to flush
+    drop(writer);
+
+    Ok(EncodeOutput {
+        data: output,
+        format: ImageFormat::Png,
+    })
+}
+
+/// Encode RGBA8 pixels to PNG.
+pub(crate) fn encode_rgba8(
+    img: ImgRef<Rgba<u8>>,
+    _limits: Option<&Limits>,
+    _stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let width = img.width() as u32;
+    let height = img.height() as u32;
+    let (buf, _, _) = img.to_contiguous_buf();
+    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
+
+    let mut output = Vec::new();
+    let mut encoder = png::Encoder::new(&mut output, width, height);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+
+    let mut writer = encoder
+        .write_header()
+        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
+
+    writer
+        .write_image_data(bytes)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
+
     drop(writer);
 
     Ok(EncodeOutput {
