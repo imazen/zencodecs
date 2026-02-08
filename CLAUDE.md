@@ -76,16 +76,24 @@ zencodecs/
 - Passed to `EncodeRequest::with_codec_config(&config)`
 
 ### Metadata (ICC/EXIF/XMP)
+- `ImageInfo` has `icc_profile`, `exif`, `xmp` fields (all `Option<Vec<u8>>`)
+- `ImageInfo::metadata()` returns `ImageMetadata` borrowing from the info (for roundtrip convenience)
 - `ImageMetadata<'a>` with `icc_profile`, `exif`, `xmp` fields (all `Option<&'a [u8]>`)
 - Passed to `EncodeRequest::with_metadata(&meta)`
-- Per-codec support: JPEG (all three), WebP (all three via mux), PNG (ICC+EXIF), AVIF (EXIF only), GIF (none)
+- **Decode extraction**: JPEG (ICC/EXIF/XMP via zenjpeg extras), WebP (ICC/EXIF/XMP via demuxer), PNG (ICC/EXIF), AVIF/GIF (none)
+- **Encode embedding**: JPEG (ICC/EXIF/XMP), WebP (ICC/EXIF/XMP via mux), PNG (ICC/EXIF), AVIF (EXIF only), GIF (none)
+
+### Pixel Conversions
+- `PixelData::to_rgb8()` and `to_rgba8()` convert any variant to 8-bit
+- `PixelData::as_bytes()` returns raw bytes
+- `PixelData::has_alpha()`, `width()`, `height()` accessors
 
 ### What's NOT implemented yet
 - Streaming decode/encode
 - Animation frame iteration
 - Color management (moxcms)
 - `decode_into()` pre-allocated buffer
-- Format-specific decode configs (only encode configs wired up)
+- Format-specific decode configs (JPEG/AVIF decoder configs accepted but not wired to underlying codecs yet)
 
 ## Public API Spec (Design Intent)
 
