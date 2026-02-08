@@ -9,37 +9,36 @@ use crate::{
 
 /// Probe WebP metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    let decoder = zenwebp::WebPDecoder::new(data)
+    let info = zenwebp::ImageInfo::from_webp(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
-
-    let (width, height) = decoder.dimensions();
-    let has_alpha = decoder.has_alpha();
-
-    let demuxer = zenwebp::WebPDemuxer::new(data)
-        .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
-    let has_animation = demuxer.is_animated();
-    let frame_count = demuxer.num_frames();
-    let icc_profile = demuxer.icc_profile().map(|p| p.to_vec());
-    let exif = demuxer.exif().map(|p| p.to_vec());
-    let xmp = demuxer.xmp().map(|p| p.to_vec());
 
     Ok(ImageInfo {
-        width,
-        height,
+        width: info.width,
+        height: info.height,
         format: ImageFormat::WebP,
-        has_alpha,
-        has_animation,
-        frame_count: Some(frame_count),
-        icc_profile,
-        exif,
-        xmp,
+        has_alpha: info.has_alpha,
+        has_animation: info.has_animation,
+        frame_count: Some(info.frame_count),
+        icc_profile: info.icc_profile,
+        exif: info.exif,
+        xmp: info.xmp,
     })
 }
 
-/// Build zenwebp Limits from zencodecs Limits.
-fn to_webp_limits(limits: Option<&Limits>) -> zenwebp::decoder::Limits {
-    let mut wl = zenwebp::decoder::Limits::default();
+/// Build zenwebp DecodeConfig from codec config and limits.
+fn build_decode_config(
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+) -> zenwebp::DecodeConfig {
+    // Start from the user's config if provided, otherwise default.
+    let mut config = codec_config
+        .and_then(|c| c.webp_decoder.as_ref())
+        .map(|c| c.as_ref().clone())
+        .unwrap_or_default();
+
+    // Merge zencodecs limits into the config's limits.
     if let Some(lim) = limits {
+        let mut wl = config.limits.clone();
         if let Some(max_w) = lim.max_width {
             wl.max_width = Some(max_w as u32);
         }
@@ -52,39 +51,37 @@ fn to_webp_limits(limits: Option<&Limits>) -> zenwebp::decoder::Limits {
         if let Some(max_mem) = lim.max_memory_bytes {
             wl.max_memory = Some(max_mem);
         }
+        config = config.limits(wl);
     }
-    wl
+
+    config
 }
 
 /// Decode WebP to pixels.
 pub(crate) fn decode(
     data: &[u8],
-    _codec_config: Option<&CodecConfig>,
+    codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    let demuxer = zenwebp::WebPDemuxer::new(data)
+    // Get metadata via lightweight probe (parses headers, no pixel decode).
+    let webp_info = zenwebp::ImageInfo::from_webp(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
-    let has_animation = demuxer.is_animated();
-    let icc_profile = demuxer.icc_profile().map(|p| p.to_vec());
-    let exif = demuxer.exif().map(|p| p.to_vec());
-    let xmp = demuxer.xmp().map(|p| p.to_vec());
 
-    let webp_config = zenwebp::DecodeConfig::default().limits(to_webp_limits(limits));
+    let decode_config = build_decode_config(codec_config, limits);
 
-    let mut request = zenwebp::DecodeRequest::new(&webp_config, data);
+    let mut request = zenwebp::DecodeRequest::new(&decode_config, data);
     if let Some(s) = stop {
         request = request.stop(s);
     }
 
-    let has_alpha = zenwebp::WebPDecoder::new(data)
-        .map(|d| d.has_alpha())
-        .unwrap_or(false);
+    // decode() auto-selects RGB or RGBA based on image content.
+    let (raw, width, height, layout) = request
+        .decode()
+        .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
 
+    let has_alpha = layout == zenwebp::PixelLayout::Rgba8;
     let pixels = if has_alpha {
-        let (raw, width, height) = request
-            .decode_rgba()
-            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
         let rgba_pixels: &[Rgba<u8>] = bytemuck::cast_slice(&raw);
         PixelData::Rgba8(ImgVec::new(
             rgba_pixels.to_vec(),
@@ -92,9 +89,6 @@ pub(crate) fn decode(
             height as usize,
         ))
     } else {
-        let (raw, width, height) = request
-            .decode_rgb()
-            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
         let rgb_pixels: &[Rgb<u8>] = bytemuck::cast_slice(&raw);
         PixelData::Rgb8(ImgVec::new(
             rgb_pixels.to_vec(),
@@ -102,9 +96,6 @@ pub(crate) fn decode(
             height as usize,
         ))
     };
-
-    let width = pixels.width();
-    let height = pixels.height();
 
     // Additional zencodecs-level limits check
     if let Some(lim) = limits {
@@ -118,16 +109,33 @@ pub(crate) fn decode(
             width,
             height,
             format: ImageFormat::WebP,
-            has_alpha,
-            has_animation,
-            frame_count: Some(demuxer.num_frames()),
-            icc_profile,
-            exif,
-            xmp,
+            has_alpha: webp_info.has_alpha,
+            has_animation: webp_info.has_animation,
+            frame_count: Some(webp_info.frame_count),
+            icc_profile: webp_info.icc_profile,
+            exif: webp_info.exif,
+            xmp: webp_info.xmp,
         },
         #[cfg(feature = "jpeg")]
         jpeg_extras: None,
     })
+}
+
+/// Convert zencodecs ImageMetadata to zenwebp ImageMetadata.
+fn to_webp_metadata<'a>(metadata: Option<&'a ImageMetadata<'a>>) -> zenwebp::ImageMetadata<'a> {
+    let mut webp_meta = zenwebp::ImageMetadata::new();
+    if let Some(meta) = metadata {
+        if let Some(icc) = meta.icc_profile {
+            webp_meta = webp_meta.with_icc_profile(icc);
+        }
+        if let Some(exif) = meta.exif {
+            webp_meta = webp_meta.with_exif(exif);
+        }
+        if let Some(xmp) = meta.xmp {
+            webp_meta = webp_meta.with_xmp(xmp);
+        }
+    }
+    webp_meta
 }
 
 /// Encode RGB8 pixels to WebP.
@@ -138,19 +146,31 @@ pub(crate) fn encode_rgb8(
     metadata: Option<&ImageMetadata<'_>>,
     codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
-    _stop: Option<&dyn Stop>,
+    stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
     let width = img.width() as u32;
     let height = img.height() as u32;
     let (buf, _, _) = img.to_contiguous_buf();
     let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
+    let webp_meta = to_webp_metadata(metadata);
 
-    let mut webp_data = if lossless {
+    let webp_data = if lossless {
         let config = codec_config
             .and_then(|c| c.webp_lossless.as_ref())
             .map(|c| c.as_ref().clone())
             .unwrap_or_default();
-        zenwebp::EncodeRequest::lossless(&config, bytes, zenwebp::PixelLayout::Rgb8, width, height)
+        let mut request = zenwebp::EncodeRequest::lossless(
+            &config,
+            bytes,
+            zenwebp::PixelLayout::Rgb8,
+            width,
+            height,
+        )
+        .with_metadata(webp_meta);
+        if let Some(s) = stop {
+            request = request.with_stop(s);
+        }
+        request
             .encode()
             .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
     } else {
@@ -159,12 +179,21 @@ pub(crate) fn encode_rgb8(
             .and_then(|c| c.webp_lossy.as_ref())
             .map(|c| c.as_ref().clone())
             .unwrap_or_else(|| zenwebp::LossyConfig::new().with_quality(quality));
-        zenwebp::EncodeRequest::lossy(&config, bytes, zenwebp::PixelLayout::Rgb8, width, height)
+        let mut request = zenwebp::EncodeRequest::lossy(
+            &config,
+            bytes,
+            zenwebp::PixelLayout::Rgb8,
+            width,
+            height,
+        )
+        .with_metadata(webp_meta);
+        if let Some(s) = stop {
+            request = request.with_stop(s);
+        }
+        request
             .encode()
             .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
     };
-
-    embed_webp_metadata(&mut webp_data, metadata)?;
 
     Ok(EncodeOutput {
         data: webp_data,
@@ -180,19 +209,31 @@ pub(crate) fn encode_rgba8(
     metadata: Option<&ImageMetadata<'_>>,
     codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
-    _stop: Option<&dyn Stop>,
+    stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
     let width = img.width() as u32;
     let height = img.height() as u32;
     let (buf, _, _) = img.to_contiguous_buf();
     let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
+    let webp_meta = to_webp_metadata(metadata);
 
-    let mut webp_data = if lossless {
+    let webp_data = if lossless {
         let config = codec_config
             .and_then(|c| c.webp_lossless.as_ref())
             .map(|c| c.as_ref().clone())
             .unwrap_or_default();
-        zenwebp::EncodeRequest::lossless(&config, bytes, zenwebp::PixelLayout::Rgba8, width, height)
+        let mut request = zenwebp::EncodeRequest::lossless(
+            &config,
+            bytes,
+            zenwebp::PixelLayout::Rgba8,
+            width,
+            height,
+        )
+        .with_metadata(webp_meta);
+        if let Some(s) = stop {
+            request = request.with_stop(s);
+        }
+        request
             .encode()
             .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
     } else {
@@ -201,37 +242,24 @@ pub(crate) fn encode_rgba8(
             .and_then(|c| c.webp_lossy.as_ref())
             .map(|c| c.as_ref().clone())
             .unwrap_or_else(|| zenwebp::LossyConfig::new().with_quality(quality));
-        zenwebp::EncodeRequest::lossy(&config, bytes, zenwebp::PixelLayout::Rgba8, width, height)
+        let mut request = zenwebp::EncodeRequest::lossy(
+            &config,
+            bytes,
+            zenwebp::PixelLayout::Rgba8,
+            width,
+            height,
+        )
+        .with_metadata(webp_meta);
+        if let Some(s) = stop {
+            request = request.with_stop(s);
+        }
+        request
             .encode()
             .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
     };
-
-    embed_webp_metadata(&mut webp_data, metadata)?;
 
     Ok(EncodeOutput {
         data: webp_data,
         format: ImageFormat::WebP,
     })
-}
-
-/// Embed ICC/EXIF/XMP metadata into encoded WebP data via mux.
-fn embed_webp_metadata(
-    webp_data: &mut alloc::vec::Vec<u8>,
-    metadata: Option<&ImageMetadata<'_>>,
-) -> Result<(), CodecError> {
-    if let Some(meta) = metadata {
-        if let Some(icc) = meta.icc_profile {
-            *webp_data = zenwebp::embed_icc(webp_data, icc)
-                .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
-        }
-        if let Some(exif) = meta.exif {
-            *webp_data = zenwebp::embed_exif(webp_data, exif)
-                .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
-        }
-        if let Some(xmp) = meta.xmp {
-            *webp_data = zenwebp::embed_xmp(webp_data, xmp)
-                .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
-        }
-    }
-    Ok(())
 }

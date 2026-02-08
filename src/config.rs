@@ -24,7 +24,10 @@ pub mod jpeg {
 /// WebP configuration types from zenwebp.
 #[cfg(feature = "webp")]
 pub mod webp {
-    pub use zenwebp::{LosslessConfig, LossyConfig, PixelLayout as WebpPixelLayout, Preset};
+    pub use zenwebp::{
+        DecodeConfig, LosslessConfig, LossyConfig, PixelLayout as WebpPixelLayout, Preset,
+        UpsamplingMethod,
+    };
 }
 
 /// GIF configuration types from zengif.
@@ -83,6 +86,10 @@ pub struct CodecConfig {
     #[cfg(feature = "jpeg")]
     pub jpeg_decoder: Option<Box<jpeg::DecoderConfig>>,
 
+    /// WebP decoder configuration (upsampling method, limits).
+    #[cfg(feature = "webp")]
+    pub webp_decoder: Option<Box<webp::DecodeConfig>>,
+
     /// WebP lossy encoder configuration (overrides quality).
     #[cfg(feature = "webp")]
     pub webp_lossy: Option<Box<webp::LossyConfig>>,
@@ -134,6 +141,13 @@ impl CodecConfig {
     #[cfg(feature = "jpeg")]
     pub fn with_jpeg_decoder(mut self, config: jpeg::DecoderConfig) -> Self {
         self.jpeg_decoder = Some(Box::new(config));
+        self
+    }
+
+    /// Set WebP decoder configuration (upsampling method, limits).
+    #[cfg(feature = "webp")]
+    pub fn with_webp_decoder(mut self, config: webp::DecodeConfig) -> Self {
+        self.webp_decoder = Some(Box::new(config));
         self
     }
 
@@ -212,6 +226,7 @@ impl core::fmt::Debug for CodecConfig {
         }
         #[cfg(feature = "webp")]
         {
+            d.field("webp_decoder", &self.webp_decoder.is_some());
             d.field("webp_lossy", &self.webp_lossy.is_some());
             d.field("webp_lossless", &self.webp_lossless.is_some());
         }
