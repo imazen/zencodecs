@@ -70,24 +70,21 @@ pub(crate) fn decode(
     let exif = demuxer.exif().map(|p| p.to_vec());
     let xmp = demuxer.xmp().map(|p| p.to_vec());
 
-    // Use WebPDecoder directly to work around DecodeRequest::decode_rgba() bug
-    // where it allocates w*h*4 but read_image expects output_buffer_size() (w*h*3 for non-alpha).
-    let mut decoder = zenwebp::WebPDecoder::new(data)
-        .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
-    decoder.set_limits(to_webp_limits(limits));
-    decoder.set_stop(stop);
+    let webp_config = zenwebp::DecodeConfig::default().limits(to_webp_limits(limits));
 
-    let (width, height) = decoder.dimensions();
-    let has_alpha = decoder.has_alpha();
-    let output_size = decoder
-        .output_buffer_size()
-        .ok_or_else(|| CodecError::LimitExceeded("WebP output buffer size overflow".into()))?;
-    let mut raw = alloc::vec![0u8; output_size];
-    decoder
-        .read_image(&mut raw)
-        .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
+    let mut request = zenwebp::DecodeRequest::new(&webp_config, data);
+    if let Some(s) = stop {
+        request = request.stop(s);
+    }
+
+    let has_alpha = zenwebp::WebPDecoder::new(data)
+        .map(|d| d.has_alpha())
+        .unwrap_or(false);
 
     let pixels = if has_alpha {
+        let (raw, width, height) = request
+            .decode_rgba()
+            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
         let rgba_pixels: &[Rgba<u8>] = bytemuck::cast_slice(&raw);
         PixelData::Rgba8(ImgVec::new(
             rgba_pixels.to_vec(),
@@ -95,6 +92,9 @@ pub(crate) fn decode(
             height as usize,
         ))
     } else {
+        let (raw, width, height) = request
+            .decode_rgb()
+            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
         let rgb_pixels: &[Rgb<u8>] = bytemuck::cast_slice(&raw);
         PixelData::Rgb8(ImgVec::new(
             rgb_pixels.to_vec(),
@@ -102,6 +102,9 @@ pub(crate) fn decode(
             height as usize,
         ))
     };
+
+    let width = pixels.width();
+    let height = pixels.height();
 
     // Additional zencodecs-level limits check
     if let Some(lim) = limits {
