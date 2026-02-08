@@ -33,6 +33,12 @@ pub mod gif {
     pub use zengif::EncoderConfig;
 }
 
+/// PNG configuration types from png crate.
+#[cfg(feature = "png")]
+pub mod png_codec {
+    pub use png::{Compression, DeflateCompression, Filter};
+}
+
 /// AVIF decode configuration from zenavif.
 #[cfg(feature = "avif-decode")]
 pub mod avif_decode {
@@ -89,6 +95,14 @@ pub struct CodecConfig {
     #[cfg(feature = "gif")]
     pub gif_encoder: Option<Box<gif::EncoderConfig>>,
 
+    /// PNG compression level.
+    #[cfg(feature = "png")]
+    pub png_compression: Option<png::Compression>,
+
+    /// PNG filter strategy.
+    #[cfg(feature = "png")]
+    pub png_filter: Option<png::Filter>,
+
     /// AVIF decoder configuration.
     #[cfg(feature = "avif-decode")]
     pub avif_decoder: Option<Box<avif_decode::DecoderConfig>>,
@@ -144,6 +158,20 @@ impl CodecConfig {
         self
     }
 
+    /// Set PNG compression level.
+    #[cfg(feature = "png")]
+    pub fn with_png_compression(mut self, compression: png::Compression) -> Self {
+        self.png_compression = Some(compression);
+        self
+    }
+
+    /// Set PNG filter strategy.
+    #[cfg(feature = "png")]
+    pub fn with_png_filter(mut self, filter: png::Filter) -> Self {
+        self.png_filter = Some(filter);
+        self
+    }
+
     /// Set AVIF decoder configuration.
     #[cfg(feature = "avif-decode")]
     pub fn with_avif_decoder(mut self, config: avif_decode::DecoderConfig) -> Self {
@@ -189,6 +217,11 @@ impl core::fmt::Debug for CodecConfig {
         }
         #[cfg(feature = "gif")]
         d.field("gif_encoder", &self.gif_encoder.is_some());
+        #[cfg(feature = "png")]
+        {
+            d.field("png_compression", &self.png_compression);
+            d.field("png_filter", &self.png_filter);
+        }
         #[cfg(feature = "avif-decode")]
         d.field("avif_decoder", &self.avif_decoder.is_some());
         #[cfg(feature = "avif-encode")]

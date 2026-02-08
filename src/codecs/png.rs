@@ -6,6 +6,7 @@ extern crate std;
 
 use std::io::Cursor;
 
+use crate::config::CodecConfig;
 use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
     CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, ImageMetadata, Limits,
@@ -164,10 +165,23 @@ pub(crate) fn decode(
     })
 }
 
+/// Apply PNG-specific config to an encoder.
+fn apply_png_config<W: std::io::Write>(encoder: &mut png::Encoder<'_, W>, codec_config: Option<&CodecConfig>) {
+    if let Some(cfg) = codec_config {
+        if let Some(compression) = cfg.png_compression {
+            encoder.set_compression(compression);
+        }
+        if let Some(filter) = cfg.png_filter {
+            encoder.set_filter(filter);
+        }
+    }
+}
+
 /// Encode RGB8 pixels to PNG.
 pub(crate) fn encode_rgb8(
     img: ImgRef<Rgb<u8>>,
     metadata: Option<&ImageMetadata<'_>>,
+    codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
@@ -178,8 +192,9 @@ pub(crate) fn encode_rgb8(
 
     let mut output = Vec::new();
     let info = make_png_info(width, height, png::ColorType::Rgb, metadata);
-    let encoder = png::Encoder::with_info(&mut output, info)
+    let mut encoder = png::Encoder::with_info(&mut output, info)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
+    apply_png_config(&mut encoder, codec_config);
 
     let mut writer = encoder
         .write_header()
@@ -201,6 +216,7 @@ pub(crate) fn encode_rgb8(
 pub(crate) fn encode_rgba8(
     img: ImgRef<Rgba<u8>>,
     metadata: Option<&ImageMetadata<'_>>,
+    codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
@@ -211,8 +227,9 @@ pub(crate) fn encode_rgba8(
 
     let mut output = Vec::new();
     let info = make_png_info(width, height, png::ColorType::Rgba, metadata);
-    let encoder = png::Encoder::with_info(&mut output, info)
+    let mut encoder = png::Encoder::with_info(&mut output, info)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
+    apply_png_config(&mut encoder, codec_config);
 
     let mut writer = encoder
         .write_header()

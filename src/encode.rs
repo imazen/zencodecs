@@ -269,7 +269,7 @@ impl<'a> EncodeRequest<'a> {
 
             #[cfg(feature = "png")]
             ImageFormat::Png => {
-                crate::codecs::png::encode_rgb8(img, self.metadata, self.limits, self.stop)
+                crate::codecs::png::encode_rgb8(img, self.metadata, self.codec_config, self.limits, self.stop)
             }
             #[cfg(not(feature = "png"))]
             ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
@@ -328,7 +328,7 @@ impl<'a> EncodeRequest<'a> {
 
             #[cfg(feature = "png")]
             ImageFormat::Png => {
-                crate::codecs::png::encode_rgba8(img, self.metadata, self.limits, self.stop)
+                crate::codecs::png::encode_rgba8(img, self.metadata, self.codec_config, self.limits, self.stop)
             }
             #[cfg(not(feature = "png"))]
             ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
