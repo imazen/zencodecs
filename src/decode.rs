@@ -1,5 +1,6 @@
 //! Image decoding.
 
+use crate::config::CodecConfig;
 use crate::{CodecError, CodecRegistry, ImageFormat, ImageInfo, Limits, PixelData, Stop};
 
 /// Decoded image output.
@@ -41,6 +42,7 @@ pub struct DecodeRequest<'a> {
     limits: Option<&'a Limits>,
     stop: Option<&'a dyn Stop>,
     registry: Option<&'a CodecRegistry>,
+    codec_config: Option<&'a CodecConfig>,
 }
 
 impl<'a> DecodeRequest<'a> {
@@ -55,6 +57,7 @@ impl<'a> DecodeRequest<'a> {
             limits: None,
             stop: None,
             registry: None,
+            codec_config: None,
         }
     }
 
@@ -79,6 +82,12 @@ impl<'a> DecodeRequest<'a> {
     /// Set a codec registry to control which formats are enabled.
     pub fn with_registry(mut self, registry: &'a CodecRegistry) -> Self {
         self.registry = Some(registry);
+        self
+    }
+
+    /// Set format-specific codec configuration.
+    pub fn with_codec_config(mut self, config: &'a CodecConfig) -> Self {
+        self.codec_config = Some(config);
         self
     }
 
@@ -131,7 +140,7 @@ impl<'a> DecodeRequest<'a> {
 
     #[cfg(feature = "jpeg")]
     fn decode_jpeg(self) -> Result<DecodeOutput, CodecError> {
-        crate::codecs::jpeg::decode(self.data, self.limits, self.stop)
+        crate::codecs::jpeg::decode(self.data, self.codec_config, self.limits, self.stop)
     }
 
     #[cfg(feature = "webp")]
@@ -151,7 +160,7 @@ impl<'a> DecodeRequest<'a> {
 
     #[cfg(feature = "avif-decode")]
     fn decode_avif(self) -> Result<DecodeOutput, CodecError> {
-        crate::codecs::avif_dec::decode(self.data, self.limits, self.stop)
+        crate::codecs::avif_dec::decode(self.data, self.codec_config, self.limits, self.stop)
     }
 }
 

@@ -1,5 +1,6 @@
 //! AVIF decode adapter using zenavif.
 
+use crate::config::CodecConfig;
 use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop};
 
 /// Probe AVIF metadata without decoding pixels.
@@ -20,9 +21,11 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
 /// Decode AVIF to pixels.
 pub(crate) fn decode(
     data: &[u8],
+    _codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
+    // TODO: use codec_config.avif_decoder when zenavif supports DecoderConfig
     let image = zenavif::decode(data).map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))?;
 
     let width = image.width() as u32;

@@ -28,9 +28,11 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
 /// Decode JPEG to pixels.
 pub(crate) fn decode(
     data: &[u8],
+    _codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
+    // TODO: use codec_config.jpeg_decoder when zenjpeg decoder supports DecodeConfig
     let decoder = zenjpeg::decoder::Decoder::new();
 
     let decoded = decoder
