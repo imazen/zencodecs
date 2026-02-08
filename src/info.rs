@@ -2,7 +2,7 @@
 
 use alloc::vec::Vec;
 
-use crate::{CodecError, CodecRegistry, ImageFormat};
+use crate::{CodecError, CodecRegistry, ImageFormat, ImageMetadata};
 
 /// Unified image metadata from header parsing.
 ///
@@ -31,6 +31,17 @@ pub struct ImageInfo {
 }
 
 impl ImageInfo {
+    /// Create an `ImageMetadata` referencing this info's embedded metadata.
+    ///
+    /// Useful for roundtrip decode → re-encode with preserved metadata.
+    pub fn metadata(&self) -> ImageMetadata<'_> {
+        ImageMetadata {
+            icc_profile: self.icc_profile.as_deref(),
+            exif: self.exif.as_deref(),
+            xmp: self.xmp.as_deref(),
+        }
+    }
+
     /// Probe image metadata without decoding pixels.
     ///
     /// Uses format auto-detection and dispatches to the appropriate codec's probe.
