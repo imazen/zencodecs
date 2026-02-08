@@ -190,7 +190,7 @@ pub(crate) fn encode_rgb8(
     let (buf, _, _) = img.to_contiguous_buf();
     let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
 
-    let mut output = Vec::new();
+    let mut output = alloc::vec::Vec::new();
     let info = make_png_info(width, height, png::ColorType::Rgb, metadata);
     let mut encoder = png::Encoder::with_info(&mut output, info)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
@@ -225,7 +225,7 @@ pub(crate) fn encode_rgba8(
     let (buf, _, _) = img.to_contiguous_buf();
     let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
 
-    let mut output = Vec::new();
+    let mut output = alloc::vec::Vec::new();
     let info = make_png_info(width, height, png::ColorType::Rgba, metadata);
     let mut encoder = png::Encoder::with_info(&mut output, info)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;

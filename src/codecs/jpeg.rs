@@ -10,26 +10,43 @@ use crate::{
 /// Probe JPEG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     let decoder = zenjpeg::decoder::Decoder::new();
-    let result = decoder
-        .decode(data, enough::Unstoppable)
+    let info = decoder
+        .read_info(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
-    let extras = result.extras();
-    let icc_profile = extras.and_then(|e| e.icc_profile()).map(|p| p.to_vec());
-    let exif = extras.and_then(|e| e.exif()).map(|p| p.to_vec());
-    let xmp = extras.and_then(|e| e.xmp()).map(|s| s.as_bytes().to_vec());
-
     Ok(ImageInfo {
-        width: result.width(),
-        height: result.height(),
+        width: info.dimensions.width,
+        height: info.dimensions.height,
         format: ImageFormat::Jpeg,
         has_alpha: false,
         has_animation: false,
         frame_count: Some(1),
-        icc_profile,
-        exif,
-        xmp,
+        icc_profile: info.icc_profile,
+        exif: info.exif,
+        xmp: info.xmp.map(|s| s.into_bytes()),
     })
+}
+
+/// Build a zenjpeg Decoder from codec config and limits.
+fn build_decoder(
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+) -> zenjpeg::decoder::Decoder {
+    let mut decoder = codec_config
+        .and_then(|c| c.jpeg_decoder.as_ref())
+        .map(|d| d.as_ref().clone())
+        .unwrap_or_default();
+
+    if let Some(lim) = limits {
+        if let Some(max_px) = lim.max_pixels {
+            decoder = decoder.max_pixels(max_px);
+        }
+        if let Some(max_mem) = lim.max_memory_bytes {
+            decoder = decoder.max_memory(max_mem);
+        }
+    }
+
+    decoder
 }
 
 /// Decode JPEG to pixels.
@@ -40,39 +57,14 @@ pub(crate) fn decode(
     stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
     let stop = crate::limits::stop_or_default(stop);
+    let decoder = build_decoder(codec_config, limits);
 
-    // Build zenjpeg DecodeConfig from codec_config, or use defaults
-    let decode_config = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_decoder.as_ref()) {
-        let mut dc = cfg.as_ref().clone();
-        // Override limits from zencodecs Limits if provided
-        if let Some(lim) = limits {
-            if let Some(max_px) = lim.max_pixels {
-                dc.max_pixels = max_px;
-            }
-            if let Some(max_mem) = lim.max_memory_bytes {
-                dc.max_memory = max_mem as usize;
-            }
-        }
-        dc
-    } else {
-        let mut dc = zenjpeg::decoder::DecodeConfig::default();
-        if let Some(lim) = limits {
-            if let Some(max_px) = lim.max_pixels {
-                dc.max_pixels = max_px;
-            }
-            if let Some(max_mem) = lim.max_memory_bytes {
-                dc.max_memory = max_mem as usize;
-            }
-        }
-        dc
-    };
-
-    let mut decoded = decode_config
+    let mut result = decoder
         .decode(data, stop)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
-    let width = decoded.width();
-    let height = decoded.height();
+    let width = result.width();
+    let height = result.height();
 
     // Validate dimensions against zencodecs limits (zenjpeg has its own, but
     // this catches width/height limits that zenjpeg doesn't check)
@@ -80,19 +72,21 @@ pub(crate) fn decode(
         lim.validate(width, height, 3)?;
     }
 
-    let extras = decoded.extras();
-    let icc_profile = extras.and_then(|e| e.icc_profile()).map(|p| p.to_vec());
-    let exif = extras.and_then(|e| e.exif()).map(|p| p.to_vec());
-    let xmp = extras.and_then(|e| e.xmp()).map(|s| s.as_bytes().to_vec());
+    let extras = result.extras();
+    let icc_profile = extras.and_then(|e| e.icc_profile()).map(|p: &[u8]| p.to_vec());
+    let exif = extras.and_then(|e| e.exif()).map(|p: &[u8]| p.to_vec());
+    let xmp = extras
+        .and_then(|e| e.xmp())
+        .map(|s: &str| s.as_bytes().to_vec());
 
-    let raw_pixels = decoded
+    let raw_pixels = result
         .pixels_u8()
         .ok_or_else(|| CodecError::InvalidInput("no pixel data in decoded image".into()))?;
 
     let rgb_pixels: &[Rgb<u8>] = bytemuck::cast_slice(raw_pixels);
     let img = ImgVec::new(rgb_pixels.to_vec(), width as usize, height as usize);
 
-    let jpeg_extras = decoded.take_extras().map(alloc::boxed::Box::new);
+    let jpeg_extras = result.take_extras().map(alloc::boxed::Box::new);
 
     Ok(DecodeOutput {
         pixels: PixelData::Rgb8(img),
@@ -118,48 +112,32 @@ pub(crate) fn encode_rgb8(
     metadata: Option<&ImageMetadata<'_>>,
     codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
-    _stop: Option<&dyn Stop>,
+    stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
     // If user provided a full JPEG encoder config, use it
-    if let Some(config) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
-        return encode_with_config(config, img, metadata);
-    }
+    let config = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
+        cfg.as_ref().clone()
+    } else {
+        let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0) as u8;
+        zenjpeg::encoder::EncoderConfig::ycbcr(
+            quality,
+            zenjpeg::encoder::ChromaSubsampling::Quarter,
+        )
+    };
 
-    let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0) as u8;
     let width = img.width() as u32;
     let height = img.height() as u32;
-
-    let mut config = zenjpeg::encoder::EncoderConfig::ycbcr(
-        quality,
-        zenjpeg::encoder::ChromaSubsampling::Quarter,
-    );
-
-    // Apply metadata to config
-    if let Some(meta) = metadata {
-        if let Some(icc) = meta.icc_profile {
-            config = config.icc_profile(icc.to_vec());
-        }
-        if let Some(exif) = meta.exif {
-            config = config.exif(zenjpeg::encoder::Exif::Raw(exif.to_vec()));
-        }
-        if let Some(xmp) = meta.xmp {
-            config = config.xmp(xmp.to_vec());
-        }
-    }
-
     let (buf, _, _) = img.to_contiguous_buf();
     let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
 
-    let mut encoder = config
-        .encode_from_bytes(width, height, zenjpeg::encoder::PixelLayout::Rgb8Srgb)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+    let mut request = config.request();
+    request = apply_metadata(request, metadata);
+    if let Some(s) = stop {
+        request = request.stop(s);
+    }
 
-    encoder
-        .push_packed(bytes, enough::Unstoppable)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
-
-    let jpeg_data = encoder
-        .finish()
+    let jpeg_data = request
+        .encode_bytes(bytes, width, height, zenjpeg::encoder::PixelLayout::Rgb8Srgb)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
     Ok(EncodeOutput {
@@ -175,46 +153,31 @@ pub(crate) fn encode_rgba8(
     metadata: Option<&ImageMetadata<'_>>,
     codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
-    _stop: Option<&dyn Stop>,
+    stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0) as u8;
-    let width = img.width() as u32;
-    let height = img.height() as u32;
-
-    let mut config = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
+    let config = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
         cfg.as_ref().clone()
     } else {
+        let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0) as u8;
         zenjpeg::encoder::EncoderConfig::ycbcr(
             quality,
             zenjpeg::encoder::ChromaSubsampling::Quarter,
         )
     };
 
-    if let Some(meta) = metadata {
-        if let Some(icc) = meta.icc_profile {
-            config = config.icc_profile(icc.to_vec());
-        }
-        if let Some(exif) = meta.exif {
-            config = config.exif(zenjpeg::encoder::Exif::Raw(exif.to_vec()));
-        }
-        if let Some(xmp) = meta.xmp {
-            config = config.xmp(xmp.to_vec());
-        }
-    }
-
+    let width = img.width() as u32;
+    let height = img.height() as u32;
     let (buf, _, _) = img.to_contiguous_buf();
     let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
 
-    let mut encoder = config
-        .encode_from_bytes(width, height, zenjpeg::encoder::PixelLayout::Rgba8Srgb)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+    let mut request = config.request();
+    request = apply_metadata(request, metadata);
+    if let Some(s) = stop {
+        request = request.stop(s);
+    }
 
-    encoder
-        .push_packed(bytes, enough::Unstoppable)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
-
-    let jpeg_data = encoder
-        .finish()
+    let jpeg_data = request
+        .encode_bytes(bytes, width, height, zenjpeg::encoder::PixelLayout::Rgba8Srgb)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
     Ok(EncodeOutput {
@@ -223,46 +186,21 @@ pub(crate) fn encode_rgba8(
     })
 }
 
-/// Encode using a fully-specified JPEG encoder config (RGB8 path).
-fn encode_with_config(
-    config: &zenjpeg::encoder::EncoderConfig,
-    img: ImgRef<Rgb<u8>>,
-    metadata: Option<&ImageMetadata<'_>>,
-) -> Result<EncodeOutput, CodecError> {
-    let width = img.width() as u32;
-    let height = img.height() as u32;
-
-    let mut config = config.clone();
-
+/// Apply zencodecs ImageMetadata to a zenjpeg EncodeRequest.
+fn apply_metadata<'a>(
+    mut request: zenjpeg::encoder::EncodeRequest<'a>,
+    metadata: Option<&'a ImageMetadata<'a>>,
+) -> zenjpeg::encoder::EncodeRequest<'a> {
     if let Some(meta) = metadata {
         if let Some(icc) = meta.icc_profile {
-            config = config.icc_profile(icc.to_vec());
+            request = request.icc_profile(icc);
         }
         if let Some(exif) = meta.exif {
-            config = config.exif(zenjpeg::encoder::Exif::Raw(exif.to_vec()));
+            request = request.exif(zenjpeg::encoder::Exif::raw(exif.to_vec()));
         }
         if let Some(xmp) = meta.xmp {
-            config = config.xmp(xmp.to_vec());
+            request = request.xmp(xmp);
         }
     }
-
-    let (buf, _, _) = img.to_contiguous_buf();
-    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
-
-    let mut encoder = config
-        .encode_from_bytes(width, height, zenjpeg::encoder::PixelLayout::Rgb8Srgb)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
-
-    encoder
-        .push_packed(bytes, enough::Unstoppable)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
-
-    let jpeg_data = encoder
-        .finish()
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
-
-    Ok(EncodeOutput {
-        data: jpeg_data,
-        format: ImageFormat::Jpeg,
-    })
+    request
 }

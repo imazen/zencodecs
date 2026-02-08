@@ -12,12 +12,12 @@ use alloc::boxed::Box;
 #[cfg(feature = "jpeg")]
 pub mod jpeg {
     pub use zenjpeg::decoder::{
-        ChromaUpsampling, DecodeConfig as DecoderConfig, DecodedExtras, MpfDirectory, MpfEntry,
-        MpfImageType, OutputTarget, PreservedMpfImage, PreservedSegment, SegmentType, Strictness,
+        ChromaUpsampling, Decoder, DecodedExtras, JpegInfo, MpfDirectory, MpfEntry, MpfImageType,
+        OutputTarget, PreserveConfig, PreservedMpfImage, PreservedSegment, SegmentType, Strictness,
     };
     pub use zenjpeg::encoder::{
-        ChromaSubsampling, ColorMode, EncoderConfig, Exif, ExifFields, HuffmanStrategy,
-        Orientation, PixelLayout as JpegPixelLayout, Quality,
+        ChromaSubsampling, ColorMode, EncodeRequest as JpegEncodeRequest, EncoderConfig, Exif,
+        ExifFields, HuffmanStrategy, Orientation, PixelLayout as JpegPixelLayout, Quality,
     };
 }
 
@@ -84,7 +84,7 @@ pub struct CodecConfig {
 
     /// JPEG decoder configuration.
     #[cfg(feature = "jpeg")]
-    pub jpeg_decoder: Option<Box<jpeg::DecoderConfig>>,
+    pub jpeg_decoder: Option<Box<jpeg::Decoder>>,
 
     /// WebP decoder configuration (upsampling method, limits).
     #[cfg(feature = "webp")]
@@ -139,7 +139,7 @@ impl CodecConfig {
 
     /// Set JPEG decoder configuration.
     #[cfg(feature = "jpeg")]
-    pub fn with_jpeg_decoder(mut self, config: jpeg::DecoderConfig) -> Self {
+    pub fn with_jpeg_decoder(mut self, config: jpeg::Decoder) -> Self {
         self.jpeg_decoder = Some(Box::new(config));
         self
     }
