@@ -8,7 +8,8 @@ use std::io::Cursor;
 
 use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop,
+    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, ImageMetadata, Limits,
+    PixelData, Stop,
 };
 
 /// Probe PNG metadata without decoding pixels.
@@ -99,7 +100,6 @@ pub(crate) fn decode(
             PixelData::Rgb8(ImgVec::new(rgb.to_vec(), w, h))
         }
         png::ColorType::GrayscaleAlpha => {
-            // GA → RGBA
             let rgba: alloc::vec::Vec<Rgba<u8>> = raw_pixels
                 .chunks_exact(2)
                 .map(|ga| Rgba {
@@ -117,7 +117,6 @@ pub(crate) fn decode(
             PixelData::Gray8(ImgVec::new(gray, w, h))
         }
         png::ColorType::Indexed => {
-            // png crate expands indexed to RGB/RGBA
             if has_alpha {
                 let rgba: &[Rgba<u8>] = bytemuck::cast_slice(&raw_pixels);
                 PixelData::Rgba8(ImgVec::new(rgba.to_vec(), w, h))
@@ -145,6 +144,7 @@ pub(crate) fn decode(
 /// Encode RGB8 pixels to PNG.
 pub(crate) fn encode_rgb8(
     img: ImgRef<Rgb<u8>>,
+    metadata: Option<&ImageMetadata<'_>>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
@@ -154,9 +154,9 @@ pub(crate) fn encode_rgb8(
     let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
 
     let mut output = Vec::new();
-    let mut encoder = png::Encoder::new(&mut output, width, height);
-    encoder.set_color(png::ColorType::Rgb);
-    encoder.set_depth(png::BitDepth::Eight);
+    let info = make_png_info(width, height, png::ColorType::Rgb, metadata);
+    let encoder = png::Encoder::with_info(&mut output, info)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
 
     let mut writer = encoder
         .write_header()
@@ -177,6 +177,7 @@ pub(crate) fn encode_rgb8(
 /// Encode RGBA8 pixels to PNG.
 pub(crate) fn encode_rgba8(
     img: ImgRef<Rgba<u8>>,
+    metadata: Option<&ImageMetadata<'_>>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
@@ -186,9 +187,9 @@ pub(crate) fn encode_rgba8(
     let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
 
     let mut output = Vec::new();
-    let mut encoder = png::Encoder::new(&mut output, width, height);
-    encoder.set_color(png::ColorType::Rgba);
-    encoder.set_depth(png::BitDepth::Eight);
+    let info = make_png_info(width, height, png::ColorType::Rgba, metadata);
+    let encoder = png::Encoder::with_info(&mut output, info)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
 
     let mut writer = encoder
         .write_header()
@@ -204,4 +205,28 @@ pub(crate) fn encode_rgba8(
         data: output,
         format: ImageFormat::Png,
     })
+}
+
+/// Create a PNG Info struct with metadata applied.
+fn make_png_info<'a>(
+    width: u32,
+    height: u32,
+    color_type: png::ColorType,
+    metadata: Option<&'a ImageMetadata<'a>>,
+) -> png::Info<'a> {
+    let mut info = png::Info::with_size(width, height);
+    info.color_type = color_type;
+    info.bit_depth = png::BitDepth::Eight;
+
+    if let Some(meta) = metadata {
+        if let Some(icc) = meta.icc_profile {
+            info.icc_profile = Some(icc.into());
+        }
+        if let Some(exif) = meta.exif {
+            info.exif_metadata = Some(exif.into());
+        }
+        // XMP: PNG doesn't have a standard XMP chunk. Silently ignored.
+    }
+
+    info
 }

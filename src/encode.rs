@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 
+use crate::config::CodecConfig;
 use crate::pixel::{ImgRef, Rgb, Rgba};
 use crate::{CodecError, CodecRegistry, ImageFormat, ImageMetadata, Limits, Stop};
 
@@ -37,6 +38,7 @@ pub struct EncodeRequest<'a> {
     stop: Option<&'a dyn Stop>,
     metadata: Option<&'a ImageMetadata<'a>>,
     registry: Option<&'a CodecRegistry>,
+    codec_config: Option<&'a CodecConfig>,
 }
 
 impl<'a> EncodeRequest<'a> {
@@ -51,6 +53,7 @@ impl<'a> EncodeRequest<'a> {
             stop: None,
             metadata: None,
             registry: None,
+            codec_config: None,
         }
     }
 
@@ -65,6 +68,7 @@ impl<'a> EncodeRequest<'a> {
             stop: None,
             metadata: None,
             registry: None,
+            codec_config: None,
         }
     }
 
@@ -98,7 +102,11 @@ impl<'a> EncodeRequest<'a> {
         self
     }
 
-    /// Set metadata to embed in the output.
+    /// Set metadata to embed in the output (ICC profile, EXIF, XMP).
+    ///
+    /// Not all formats support all metadata types. Unsupported metadata
+    /// is silently ignored — GIF ignores all metadata, AVIF encode only
+    /// supports EXIF, etc.
     pub fn with_metadata(mut self, metadata: &'a ImageMetadata<'a>) -> Self {
         self.metadata = Some(metadata);
         self
@@ -107,6 +115,15 @@ impl<'a> EncodeRequest<'a> {
     /// Set a codec registry to control which formats are enabled.
     pub fn with_registry(mut self, registry: &'a CodecRegistry) -> Self {
         self.registry = Some(registry);
+        self
+    }
+
+    /// Set format-specific codec configuration.
+    ///
+    /// When set, the relevant codec's config overrides the generic
+    /// quality/effort parameters for that format.
+    pub fn with_codec_config(mut self, config: &'a CodecConfig) -> Self {
+        self.codec_config = Some(config);
         self
     }
 
@@ -129,7 +146,6 @@ impl<'a> EncodeRequest<'a> {
         let default_registry = CodecRegistry::all();
         let registry = self.registry.unwrap_or(&default_registry);
 
-        // Check if any pixel actually has transparency
         let has_alpha = img.pixels().any(|p| p.a < 255);
 
         let format = match self.format {
@@ -176,7 +192,6 @@ impl<'a> EncodeRequest<'a> {
         self.encode_format_rgba8(format, img)
     }
 
-    /// Auto-select format.
     fn auto_select_format(
         &self,
         has_alpha: bool,
@@ -221,9 +236,14 @@ impl<'a> EncodeRequest<'a> {
     ) -> Result<EncodeOutput, CodecError> {
         match format {
             #[cfg(feature = "jpeg")]
-            ImageFormat::Jpeg => {
-                crate::codecs::jpeg::encode_rgb8(img, self.quality, self.limits, self.stop)
-            }
+            ImageFormat::Jpeg => crate::codecs::jpeg::encode_rgb8(
+                img,
+                self.quality,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
             #[cfg(not(feature = "jpeg"))]
             ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
 
@@ -232,6 +252,8 @@ impl<'a> EncodeRequest<'a> {
                 img,
                 self.quality,
                 self.lossless,
+                self.metadata,
+                self.codec_config,
                 self.limits,
                 self.stop,
             ),
@@ -239,19 +261,28 @@ impl<'a> EncodeRequest<'a> {
             ImageFormat::WebP => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "gif")]
-            ImageFormat::Gif => crate::codecs::gif::encode_rgb8(img, self.limits, self.stop),
+            ImageFormat::Gif => {
+                crate::codecs::gif::encode_rgb8(img, self.codec_config, self.limits, self.stop)
+            }
             #[cfg(not(feature = "gif"))]
             ImageFormat::Gif => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "png")]
-            ImageFormat::Png => crate::codecs::png::encode_rgb8(img, self.limits, self.stop),
+            ImageFormat::Png => {
+                crate::codecs::png::encode_rgb8(img, self.metadata, self.limits, self.stop)
+            }
             #[cfg(not(feature = "png"))]
             ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "avif-encode")]
-            ImageFormat::Avif => {
-                crate::codecs::avif_enc::encode_rgb8(img, self.quality, self.limits, self.stop)
-            }
+            ImageFormat::Avif => crate::codecs::avif_enc::encode_rgb8(
+                img,
+                self.quality,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
         }
@@ -264,9 +295,14 @@ impl<'a> EncodeRequest<'a> {
     ) -> Result<EncodeOutput, CodecError> {
         match format {
             #[cfg(feature = "jpeg")]
-            ImageFormat::Jpeg => {
-                crate::codecs::jpeg::encode_rgba8(img, self.quality, self.limits, self.stop)
-            }
+            ImageFormat::Jpeg => crate::codecs::jpeg::encode_rgba8(
+                img,
+                self.quality,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
             #[cfg(not(feature = "jpeg"))]
             ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
 
@@ -275,6 +311,8 @@ impl<'a> EncodeRequest<'a> {
                 img,
                 self.quality,
                 self.lossless,
+                self.metadata,
+                self.codec_config,
                 self.limits,
                 self.stop,
             ),
@@ -282,19 +320,28 @@ impl<'a> EncodeRequest<'a> {
             ImageFormat::WebP => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "gif")]
-            ImageFormat::Gif => crate::codecs::gif::encode_rgba8(img, self.limits, self.stop),
+            ImageFormat::Gif => {
+                crate::codecs::gif::encode_rgba8(img, self.codec_config, self.limits, self.stop)
+            }
             #[cfg(not(feature = "gif"))]
             ImageFormat::Gif => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "png")]
-            ImageFormat::Png => crate::codecs::png::encode_rgba8(img, self.limits, self.stop),
+            ImageFormat::Png => {
+                crate::codecs::png::encode_rgba8(img, self.metadata, self.limits, self.stop)
+            }
             #[cfg(not(feature = "png"))]
             ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "avif-encode")]
-            ImageFormat::Avif => {
-                crate::codecs::avif_enc::encode_rgba8(img, self.quality, self.limits, self.stop)
-            }
+            ImageFormat::Avif => crate::codecs::avif_enc::encode_rgba8(
+                img,
+                self.quality,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
         }
@@ -338,5 +385,21 @@ mod tests {
             result,
             Err(CodecError::UnsupportedOperation { .. })
         ));
+    }
+
+    #[test]
+    fn codec_config_builder() {
+        let config = CodecConfig::default();
+        let _request = EncodeRequest::new(ImageFormat::Jpeg).with_codec_config(&config);
+    }
+
+    #[test]
+    fn metadata_builder() {
+        let meta = ImageMetadata {
+            icc_profile: Some(b"fake_icc"),
+            exif: Some(b"fake_exif"),
+            xmp: Some(b"fake_xmp"),
+        };
+        let _request = EncodeRequest::new(ImageFormat::Jpeg).with_metadata(&meta);
     }
 }

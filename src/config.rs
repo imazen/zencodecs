@@ -1,0 +1,201 @@
+//! Format-specific codec configuration and re-exports.
+//!
+//! Each codec's configuration types are re-exported behind feature gates.
+//! The [`CodecConfig`] struct bundles all format-specific overrides into
+//! a single value that can be passed to encode/decode requests.
+
+use alloc::boxed::Box;
+
+// --- Re-exports ---
+
+/// JPEG configuration types from zenjpeg.
+#[cfg(feature = "jpeg")]
+pub mod jpeg {
+    pub use zenjpeg::decoder::{
+        ChromaUpsampling, DecodeConfig as DecoderConfig, OutputTarget, Strictness,
+    };
+    pub use zenjpeg::encoder::{
+        ChromaSubsampling, ColorMode, EncoderConfig, Exif, ExifFields, HuffmanStrategy,
+        Orientation, PixelLayout as JpegPixelLayout, Quality,
+    };
+}
+
+/// WebP configuration types from zenwebp.
+#[cfg(feature = "webp")]
+pub mod webp {
+    pub use zenwebp::{LosslessConfig, LossyConfig, PixelLayout as WebpPixelLayout, Preset};
+}
+
+/// GIF configuration types from zengif.
+#[cfg(feature = "gif")]
+pub mod gif {
+    pub use zengif::EncoderConfig;
+}
+
+/// AVIF decode configuration from zenavif.
+#[cfg(feature = "avif-decode")]
+pub mod avif_decode {
+    pub use zenavif::DecoderConfig;
+}
+
+/// AVIF encode configuration from ravif.
+#[cfg(feature = "avif-encode")]
+pub mod avif_encode {
+    pub use ravif::{AlphaColorMode, BitDepth, ColorModel, Encoder as RavifEncoder};
+}
+
+// --- Unified codec config ---
+
+/// Format-specific configuration overrides.
+///
+/// Contains optional boxed configs for each codec. When a config is `Some`,
+/// the codec adapter will use it instead of deriving settings from the
+/// generic quality/effort/lossless parameters on `EncodeRequest`/`DecodeRequest`.
+///
+/// This gives callers full control over codec behavior without zencodecs
+/// having to expose every knob in its own API.
+///
+/// # Example
+///
+/// ```ignore
+/// use zencodecs::{EncodeRequest, ImageFormat};
+/// use zencodecs::config::{jpeg::EncoderConfig, CodecConfig};
+///
+/// let jpeg_config = EncoderConfig::ycbcr(92, zencodecs::config::jpeg::ChromaSubsampling::Half);
+/// let config = CodecConfig::default().with_jpeg_encoder(jpeg_config);
+/// let request = EncodeRequest::new(ImageFormat::Jpeg).with_codec_config(&config);
+/// ```
+#[derive(Default)]
+#[non_exhaustive]
+pub struct CodecConfig {
+    /// JPEG encoder configuration (overrides quality/effort).
+    #[cfg(feature = "jpeg")]
+    pub jpeg_encoder: Option<Box<jpeg::EncoderConfig>>,
+
+    /// JPEG decoder configuration.
+    #[cfg(feature = "jpeg")]
+    pub jpeg_decoder: Option<Box<jpeg::DecoderConfig>>,
+
+    /// WebP lossy encoder configuration (overrides quality).
+    #[cfg(feature = "webp")]
+    pub webp_lossy: Option<Box<webp::LossyConfig>>,
+
+    /// WebP lossless encoder configuration.
+    #[cfg(feature = "webp")]
+    pub webp_lossless: Option<Box<webp::LosslessConfig>>,
+
+    /// GIF encoder configuration.
+    #[cfg(feature = "gif")]
+    pub gif_encoder: Option<Box<gif::EncoderConfig>>,
+
+    /// AVIF decoder configuration.
+    #[cfg(feature = "avif-decode")]
+    pub avif_decoder: Option<Box<avif_decode::DecoderConfig>>,
+
+    /// AVIF encoder (ravif) — boxed because it has a lifetime param.
+    /// When set, quality/speed from this encoder override the generic
+    /// quality/effort on EncodeRequest.
+    #[cfg(feature = "avif-encode")]
+    pub avif_quality: Option<f32>,
+
+    /// AVIF encode speed (1-10, lower = slower/better).
+    #[cfg(feature = "avif-encode")]
+    pub avif_speed: Option<u8>,
+
+    /// AVIF alpha quality override.
+    #[cfg(feature = "avif-encode")]
+    pub avif_alpha_quality: Option<f32>,
+}
+
+impl CodecConfig {
+    /// Set JPEG encoder configuration.
+    #[cfg(feature = "jpeg")]
+    pub fn with_jpeg_encoder(mut self, config: jpeg::EncoderConfig) -> Self {
+        self.jpeg_encoder = Some(Box::new(config));
+        self
+    }
+
+    /// Set JPEG decoder configuration.
+    #[cfg(feature = "jpeg")]
+    pub fn with_jpeg_decoder(mut self, config: jpeg::DecoderConfig) -> Self {
+        self.jpeg_decoder = Some(Box::new(config));
+        self
+    }
+
+    /// Set WebP lossy encoder configuration.
+    #[cfg(feature = "webp")]
+    pub fn with_webp_lossy(mut self, config: webp::LossyConfig) -> Self {
+        self.webp_lossy = Some(Box::new(config));
+        self
+    }
+
+    /// Set WebP lossless encoder configuration.
+    #[cfg(feature = "webp")]
+    pub fn with_webp_lossless(mut self, config: webp::LosslessConfig) -> Self {
+        self.webp_lossless = Some(Box::new(config));
+        self
+    }
+
+    /// Set GIF encoder configuration.
+    #[cfg(feature = "gif")]
+    pub fn with_gif_encoder(mut self, config: gif::EncoderConfig) -> Self {
+        self.gif_encoder = Some(Box::new(config));
+        self
+    }
+
+    /// Set AVIF decoder configuration.
+    #[cfg(feature = "avif-decode")]
+    pub fn with_avif_decoder(mut self, config: avif_decode::DecoderConfig) -> Self {
+        self.avif_decoder = Some(Box::new(config));
+        self
+    }
+
+    /// Set AVIF encode quality (0-100).
+    #[cfg(feature = "avif-encode")]
+    pub fn with_avif_quality(mut self, quality: f32) -> Self {
+        self.avif_quality = Some(quality);
+        self
+    }
+
+    /// Set AVIF encode speed (1-10, lower = slower/better).
+    #[cfg(feature = "avif-encode")]
+    pub fn with_avif_speed(mut self, speed: u8) -> Self {
+        self.avif_speed = Some(speed);
+        self
+    }
+
+    /// Set AVIF alpha quality (0-100).
+    #[cfg(feature = "avif-encode")]
+    pub fn with_avif_alpha_quality(mut self, quality: f32) -> Self {
+        self.avif_alpha_quality = Some(quality);
+        self
+    }
+}
+
+impl core::fmt::Debug for CodecConfig {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut d = f.debug_struct("CodecConfig");
+
+        #[cfg(feature = "jpeg")]
+        {
+            d.field("jpeg_encoder", &self.jpeg_encoder.is_some());
+            d.field("jpeg_decoder", &self.jpeg_decoder.is_some());
+        }
+        #[cfg(feature = "webp")]
+        {
+            d.field("webp_lossy", &self.webp_lossy.is_some());
+            d.field("webp_lossless", &self.webp_lossless.is_some());
+        }
+        #[cfg(feature = "gif")]
+        d.field("gif_encoder", &self.gif_encoder.is_some());
+        #[cfg(feature = "avif-decode")]
+        d.field("avif_decoder", &self.avif_decoder.is_some());
+        #[cfg(feature = "avif-encode")]
+        {
+            d.field("avif_quality", &self.avif_quality);
+            d.field("avif_speed", &self.avif_speed);
+        }
+
+        d.finish()
+    }
+}

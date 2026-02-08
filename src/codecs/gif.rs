@@ -1,5 +1,6 @@
 //! GIF codec adapter using zengif.
 
+use crate::config::CodecConfig;
 use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
     CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop,
@@ -42,7 +43,6 @@ pub(crate) fn decode(
     let width = metadata.width as usize;
     let height = metadata.height as usize;
 
-    // Convert zengif::Rgba to rgb::Rgba<u8>
     let rgba_pixels: alloc::vec::Vec<Rgba<u8>> = frame
         .pixels
         .into_iter()
@@ -73,6 +73,7 @@ pub(crate) fn decode(
 /// Encode RGB8 pixels to GIF (single frame).
 pub(crate) fn encode_rgb8(
     img: ImgRef<Rgb<u8>>,
+    codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
@@ -83,13 +84,15 @@ pub(crate) fn encode_rgb8(
         .try_into()
         .map_err(|_| CodecError::InvalidInput("height exceeds GIF maximum (65535)".into()))?;
 
-    // Convert RGB to RGBA bytes for zengif
     let (buf, _, _) = img.to_contiguous_buf();
     let rgba_bytes: alloc::vec::Vec<u8> = buf.iter().flat_map(|p| [p.r, p.g, p.b, 255u8]).collect();
 
     let frame = zengif::FrameInput::from_bytes(width, height, 10, &rgba_bytes);
 
-    let config = zengif::EncoderConfig::new();
+    let config = codec_config
+        .and_then(|c| c.gif_encoder.as_ref())
+        .map(|c| c.as_ref().clone())
+        .unwrap_or_else(zengif::EncoderConfig::new);
     let limits = zengif::Limits::default();
 
     let gif_data = zengif::encode_gif(
@@ -111,6 +114,7 @@ pub(crate) fn encode_rgb8(
 /// Encode RGBA8 pixels to GIF (single frame).
 pub(crate) fn encode_rgba8(
     img: ImgRef<Rgba<u8>>,
+    codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
@@ -126,7 +130,10 @@ pub(crate) fn encode_rgba8(
 
     let frame = zengif::FrameInput::from_bytes(width, height, 10, &rgba_bytes);
 
-    let config = zengif::EncoderConfig::new();
+    let config = codec_config
+        .and_then(|c| c.gif_encoder.as_ref())
+        .map(|c| c.as_ref().clone())
+        .unwrap_or_else(zengif::EncoderConfig::new);
     let limits = zengif::Limits::default();
 
     let gif_data = zengif::encode_gif(
