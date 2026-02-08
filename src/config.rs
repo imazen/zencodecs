@@ -12,7 +12,8 @@ use alloc::boxed::Box;
 #[cfg(feature = "jpeg")]
 pub mod jpeg {
     pub use zenjpeg::decoder::{
-        ChromaUpsampling, DecodeConfig as DecoderConfig, OutputTarget, Strictness,
+        ChromaUpsampling, DecodeConfig as DecoderConfig, DecodedExtras, MpfDirectory, MpfEntry,
+        MpfImageType, OutputTarget, PreservedMpfImage, PreservedSegment, SegmentType, Strictness,
     };
     pub use zenjpeg::encoder::{
         ChromaSubsampling, ColorMode, EncoderConfig, Exif, ExifFields, HuffmanStrategy,

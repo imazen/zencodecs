@@ -42,7 +42,7 @@ pub(crate) fn decode(
     // TODO: use codec_config.jpeg_decoder when zenjpeg decoder supports DecodeConfig
     let decoder = zenjpeg::decoder::Decoder::new();
 
-    let decoded = decoder
+    let mut decoded = decoder
         .decode(data, enough::Unstoppable)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
@@ -61,6 +61,8 @@ pub(crate) fn decode(
     let rgb_pixels: &[Rgb<u8>] = bytemuck::cast_slice(raw_pixels);
     let img = ImgVec::new(rgb_pixels.to_vec(), width as usize, height as usize);
 
+    let jpeg_extras = decoded.take_extras().map(alloc::boxed::Box::new);
+
     Ok(DecodeOutput {
         pixels: PixelData::Rgb8(img),
         info: ImageInfo {
@@ -74,6 +76,7 @@ pub(crate) fn decode(
             exif,
             xmp,
         },
+        jpeg_extras,
     })
 }
 

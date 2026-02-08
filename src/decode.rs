@@ -10,6 +10,12 @@ pub struct DecodeOutput {
     pub pixels: PixelData,
     /// Image metadata.
     pub info: ImageInfo,
+    /// JPEG-specific extras (MPF secondary images, preserved segments, etc.).
+    ///
+    /// Available when the `jpeg` feature is enabled and the input was JPEG.
+    /// Use this to access gain maps, depth maps, and other MPF secondary images.
+    #[cfg(feature = "jpeg")]
+    pub jpeg_extras: Option<alloc::boxed::Box<zenjpeg::decoder::DecodedExtras>>,
 }
 
 impl DecodeOutput {

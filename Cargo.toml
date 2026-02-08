@@ -48,3 +48,15 @@ moxcms = []  # Disabled for now
 
 # All codecs
 all = ["jpeg", "webp", "gif", "png", "avif-decode", "avif-encode"]
+
+[[example]]
+name = "metadata_roundtrip"
+required-features = ["all", "std"]
+
+[[example]]
+name = "gainmap_roundtrip"
+required-features = ["all", "std"]
+
+[[example]]
+name = "icc_roundtrip"
+required-features = ["all", "std"]

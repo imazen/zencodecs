@@ -71,6 +71,8 @@ pub(crate) fn decode(
             exif: None,
             xmp: None,
         },
+        #[cfg(feature = "jpeg")]
+        jpeg_extras: None,
     })
 }
 
