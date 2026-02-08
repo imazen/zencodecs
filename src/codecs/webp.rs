@@ -36,16 +36,33 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     })
 }
 
+/// Build zenwebp Limits from zencodecs Limits.
+fn to_webp_limits(limits: Option<&Limits>) -> zenwebp::decoder::Limits {
+    let mut wl = zenwebp::decoder::Limits::default();
+    if let Some(lim) = limits {
+        if let Some(max_w) = lim.max_width {
+            wl.max_width = Some(max_w as u32);
+        }
+        if let Some(max_h) = lim.max_height {
+            wl.max_height = Some(max_h as u32);
+        }
+        if let Some(max_px) = lim.max_pixels {
+            wl.max_total_pixels = Some(max_px);
+        }
+        if let Some(max_mem) = lim.max_memory_bytes {
+            wl.max_memory = Some(max_mem);
+        }
+    }
+    wl
+}
+
 /// Decode WebP to pixels.
 pub(crate) fn decode(
     data: &[u8],
-    _limits: Option<&Limits>,
-    _stop: Option<&dyn Stop>,
+    _codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    let decoder = zenwebp::WebPDecoder::new(data)
-        .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
-    let has_alpha = decoder.has_alpha();
-
     let demuxer = zenwebp::WebPDemuxer::new(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
     let has_animation = demuxer.is_animated();
@@ -53,9 +70,24 @@ pub(crate) fn decode(
     let exif = demuxer.exif().map(|p| p.to_vec());
     let xmp = demuxer.xmp().map(|p| p.to_vec());
 
+    // Use WebPDecoder directly to work around DecodeRequest::decode_rgba() bug
+    // where it allocates w*h*4 but read_image expects output_buffer_size() (w*h*3 for non-alpha).
+    let mut decoder = zenwebp::WebPDecoder::new(data)
+        .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
+    decoder.set_limits(to_webp_limits(limits));
+    decoder.set_stop(stop);
+
+    let (width, height) = decoder.dimensions();
+    let has_alpha = decoder.has_alpha();
+    let output_size = decoder
+        .output_buffer_size()
+        .ok_or_else(|| CodecError::LimitExceeded("WebP output buffer size overflow".into()))?;
+    let mut raw = alloc::vec![0u8; output_size];
+    decoder
+        .read_image(&mut raw)
+        .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
+
     let pixels = if has_alpha {
-        let (raw, width, height) =
-            zenwebp::decode_rgba(data).map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
         let rgba_pixels: &[Rgba<u8>] = bytemuck::cast_slice(&raw);
         PixelData::Rgba8(ImgVec::new(
             rgba_pixels.to_vec(),
@@ -63,8 +95,6 @@ pub(crate) fn decode(
             height as usize,
         ))
     } else {
-        let (raw, width, height) =
-            zenwebp::decode_rgb(data).map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
         let rgb_pixels: &[Rgb<u8>] = bytemuck::cast_slice(&raw);
         PixelData::Rgb8(ImgVec::new(
             rgb_pixels.to_vec(),
@@ -73,8 +103,11 @@ pub(crate) fn decode(
         ))
     };
 
-    let width = pixels.width();
-    let height = pixels.height();
+    // Additional zencodecs-level limits check
+    if let Some(lim) = limits {
+        let bpp = if has_alpha { 4 } else { 3 };
+        lim.validate(width, height, bpp)?;
+    }
 
     Ok(DecodeOutput {
         pixels,

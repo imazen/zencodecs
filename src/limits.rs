@@ -78,14 +78,38 @@ impl<'a> ImageMetadata<'a> {
     }
 }
 
-/// Cancellation token for long-running operations.
-///
-/// Codecs should periodically check `should_stop()` and return
-/// `CodecError::Cancelled` if it returns true.
-pub trait Stop: Send + Sync {
-    /// Whether the operation should be cancelled.
-    fn should_stop(&self) -> bool;
+impl Limits {
+    /// Validate dimensions and estimated memory against limits, returning CodecError on violation.
+    pub(crate) fn validate(
+        &self,
+        width: u32,
+        height: u32,
+        bytes_per_pixel: u32,
+    ) -> Result<(), crate::CodecError> {
+        self.check_dimensions(width as u64, height as u64)
+            .map_err(|msg| crate::CodecError::LimitExceeded(msg.into()))?;
+
+        let estimated_bytes = (width as u64)
+            .saturating_mul(height as u64)
+            .saturating_mul(bytes_per_pixel as u64);
+        self.check_memory(estimated_bytes)
+            .map_err(|msg| crate::CodecError::LimitExceeded(msg.into()))?;
+
+        Ok(())
+    }
 }
+
+/// Get a `&dyn Stop` reference, defaulting to `Unstoppable` if `None`.
+pub(crate) fn stop_or_default(stop: Option<&dyn Stop>) -> &dyn Stop {
+    stop.unwrap_or(&enough::Unstoppable)
+}
+
+/// Re-export `enough::Stop` for cooperative cancellation.
+///
+/// Codecs periodically call `stop.check()` and return `CodecError::Cancelled`
+/// if the operation should be cancelled. Use `enough::Unstoppable` when you
+/// don't need cancellation (zero-cost).
+pub use enough::Stop;
 
 #[cfg(test)]
 mod tests {

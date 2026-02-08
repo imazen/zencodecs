@@ -151,7 +151,7 @@ impl<'a> DecodeRequest<'a> {
 
     #[cfg(feature = "webp")]
     fn decode_webp(self) -> Result<DecodeOutput, CodecError> {
-        crate::codecs::webp::decode(self.data, self.limits, self.stop)
+        crate::codecs::webp::decode(self.data, self.codec_config, self.limits, self.stop)
     }
 
     #[cfg(feature = "gif")]

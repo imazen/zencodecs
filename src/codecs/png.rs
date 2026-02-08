@@ -54,11 +54,18 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
 /// Decode PNG to pixels.
 pub(crate) fn decode(
     data: &[u8],
-    _limits: Option<&Limits>,
+    limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
     let cursor = Cursor::new(data);
-    let decoder = png::Decoder::new(cursor);
+    let decoder = if let Some(lim) = limits {
+        let png_limits = png::Limits {
+            bytes: lim.max_memory_bytes.unwrap_or(64 * 1024 * 1024) as usize,
+        };
+        png::Decoder::new_with_limits(cursor, png_limits)
+    } else {
+        png::Decoder::new(cursor)
+    };
 
     let mut reader = decoder
         .read_info()
@@ -77,6 +84,12 @@ pub(crate) fn decode(
     } else {
         1
     };
+    // Check dimension limits
+    if let Some(lim) = limits {
+        let bpp: u32 = if has_alpha { 4 } else { 3 };
+        lim.validate(width, height, bpp)?;
+    }
+
     let icc_profile = info.icc_profile.as_ref().map(|p| p.to_vec());
     let exif = info.exif_metadata.as_ref().map(|p| p.to_vec());
     let xmp = extract_xmp_from_itxt(info);

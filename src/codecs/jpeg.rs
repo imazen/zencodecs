@@ -35,19 +35,50 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
 /// Decode JPEG to pixels.
 pub(crate) fn decode(
     data: &[u8],
-    _codec_config: Option<&CodecConfig>,
-    _limits: Option<&Limits>,
-    _stop: Option<&dyn Stop>,
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    // TODO: use codec_config.jpeg_decoder when zenjpeg decoder supports DecodeConfig
-    let decoder = zenjpeg::decoder::Decoder::new();
+    let stop = crate::limits::stop_or_default(stop);
 
-    let mut decoded = decoder
-        .decode(data, enough::Unstoppable)
+    // Build zenjpeg DecodeConfig from codec_config, or use defaults
+    let decode_config = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_decoder.as_ref()) {
+        let mut dc = cfg.as_ref().clone();
+        // Override limits from zencodecs Limits if provided
+        if let Some(lim) = limits {
+            if let Some(max_px) = lim.max_pixels {
+                dc.max_pixels = max_px;
+            }
+            if let Some(max_mem) = lim.max_memory_bytes {
+                dc.max_memory = max_mem as usize;
+            }
+        }
+        dc
+    } else {
+        let mut dc = zenjpeg::decoder::DecodeConfig::default();
+        if let Some(lim) = limits {
+            if let Some(max_px) = lim.max_pixels {
+                dc.max_pixels = max_px;
+            }
+            if let Some(max_mem) = lim.max_memory_bytes {
+                dc.max_memory = max_mem as usize;
+            }
+        }
+        dc
+    };
+
+    let mut decoded = decode_config
+        .decode(data, stop)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
     let width = decoded.width();
     let height = decoded.height();
+
+    // Validate dimensions against zencodecs limits (zenjpeg has its own, but
+    // this catches width/height limits that zenjpeg doesn't check)
+    if let Some(lim) = limits {
+        lim.validate(width, height, 3)?;
+    }
 
     let extras = decoded.extras();
     let icc_profile = extras.and_then(|e| e.icc_profile()).map(|p| p.to_vec());
