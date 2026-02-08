@@ -7,7 +7,9 @@ extern crate std;
 use std::io::Cursor;
 
 use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
-use crate::{CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop};
+use crate::{
+    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop,
+};
 
 /// Probe PNG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -72,9 +74,9 @@ pub(crate) fn decode(
     };
     let icc_profile = info.icc_profile.as_ref().map(|p| p.to_vec());
 
-    let buffer_size = reader
-        .output_buffer_size()
-        .ok_or_else(|| CodecError::InvalidInput("cannot determine PNG output buffer size".into()))?;
+    let buffer_size = reader.output_buffer_size().ok_or_else(|| {
+        CodecError::InvalidInput("cannot determine PNG output buffer size".into())
+    })?;
     let mut raw_pixels = alloc::vec![0u8; buffer_size];
 
     let output_info = reader
@@ -110,10 +112,8 @@ pub(crate) fn decode(
             PixelData::Rgba8(ImgVec::new(rgba, w, h))
         }
         png::ColorType::Grayscale => {
-            let gray: alloc::vec::Vec<rgb::Gray<u8>> = raw_pixels
-                .iter()
-                .map(|&g| rgb::Gray(g))
-                .collect();
+            let gray: alloc::vec::Vec<rgb::Gray<u8>> =
+                raw_pixels.iter().map(|&g| rgb::Gray(g)).collect();
             PixelData::Gray8(ImgVec::new(gray, w, h))
         }
         png::ColorType::Indexed => {

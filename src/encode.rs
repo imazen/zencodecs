@@ -221,12 +221,20 @@ impl<'a> EncodeRequest<'a> {
     ) -> Result<EncodeOutput, CodecError> {
         match format {
             #[cfg(feature = "jpeg")]
-            ImageFormat::Jpeg => crate::codecs::jpeg::encode_rgb8(img, self.quality, self.limits, self.stop),
+            ImageFormat::Jpeg => {
+                crate::codecs::jpeg::encode_rgb8(img, self.quality, self.limits, self.stop)
+            }
             #[cfg(not(feature = "jpeg"))]
             ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "webp")]
-            ImageFormat::WebP => crate::codecs::webp::encode_rgb8(img, self.quality, self.lossless, self.limits, self.stop),
+            ImageFormat::WebP => crate::codecs::webp::encode_rgb8(
+                img,
+                self.quality,
+                self.lossless,
+                self.limits,
+                self.stop,
+            ),
             #[cfg(not(feature = "webp"))]
             ImageFormat::WebP => Err(CodecError::UnsupportedFormat(format)),
 
@@ -241,7 +249,9 @@ impl<'a> EncodeRequest<'a> {
             ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "avif-encode")]
-            ImageFormat::Avif => crate::codecs::avif_enc::encode_rgb8(img, self.quality, self.limits, self.stop),
+            ImageFormat::Avif => {
+                crate::codecs::avif_enc::encode_rgb8(img, self.quality, self.limits, self.stop)
+            }
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
         }
@@ -254,12 +264,20 @@ impl<'a> EncodeRequest<'a> {
     ) -> Result<EncodeOutput, CodecError> {
         match format {
             #[cfg(feature = "jpeg")]
-            ImageFormat::Jpeg => crate::codecs::jpeg::encode_rgba8(img, self.quality, self.limits, self.stop),
+            ImageFormat::Jpeg => {
+                crate::codecs::jpeg::encode_rgba8(img, self.quality, self.limits, self.stop)
+            }
             #[cfg(not(feature = "jpeg"))]
             ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "webp")]
-            ImageFormat::WebP => crate::codecs::webp::encode_rgba8(img, self.quality, self.lossless, self.limits, self.stop),
+            ImageFormat::WebP => crate::codecs::webp::encode_rgba8(
+                img,
+                self.quality,
+                self.lossless,
+                self.limits,
+                self.stop,
+            ),
             #[cfg(not(feature = "webp"))]
             ImageFormat::WebP => Err(CodecError::UnsupportedFormat(format)),
 
@@ -274,7 +292,9 @@ impl<'a> EncodeRequest<'a> {
             ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "avif-encode")]
-            ImageFormat::Avif => crate::codecs::avif_enc::encode_rgba8(img, self.quality, self.limits, self.stop),
+            ImageFormat::Avif => {
+                crate::codecs::avif_enc::encode_rgba8(img, self.quality, self.limits, self.stop)
+            }
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
         }
@@ -299,7 +319,14 @@ mod tests {
     #[test]
     fn lossless_with_jpeg_error() {
         let img = imgref::ImgVec::new(
-            vec![Rgb { r: 255u8, g: 255, b: 255 }; 100 * 100],
+            vec![
+                Rgb {
+                    r: 255u8,
+                    g: 255,
+                    b: 255
+                };
+                100 * 100
+            ],
             100,
             100,
         );

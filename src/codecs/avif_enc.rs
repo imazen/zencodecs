@@ -12,9 +12,7 @@ pub(crate) fn encode_rgb8(
 ) -> Result<EncodeOutput, CodecError> {
     let quality = quality.unwrap_or(75.0).clamp(0.0, 100.0);
 
-    let encoder = ravif::Encoder::new()
-        .with_quality(quality)
-        .with_speed(4);
+    let encoder = ravif::Encoder::new().with_quality(quality).with_speed(4);
 
     let result = encoder
         .encode_rgb(img)
@@ -35,9 +33,7 @@ pub(crate) fn encode_rgba8(
 ) -> Result<EncodeOutput, CodecError> {
     let quality = quality.unwrap_or(75.0).clamp(0.0, 100.0);
 
-    let encoder = ravif::Encoder::new()
-        .with_quality(quality)
-        .with_speed(4);
+    let encoder = ravif::Encoder::new().with_quality(quality).with_speed(4);
 
     let result = encoder
         .encode_rgba(img)

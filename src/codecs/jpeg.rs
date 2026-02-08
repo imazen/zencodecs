@@ -1,7 +1,9 @@
 //! JPEG codec adapter using zenjpeg.
 
 use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
-use crate::{CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop};
+use crate::{
+    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop,
+};
 
 /// Probe JPEG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -141,7 +143,14 @@ mod tests {
     fn encode_rgb8_smoke() {
         // Just verify we can create the types
         let img = ImgVec::new(
-            vec![Rgb { r: 128u8, g: 128, b: 128 }; 4],
+            vec![
+                Rgb {
+                    r: 128u8,
+                    g: 128,
+                    b: 128
+                };
+                4
+            ],
             2,
             2,
         );

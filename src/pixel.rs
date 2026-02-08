@@ -196,7 +196,13 @@ impl core::fmt::Debug for PixelData {
             PixelData::RgbaF32(_) => "RgbaF32",
             PixelData::Gray8(_) => "Gray8",
         };
-        write!(f, "PixelData::{}({}x{})", variant, self.width(), self.height())
+        write!(
+            f,
+            "PixelData::{}({}x{})",
+            variant,
+            self.width(),
+            self.height()
+        )
     }
 }
 
@@ -216,7 +222,15 @@ mod tests {
     #[test]
     fn pixel_data_rgba_has_alpha() {
         let img = ImgVec::new(
-            vec![Rgba { r: 0u8, g: 0, b: 0, a: 255 }; 4],
+            vec![
+                Rgba {
+                    r: 0u8,
+                    g: 0,
+                    b: 0,
+                    a: 255
+                };
+                4
+            ],
             2,
             2,
         );
@@ -227,7 +241,14 @@ mod tests {
     #[test]
     fn rgb8_to_rgba8() {
         let img = ImgVec::new(
-            vec![Rgb { r: 10u8, g: 20, b: 30 }; 4],
+            vec![
+                Rgb {
+                    r: 10u8,
+                    g: 20,
+                    b: 30
+                };
+                4
+            ],
             2,
             2,
         );

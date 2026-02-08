@@ -1,7 +1,9 @@
 //! GIF codec adapter using zengif.
 
 use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
-use crate::{CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop};
+use crate::{
+    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop,
+};
 
 /// Probe GIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -83,10 +85,7 @@ pub(crate) fn encode_rgb8(
 
     // Convert RGB to RGBA bytes for zengif
     let (buf, _, _) = img.to_contiguous_buf();
-    let rgba_bytes: alloc::vec::Vec<u8> = buf
-        .iter()
-        .flat_map(|p| [p.r, p.g, p.b, 255u8])
-        .collect();
+    let rgba_bytes: alloc::vec::Vec<u8> = buf.iter().flat_map(|p| [p.r, p.g, p.b, 255u8]).collect();
 
     let frame = zengif::FrameInput::from_bytes(width, height, 10, &rgba_bytes);
 
@@ -123,10 +122,7 @@ pub(crate) fn encode_rgba8(
         .map_err(|_| CodecError::InvalidInput("height exceeds GIF maximum (65535)".into()))?;
 
     let (buf, _, _) = img.to_contiguous_buf();
-    let rgba_bytes: alloc::vec::Vec<u8> = buf
-        .iter()
-        .flat_map(|p| [p.r, p.g, p.b, p.a])
-        .collect();
+    let rgba_bytes: alloc::vec::Vec<u8> = buf.iter().flat_map(|p| [p.r, p.g, p.b, p.a]).collect();
 
     let frame = zengif::FrameInput::from_bytes(width, height, 10, &rgba_bytes);
 

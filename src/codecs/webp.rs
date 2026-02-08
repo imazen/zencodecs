@@ -1,7 +1,9 @@
 //! WebP codec adapter using zenwebp.
 
 use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
-use crate::{CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop};
+use crate::{
+    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop,
+};
 
 /// Probe WebP metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -45,15 +47,23 @@ pub(crate) fn decode(
     let icc_profile = demuxer.icc_profile().map(|p| p.to_vec());
 
     let pixels = if has_alpha {
-        let (raw, width, height) = zenwebp::decode_rgba(data)
-            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
+        let (raw, width, height) =
+            zenwebp::decode_rgba(data).map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
         let rgba_pixels: &[Rgba<u8>] = bytemuck::cast_slice(&raw);
-        PixelData::Rgba8(ImgVec::new(rgba_pixels.to_vec(), width as usize, height as usize))
+        PixelData::Rgba8(ImgVec::new(
+            rgba_pixels.to_vec(),
+            width as usize,
+            height as usize,
+        ))
     } else {
-        let (raw, width, height) = zenwebp::decode_rgb(data)
-            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
+        let (raw, width, height) =
+            zenwebp::decode_rgb(data).map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
         let rgb_pixels: &[Rgb<u8>] = bytemuck::cast_slice(&raw);
-        PixelData::Rgb8(ImgVec::new(rgb_pixels.to_vec(), width as usize, height as usize))
+        PixelData::Rgb8(ImgVec::new(
+            rgb_pixels.to_vec(),
+            width as usize,
+            height as usize,
+        ))
     };
 
     let width = pixels.width();
