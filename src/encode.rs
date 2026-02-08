@@ -285,6 +285,9 @@ impl<'a> EncodeRequest<'a> {
             ),
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
+
+            // No JXL encode support
+            ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
         }
     }
 
@@ -344,6 +347,9 @@ impl<'a> EncodeRequest<'a> {
             ),
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
+
+            // No JXL encode support
+            ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
         }
     }
 }

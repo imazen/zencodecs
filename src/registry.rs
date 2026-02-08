@@ -13,6 +13,7 @@ impl FormatSet {
     const GIF: u8 = 1 << 2;
     const PNG: u8 = 1 << 3;
     const AVIF: u8 = 1 << 4;
+    const JXL: u8 = 1 << 5;
 
     fn all_compiled() -> Self {
         let mut bits = 0u8;
@@ -38,16 +39,18 @@ impl FormatSet {
     }
 
     fn all_compiled_decode() -> Self {
-        let bits = Self::all_compiled().0;
+        let mut bits = Self::all_compiled().0;
 
         #[cfg(feature = "avif-decode")]
         {
-            FormatSet(bits | Self::AVIF)
+            bits |= Self::AVIF;
         }
-        #[cfg(not(feature = "avif-decode"))]
+        #[cfg(feature = "jxl-decode")]
         {
-            FormatSet(bits)
+            bits |= Self::JXL;
         }
+
+        FormatSet(bits)
     }
 
     fn all_compiled_encode() -> Self {
@@ -70,6 +73,7 @@ impl FormatSet {
             ImageFormat::Gif => Self::GIF,
             ImageFormat::Png => Self::PNG,
             ImageFormat::Avif => Self::AVIF,
+            ImageFormat::Jxl => Self::JXL,
         };
         (self.0 & bit) != 0
     }
@@ -81,6 +85,7 @@ impl FormatSet {
             ImageFormat::Gif => Self::GIF,
             ImageFormat::Png => Self::PNG,
             ImageFormat::Avif => Self::AVIF,
+            ImageFormat::Jxl => Self::JXL,
         };
         self.0 |= bit;
     }
@@ -92,17 +97,19 @@ impl FormatSet {
             ImageFormat::Gif => Self::GIF,
             ImageFormat::Png => Self::PNG,
             ImageFormat::Avif => Self::AVIF,
+            ImageFormat::Jxl => Self::JXL,
         };
         self.0 &= !bit;
     }
 
     fn iter(self) -> impl Iterator<Item = ImageFormat> {
-        const ALL_FORMATS: [ImageFormat; 5] = [
+        const ALL_FORMATS: [ImageFormat; 6] = [
             ImageFormat::Jpeg,
             ImageFormat::WebP,
             ImageFormat::Gif,
             ImageFormat::Png,
             ImageFormat::Avif,
+            ImageFormat::Jxl,
         ];
 
         ALL_FORMATS.into_iter().filter(move |&f| self.contains(f))
@@ -192,6 +199,11 @@ impl CodecRegistry {
             ImageFormat::Avif => true,
             #[cfg(not(feature = "avif-decode"))]
             ImageFormat::Avif => false,
+
+            #[cfg(feature = "jxl-decode")]
+            ImageFormat::Jxl => true,
+            #[cfg(not(feature = "jxl-decode"))]
+            ImageFormat::Jxl => false,
         }
     }
 
@@ -227,6 +239,9 @@ impl CodecRegistry {
             ImageFormat::Avif => true,
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => false,
+
+            // No JXL encode support
+            ImageFormat::Jxl => false,
         }
     }
 

@@ -9,6 +9,7 @@ pub enum ImageFormat {
     Gif,
     Png,
     Avif,
+    Jxl,
 }
 
 impl ImageFormat {
@@ -70,6 +71,20 @@ impl ImageFormat {
             }
         }
 
+        // JPEG XL codestream: FF 0A
+        if data.len() >= 2 && data[0] == 0xFF && data[1] == 0x0A {
+            return Some(ImageFormat::Jxl);
+        }
+
+        // JPEG XL container: 00 00 00 0C 4A 58 4C 20 0D 0A 87 0A
+        if data.len() >= 12
+            && data[0..4] == [0x00, 0x00, 0x00, 0x0C]
+            && data[4..8] == [b'J', b'X', b'L', b' ']
+            && data[8..12] == [0x0D, 0x0A, 0x87, 0x0A]
+        {
+            return Some(ImageFormat::Jxl);
+        }
+
         None
     }
 
@@ -81,6 +96,7 @@ impl ImageFormat {
             "gif" => Some(ImageFormat::Gif),
             "png" => Some(ImageFormat::Png),
             "avif" => Some(ImageFormat::Avif),
+            "jxl" => Some(ImageFormat::Jxl),
             _ => None,
         }
     }
@@ -93,6 +109,7 @@ impl ImageFormat {
             ImageFormat::Gif => "image/gif",
             ImageFormat::Png => "image/png",
             ImageFormat::Avif => "image/avif",
+            ImageFormat::Jxl => "image/jxl",
         }
     }
 
@@ -104,6 +121,7 @@ impl ImageFormat {
             ImageFormat::Gif => &["gif"],
             ImageFormat::Png => &["png"],
             ImageFormat::Avif => &["avif"],
+            ImageFormat::Jxl => &["jxl"],
         }
     }
 
@@ -115,6 +133,7 @@ impl ImageFormat {
             ImageFormat::Gif => false,
             ImageFormat::Png => false,
             ImageFormat::Avif => true,
+            ImageFormat::Jxl => true,
         }
     }
 
@@ -126,6 +145,7 @@ impl ImageFormat {
             ImageFormat::Gif => true,
             ImageFormat::Png => true,
             ImageFormat::Avif => false,
+            ImageFormat::Jxl => true,
         }
     }
 
@@ -137,6 +157,7 @@ impl ImageFormat {
             ImageFormat::Gif => true,
             ImageFormat::Png => false, // APNG exists but we don't support it
             ImageFormat::Avif => false,
+            ImageFormat::Jxl => true,
         }
     }
 
@@ -148,6 +169,7 @@ impl ImageFormat {
             ImageFormat::Gif => true,
             ImageFormat::Png => true,
             ImageFormat::Avif => true,
+            ImageFormat::Jxl => true,
         }
     }
 }
@@ -186,6 +208,18 @@ mod tests {
     fn detect_avif() {
         let data = b"\x00\x00\x00\x18ftypavif";
         assert_eq!(ImageFormat::detect(data), Some(ImageFormat::Avif));
+    }
+
+    #[test]
+    fn detect_jxl_codestream() {
+        let data = [0xFF, 0x0A, 0x00, 0x00];
+        assert_eq!(ImageFormat::detect(&data), Some(ImageFormat::Jxl));
+    }
+
+    #[test]
+    fn detect_jxl_container() {
+        let data = [0x00, 0x00, 0x00, 0x0C, b'J', b'X', b'L', b' ', 0x0D, 0x0A, 0x87, 0x0A];
+        assert_eq!(ImageFormat::detect(&data), Some(ImageFormat::Jxl));
     }
 
     #[test]

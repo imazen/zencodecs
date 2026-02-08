@@ -20,3 +20,6 @@ pub(crate) mod avif_dec;
 
 #[cfg(feature = "avif-encode")]
 pub(crate) mod avif_enc;
+
+#[cfg(feature = "jxl-decode")]
+pub(crate) mod jxl_dec;

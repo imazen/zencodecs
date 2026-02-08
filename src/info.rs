@@ -101,6 +101,11 @@ impl ImageInfo {
             ImageFormat::Avif => Self::probe_avif(data),
             #[cfg(not(feature = "avif-decode"))]
             ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
+
+            #[cfg(feature = "jxl-decode")]
+            ImageFormat::Jxl => Self::probe_jxl(data),
+            #[cfg(not(feature = "jxl-decode"))]
+            ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
         }
     }
 
@@ -129,6 +134,11 @@ impl ImageInfo {
     #[cfg(feature = "avif-decode")]
     fn probe_avif(data: &[u8]) -> Result<Self, CodecError> {
         crate::codecs::avif_dec::probe(data)
+    }
+
+    #[cfg(feature = "jxl-decode")]
+    fn probe_jxl(data: &[u8]) -> Result<Self, CodecError> {
+        crate::codecs::jxl_dec::probe(data)
     }
 }
 

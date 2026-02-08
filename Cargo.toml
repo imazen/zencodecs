@@ -25,6 +25,7 @@ zengif = { path = "../zengif", optional = true }
 zenavif = { path = "../zenavif", optional = true }
 png = { version = "0.18", optional = true }
 ravif = { version = "0.13", optional = true }
+jxl = { version = "0.3.0", optional = true }
 
 # Color management (optional)
 # moxcms = { version = "0.8", optional = true, default-features = false }  # Disabled for now
@@ -44,12 +45,13 @@ gif-imagequant = ["gif", "zengif/imagequant"]
 png = ["dep:png"]
 avif-decode = ["dep:zenavif"]
 avif-encode = ["dep:ravif"]
+jxl-decode = ["dep:jxl"]
 
 # Color management
 moxcms = []  # Disabled for now
 
 # All codecs
-all = ["jpeg", "webp", "gif", "gif-quantizr", "png", "avif-decode", "avif-encode"]
+all = ["jpeg", "webp", "gif", "gif-quantizr", "png", "avif-decode", "avif-encode", "jxl-decode"]
 
 [[example]]
 name = "metadata_roundtrip"
