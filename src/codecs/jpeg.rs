@@ -14,6 +14,11 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         .decode(data, enough::Unstoppable)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
+    let icc_profile = result
+        .extras()
+        .and_then(|e| e.icc_profile())
+        .map(|p| p.to_vec());
+
     Ok(ImageInfo {
         width: result.width(),
         height: result.height(),
@@ -21,7 +26,7 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         has_alpha: false,
         has_animation: false,
         frame_count: Some(1),
-        icc_profile: None,
+        icc_profile,
     })
 }
 
@@ -42,6 +47,11 @@ pub(crate) fn decode(
     let width = decoded.width();
     let height = decoded.height();
 
+    let icc_profile = decoded
+        .extras()
+        .and_then(|e| e.icc_profile())
+        .map(|p| p.to_vec());
+
     let raw_pixels = decoded
         .pixels_u8()
         .ok_or_else(|| CodecError::InvalidInput("no pixel data in decoded image".into()))?;
@@ -58,7 +68,7 @@ pub(crate) fn decode(
             has_alpha: false,
             has_animation: false,
             frame_count: Some(1),
-            icc_profile: None,
+            icc_profile,
         },
     })
 }
