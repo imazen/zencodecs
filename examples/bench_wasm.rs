@@ -1,7 +1,6 @@
 //! Benchmark encode/decode across codecs with real images.
 //!
 //! Reads PNG/JPEG files from disk, decodes, and re-encodes to each format.
-//! Skips GIF encode (too slow for large images due to imagequant).
 //!
 //! Native:  `cargo run --example bench_wasm --release --features std -- <image_paths...>`
 //! WASM:    Build with --target wasm32-wasip1 --release --features std
@@ -46,13 +45,17 @@ fn bench_image(path: &str) {
     let rgb = decoded.pixels.to_rgb8();
     let img = rgb.as_ref();
 
-    // Encode to each format (skip GIF — imagequant is too slow at 4K+)
+    // Encode to each format
     for (name, format) in [
         ("JPEG q80", ImageFormat::Jpeg),
         ("WebP q80", ImageFormat::WebP),
         ("PNG", ImageFormat::Png),
+        ("GIF", ImageFormat::Gif),
     ] {
-        let quality = if format == ImageFormat::Png { None } else { Some(80.0) };
+        let quality = match format {
+            ImageFormat::Png | ImageFormat::Gif => None,
+            _ => Some(80.0),
+        };
         let result = bench(&format!("Encode {name}"), ITERS, || {
             let mut req = EncodeRequest::new(format);
             if let Some(q) = quality {

@@ -8,6 +8,11 @@ use crate::{
     CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop,
 };
 
+/// Create a default GIF encoder config with the best available quantizer.
+fn default_encoder_config() -> zengif::EncoderConfig {
+    zengif::EncoderConfig::new().quantizer(zengif::Quantizer::auto())
+}
+
 /// Probe GIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     let cursor = std::io::Cursor::new(data);
@@ -130,7 +135,7 @@ pub(crate) fn encode_rgb8(
     let config = codec_config
         .and_then(|c| c.gif_encoder.as_ref())
         .map(|c| c.as_ref().clone())
-        .unwrap_or_else(zengif::EncoderConfig::new);
+        .unwrap_or_else(default_encoder_config);
     let limits = zengif::Limits::default();
 
     let gif_data = zengif::encode_gif(
@@ -171,7 +176,7 @@ pub(crate) fn encode_rgba8(
     let config = codec_config
         .and_then(|c| c.gif_encoder.as_ref())
         .map(|c| c.as_ref().clone())
-        .unwrap_or_else(zengif::EncoderConfig::new);
+        .unwrap_or_else(default_encoder_config);
     let limits = zengif::Limits::default();
 
     let gif_data = zengif::encode_gif(

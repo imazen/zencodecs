@@ -32,13 +32,14 @@ ravif = { version = "0.13", optional = true }
 [dev-dependencies]
 
 [features]
-default = ["jpeg", "webp", "gif", "gif-imagequant", "png"]
+default = ["jpeg", "webp", "gif", "gif-quantizr", "png"]
 std = []
 
 # Individual codec features
 jpeg = ["dep:zenjpeg"]
 webp = ["dep:zenwebp"]
 gif = ["dep:zengif"]
+gif-quantizr = ["gif", "zengif/quantizr"]
 gif-imagequant = ["gif", "zengif/imagequant"]
 png = ["dep:png"]
 avif-decode = ["dep:zenavif"]
@@ -48,7 +49,7 @@ avif-encode = ["dep:ravif"]
 moxcms = []  # Disabled for now
 
 # All codecs
-all = ["jpeg", "webp", "gif", "gif-imagequant", "png", "avif-decode", "avif-encode"]
+all = ["jpeg", "webp", "gif", "gif-quantizr", "png", "avif-decode", "avif-encode"]
 
 [[example]]
 name = "metadata_roundtrip"
