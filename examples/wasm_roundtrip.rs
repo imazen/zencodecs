@@ -36,9 +36,7 @@ fn main() {
 
     for (name, format) in [
         ("JPEG", ImageFormat::Jpeg),
-        // TODO: WebP encode panics on wasm32 (zenwebp bug: unwrap on
-        // Wasm128Token::summon() without simd128 target feature)
-        // ("WebP", ImageFormat::WebP),
+        ("WebP", ImageFormat::WebP),
         ("PNG", ImageFormat::Png),
         ("GIF", ImageFormat::Gif),
     ] {

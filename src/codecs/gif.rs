@@ -11,7 +11,7 @@ use crate::{
 /// Probe GIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     let cursor = std::io::Cursor::new(data);
-    let decoder = zengif::Decoder::new(cursor, zengif::Limits::default(), enough::Unstoppable)
+    let decoder = zengif::Decoder::new(cursor, zengif::Limits::default(), &enough::Unstoppable)
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
 
     let metadata = decoder.metadata();
@@ -139,7 +139,7 @@ pub(crate) fn encode_rgb8(
         height,
         config,
         limits,
-        enough::Unstoppable,
+        &enough::Unstoppable,
     )
     .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
 
@@ -180,7 +180,7 @@ pub(crate) fn encode_rgba8(
         height,
         config,
         limits,
-        enough::Unstoppable,
+        &enough::Unstoppable,
     )
     .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
 
