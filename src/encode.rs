@@ -351,6 +351,7 @@ impl<'a> EncodeRequest<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     #[test]
     fn builder_pattern() {

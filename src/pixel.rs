@@ -295,6 +295,7 @@ impl core::fmt::Debug for PixelData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     #[test]
     fn pixel_data_dimensions() {
