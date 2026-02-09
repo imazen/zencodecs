@@ -42,6 +42,40 @@ impl ImageInfo {
         }
     }
 
+    /// Probe partial image data for metadata without decoding pixels.
+    ///
+    /// Unlike `from_bytes()`, this works with truncated data (e.g., first N bytes
+    /// from an HTTP range request). Missing dimensions result in `None` fields
+    /// rather than an error. All compiled-in codecs are attempted.
+    ///
+    /// Uses pure byte parsing — no codec crate dependencies. Works even if a
+    /// codec feature isn't compiled in.
+    pub fn probe(data: &[u8]) -> Result<crate::ProbeResult, CodecError> {
+        let format = ImageFormat::detect(data).ok_or(CodecError::UnrecognizedFormat)?;
+        Ok(crate::ProbeResult::for_format(data, format))
+    }
+
+    /// Probe partial image data with a specific registry.
+    ///
+    /// Only formats enabled in the registry will be accepted.
+    pub fn probe_with_registry(
+        data: &[u8],
+        registry: &CodecRegistry,
+    ) -> Result<crate::ProbeResult, CodecError> {
+        let format = ImageFormat::detect(data).ok_or(CodecError::UnrecognizedFormat)?;
+        if !registry.can_decode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        Ok(crate::ProbeResult::for_format(data, format))
+    }
+
+    /// Probe partial image data for a known format (skips auto-detection).
+    ///
+    /// Never fails — insufficient data results in `None` fields.
+    pub fn probe_format(data: &[u8], format: ImageFormat) -> crate::ProbeResult {
+        crate::ProbeResult::for_format(data, format)
+    }
+
     /// Probe image metadata without decoding pixels.
     ///
     /// Uses format auto-detection and dispatches to the appropriate codec's probe.
@@ -66,16 +100,16 @@ impl ImageInfo {
         }
 
         // Dispatch to codec-specific probe
-        Self::probe_format(data, format)
+        Self::probe_format_full(data, format)
     }
 
     /// Probe with a known format (skips auto-detection).
     pub fn from_bytes_format(data: &[u8], format: ImageFormat) -> Result<Self, CodecError> {
-        Self::probe_format(data, format)
+        Self::probe_format_full(data, format)
     }
 
-    /// Dispatch to format-specific probe implementation.
-    fn probe_format(data: &[u8], format: ImageFormat) -> Result<Self, CodecError> {
+    /// Dispatch to format-specific full probe (requires codec feature).
+    fn probe_format_full(data: &[u8], format: ImageFormat) -> Result<Self, CodecError> {
         match format {
             #[cfg(feature = "jpeg")]
             ImageFormat::Jpeg => Self::probe_jpeg(data),

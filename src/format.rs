@@ -161,6 +161,27 @@ impl ImageFormat {
         }
     }
 
+    /// Recommended bytes to fetch for probing any format.
+    ///
+    /// 4096 bytes is enough for all formats including JPEG (which may have
+    /// large EXIF/APP segments before the SOF marker).
+    pub const RECOMMENDED_PROBE_BYTES: usize = 4096;
+
+    /// Minimum bytes needed for reliable dimension probing of this format.
+    ///
+    /// With fewer bytes, format detection may succeed but dimensions may be
+    /// `None` in the `ProbeResult`.
+    pub fn min_probe_bytes(self) -> usize {
+        match self {
+            ImageFormat::Png => 33,    // 8 sig + 25 IHDR
+            ImageFormat::Gif => 13,    // 6 header + 7 LSD
+            ImageFormat::WebP => 30,   // RIFF(12) + chunk header + VP8X dims
+            ImageFormat::Jpeg => 2048, // SOF can follow large EXIF/APP segments
+            ImageFormat::Avif => 512,  // ISOBMFF box traversal (ftyp + meta)
+            ImageFormat::Jxl => 256,   // codestream header or container + jxlc
+        }
+    }
+
     /// Whether this format supports alpha channel.
     pub fn supports_alpha(self) -> bool {
         match self {

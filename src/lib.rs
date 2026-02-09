@@ -93,6 +93,7 @@ mod format;
 mod info;
 mod limits;
 pub mod pixel;
+mod probe;
 mod registry;
 
 // Re-exports
@@ -103,4 +104,5 @@ pub use format::ImageFormat;
 pub use info::ImageInfo;
 pub use limits::{ImageMetadata, Limits, Stop};
 pub use pixel::PixelData;
+pub use probe::ProbeResult;
 pub use registry::CodecRegistry;
