@@ -106,3 +106,9 @@ pub use limits::{ImageMetadata, Limits, Stop};
 pub use pixel::PixelData;
 pub use probe::ProbeResult;
 pub use registry::CodecRegistry;
+
+// zencodec-types trait re-exports
+pub use zencodec_types::{Decoding, DecodingJob, Encoding, EncodingJob};
+
+#[cfg(feature = "png")]
+pub use codecs::png_zencodec::{PngDecodeJob, PngDecoding, PngEncodeJob, PngEncoding};

@@ -543,8 +543,6 @@ fn probe_jxl_with_crate(data: &[u8]) -> ProbeResult {
                 .iter()
                 .any(|ec| matches!(ec.ec_type, ExtraChannel::Alpha));
             let has_animation = info.animation.is_some();
-            let bit_depth = info.bit_depth;
-
             ProbeResult {
                 format: ImageFormat::Jxl,
                 width: Some(width as u32),
@@ -552,7 +550,7 @@ fn probe_jxl_with_crate(data: &[u8]) -> ProbeResult {
                 has_alpha: Some(has_alpha),
                 has_animation: Some(has_animation),
                 frame_count: None,
-                bit_depth: Some(bit_depth as u8),
+                bit_depth: Some(info.bit_depth.bits_per_sample() as u8),
                 bytes_examined: data.len() - input.len(),
             }
         }

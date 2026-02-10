@@ -23,3 +23,6 @@ pub(crate) mod avif_enc;
 
 #[cfg(feature = "jxl-decode")]
 pub(crate) mod jxl_dec;
+
+#[cfg(feature = "png")]
+pub mod png_zencodec;

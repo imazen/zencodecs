@@ -17,6 +17,7 @@ thiserror = { version = "2.0", default-features = false }
 rgb = { version = "0.8", default-features = false, features = ["as-bytes"] }
 imgref = "1.12"
 bytemuck = { version = "1.25", default-features = false }
+zencodec-types = { path = "../zencodec-types" }
 
 # Codecs (all optional, feature-gated)
 zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder"] }
