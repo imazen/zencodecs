@@ -30,7 +30,10 @@ fn bench_image(path: &str) {
     let filename = path.rsplit('/').next().unwrap_or(path);
     let file_size = data.len();
 
-    println!("--- {filename} ({:.1} MB) ---", file_size as f64 / 1_048_576.0);
+    println!(
+        "--- {filename} ({:.1} MB) ---",
+        file_size as f64 / 1_048_576.0
+    );
 
     // Decode
     let decoded = bench("Decode", ITERS, || {
@@ -66,10 +69,7 @@ fn bench_image(path: &str) {
         match result {
             Ok(encoded) => {
                 let ratio = encoded.data.len() as f64 / (w * h * 3) as f64 * 100.0;
-                println!(
-                    "    -> {} bytes ({ratio:.1}% of raw)",
-                    encoded.data.len()
-                );
+                println!("    -> {} bytes ({ratio:.1}% of raw)", encoded.data.len());
             }
             Err(e) => println!("    FAILED: {e}"),
         }
@@ -82,7 +82,11 @@ fn bench_image(path: &str) {
         ("WebP", ImageFormat::WebP),
         ("PNG", ImageFormat::Png),
     ] {
-        let quality = if format == ImageFormat::Png { None } else { Some(80.0) };
+        let quality = if format == ImageFormat::Png {
+            None
+        } else {
+            Some(80.0)
+        };
         let mut req = EncodeRequest::new(format);
         if let Some(q) = quality {
             req = req.with_quality(q);

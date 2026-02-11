@@ -73,7 +73,9 @@ pub(crate) fn decode(
     }
 
     let extras = result.extras();
-    let icc_profile = extras.and_then(|e| e.icc_profile()).map(|p: &[u8]| p.to_vec());
+    let icc_profile = extras
+        .and_then(|e| e.icc_profile())
+        .map(|p: &[u8]| p.to_vec());
     let exif = extras.and_then(|e| e.exif()).map(|p: &[u8]| p.to_vec());
     let xmp = extras
         .and_then(|e| e.xmp())
@@ -137,7 +139,12 @@ pub(crate) fn encode_rgb8(
     }
 
     let jpeg_data = request
-        .encode_bytes(bytes, width, height, zenjpeg::encoder::PixelLayout::Rgb8Srgb)
+        .encode_bytes(
+            bytes,
+            width,
+            height,
+            zenjpeg::encoder::PixelLayout::Rgb8Srgb,
+        )
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
     Ok(EncodeOutput {
@@ -177,7 +184,12 @@ pub(crate) fn encode_rgba8(
     }
 
     let jpeg_data = request
-        .encode_bytes(bytes, width, height, zenjpeg::encoder::PixelLayout::Rgba8Srgb)
+        .encode_bytes(
+            bytes,
+            width,
+            height,
+            zenjpeg::encoder::PixelLayout::Rgba8Srgb,
+        )
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
     Ok(EncodeOutput {

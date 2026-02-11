@@ -77,11 +77,7 @@ pub(crate) fn decode(
     let width = metadata.width as usize;
     let height = metadata.height as usize;
 
-    let rgba_pixels: alloc::vec::Vec<Rgba<u8>> = frame
-        .pixels
-        .into_iter()
-        .map(Rgba::from)
-        .collect();
+    let rgba_pixels: alloc::vec::Vec<Rgba<u8>> = frame.pixels.into_iter().map(Rgba::from).collect();
 
     let img = ImgVec::new(rgba_pixels, width, height);
 

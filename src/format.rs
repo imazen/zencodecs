@@ -239,7 +239,9 @@ mod tests {
 
     #[test]
     fn detect_jxl_container() {
-        let data = [0x00, 0x00, 0x00, 0x0C, b'J', b'X', b'L', b' ', 0x0D, 0x0A, 0x87, 0x0A];
+        let data = [
+            0x00, 0x00, 0x00, 0x0C, b'J', b'X', b'L', b' ', 0x0D, 0x0A, 0x87, 0x0A,
+        ];
         assert_eq!(ImageFormat::detect(&data), Some(ImageFormat::Jxl));
     }
 
