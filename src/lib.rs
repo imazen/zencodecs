@@ -111,7 +111,7 @@ pub use registry::CodecRegistry;
 pub use zencodec_types::{Decoding, DecodingJob, Encoding, EncodingJob};
 
 #[cfg(feature = "png")]
-pub use codecs::png_zencodec::{PngDecodeJob, PngDecoding, PngEncodeJob, PngEncoding};
+pub use zenpng::{PngDecodeJob, PngDecoding, PngEncodeJob, PngEncoding};
 
 #[cfg(feature = "webp")]
 pub use zenwebp::{WebpDecodeJob, WebpDecoding, WebpEncodeJob, WebpEncoding};
@@ -121,3 +121,9 @@ pub use zengif::{GifDecodeJob, GifDecoding, GifEncodeJob, GifEncoding};
 
 #[cfg(feature = "jpeg")]
 pub use zenjpeg::{JpegDecodeJob, JpegDecoding, JpegEncodeJob, JpegEncoding};
+
+#[cfg(feature = "jxl-decode")]
+pub use zenjxl::{JxlDecodeJob, JxlDecoding};
+
+#[cfg(feature = "jxl-encode")]
+pub use zenjxl::{JxlEncodeJob, JxlEncoding};

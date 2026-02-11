@@ -194,10 +194,8 @@ fn probe_webp(data: &[u8]) -> ProbeResult {
         let has_animation = (flags & 0x02) != 0;
 
         // Canvas width: 24-bit LE at bytes 24..27, stored as (width - 1)
-        let canvas_w =
-            (data[24] as u32) | ((data[25] as u32) << 8) | ((data[26] as u32) << 16);
-        let canvas_h =
-            (data[27] as u32) | ((data[28] as u32) << 8) | ((data[29] as u32) << 16);
+        let canvas_w = (data[24] as u32) | ((data[25] as u32) << 8) | ((data[26] as u32) << 16);
+        let canvas_h = (data[27] as u32) | ((data[28] as u32) << 8) | ((data[29] as u32) << 16);
 
         result.width = Some(canvas_w + 1);
         result.height = Some(canvas_h + 1);
@@ -222,11 +220,7 @@ fn probe_webp(data: &[u8]) -> ProbeResult {
         // Keyframe signature at 23..26: 0x9D 0x01 0x2A
         // Width at 26..28, height at 28..30
 
-        if data.len() >= 30
-            && data[23] == 0x9D
-            && data[24] == 0x01
-            && data[25] == 0x2A
-        {
+        if data.len() >= 30 && data[23] == 0x9D && data[24] == 0x01 && data[25] == 0x2A {
             let width = u16::from_le_bytes([data[26], data[27]]) & 0x3FFF;
             let height = u16::from_le_bytes([data[28], data[29]]) & 0x3FFF;
 
@@ -335,7 +329,16 @@ fn probe_jpeg(data: &[u8]) -> ProbeResult {
         // Also C3 (lossless), C5-C7, C9-CB, CD-CF — all have same layout
         let is_sof = matches!(
             marker,
-            0xC0 | 0xC1 | 0xC2 | 0xC3 | 0xC5 | 0xC6 | 0xC7 | 0xC9 | 0xCA | 0xCB | 0xCD
+            0xC0 | 0xC1
+                | 0xC2
+                | 0xC3
+                | 0xC5
+                | 0xC6
+                | 0xC7
+                | 0xC9
+                | 0xCA
+                | 0xCB
+                | 0xCD
                 | 0xCE
                 | 0xCF
         );
@@ -527,34 +530,18 @@ fn probe_jxl(data: &[u8]) -> ProbeResult {
 
 #[cfg(feature = "jxl-decode")]
 fn probe_jxl_with_crate(data: &[u8]) -> ProbeResult {
-    use jxl::api::{JxlDecoder, JxlDecoderOptions, ProcessingResult};
-    use jxl::headers::extra_channels::ExtraChannel;
-
-    let options = JxlDecoderOptions::default();
-    let decoder = JxlDecoder::new(options);
-
-    let mut input = data;
-    match decoder.process(&mut input) {
-        Ok(ProcessingResult::Complete { result: decoder }) => {
-            let info = decoder.basic_info();
-            let (width, height) = info.size;
-            let has_alpha = info
-                .extra_channels
-                .iter()
-                .any(|ec| matches!(ec.ec_type, ExtraChannel::Alpha));
-            let has_animation = info.animation.is_some();
-            ProbeResult {
-                format: ImageFormat::Jxl,
-                width: Some(width as u32),
-                height: Some(height as u32),
-                has_alpha: Some(has_alpha),
-                has_animation: Some(has_animation),
-                frame_count: None,
-                bit_depth: Some(info.bit_depth.bits_per_sample() as u8),
-                bytes_examined: data.len() - input.len(),
-            }
-        }
-        Ok(ProcessingResult::NeedsMoreInput { .. }) | Err(_) => {
+    match zenjxl::probe(data) {
+        Ok(info) => ProbeResult {
+            format: ImageFormat::Jxl,
+            width: Some(info.width),
+            height: Some(info.height),
+            has_alpha: Some(info.has_alpha),
+            has_animation: Some(info.has_animation),
+            frame_count: None,
+            bit_depth: info.bit_depth,
+            bytes_examined: data.len(),
+        },
+        Err(_) => {
             // Not enough data or parse error — return format-only
             ProbeResult {
                 format: ImageFormat::Jxl,
@@ -954,7 +941,12 @@ mod tests {
 
     /// Verify probe at various truncation lengths never panics and gives
     /// correct results when enough data is present.
-    fn verify_probe_truncation(encoded: &[u8], format: ImageFormat, expected_w: u32, expected_h: u32) {
+    fn verify_probe_truncation(
+        encoded: &[u8],
+        format: ImageFormat,
+        expected_w: u32,
+        expected_h: u32,
+    ) {
         // With 12 bytes: format detection works but dimensions may not
         if encoded.len() >= 12 {
             let result = ProbeResult::for_format(&encoded[..12], format);
@@ -969,15 +961,31 @@ mod tests {
             // For most formats, min_probe_bytes should give dimensions
             // (JPEG is an exception — SOF position is variable)
             if format != ImageFormat::Jpeg {
-                assert_eq!(result.width, Some(expected_w), "width mismatch at min_probe_bytes for {format:?}");
-                assert_eq!(result.height, Some(expected_h), "height mismatch at min_probe_bytes for {format:?}");
+                assert_eq!(
+                    result.width,
+                    Some(expected_w),
+                    "width mismatch at min_probe_bytes for {format:?}"
+                );
+                assert_eq!(
+                    result.height,
+                    Some(expected_h),
+                    "height mismatch at min_probe_bytes for {format:?}"
+                );
             }
         }
 
         // With full data: should always have dimensions
         let result = ProbeResult::for_format(encoded, format);
-        assert_eq!(result.width, Some(expected_w), "width mismatch for {format:?}");
-        assert_eq!(result.height, Some(expected_h), "height mismatch for {format:?}");
+        assert_eq!(
+            result.width,
+            Some(expected_w),
+            "width mismatch for {format:?}"
+        );
+        assert_eq!(
+            result.height,
+            Some(expected_h),
+            "height mismatch for {format:?}"
+        );
 
         // Random truncation should never panic
         for len in (1..encoded.len()).step_by(7) {
@@ -1021,15 +1029,10 @@ mod tests {
     fn probe_real_webp_lossy() {
         let (pixels, w, h) = test_rgb_pixels();
         let config = zenwebp::LossyConfig::new().with_quality(75.0);
-        let encoded = zenwebp::EncodeRequest::lossy(
-            &config,
-            &pixels,
-            zenwebp::PixelLayout::Rgb8,
-            w,
-            h,
-        )
-        .encode()
-        .unwrap();
+        let encoded =
+            zenwebp::EncodeRequest::lossy(&config, &pixels, zenwebp::PixelLayout::Rgb8, w, h)
+                .encode()
+                .unwrap();
 
         verify_probe_truncation(&encoded, ImageFormat::WebP, w, h);
 
@@ -1043,15 +1046,10 @@ mod tests {
     fn probe_real_webp_lossless() {
         let (pixels, w, h) = test_rgb_pixels();
         let config = zenwebp::LosslessConfig::default();
-        let encoded = zenwebp::EncodeRequest::lossless(
-            &config,
-            &pixels,
-            zenwebp::PixelLayout::Rgb8,
-            w,
-            h,
-        )
-        .encode()
-        .unwrap();
+        let encoded =
+            zenwebp::EncodeRequest::lossless(&config, &pixels, zenwebp::PixelLayout::Rgb8, w, h)
+                .encode()
+                .unwrap();
 
         let result = probe_webp(&encoded);
         assert_eq!(result.width, Some(w));
@@ -1114,7 +1112,12 @@ mod tests {
         let w = 16u32;
         let h = 12u32;
         let pixels: Vec<crate::pixel::Rgba<u8>> = vec![
-            crate::pixel::Rgba { r: 128, g: 64, b: 32, a: 255 };
+            crate::pixel::Rgba {
+                r: 128,
+                g: 64,
+                b: 32,
+                a: 255
+            };
             (w * h) as usize
         ];
         let img = crate::pixel::ImgVec::new(pixels, w as usize, h as usize);

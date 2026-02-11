@@ -37,10 +37,10 @@ pub mod gif {
     pub use zengif::EncoderConfig;
 }
 
-/// PNG configuration types from png crate.
+/// PNG configuration types from zenpng.
 #[cfg(feature = "png")]
 pub mod png_codec {
-    pub use png::{Compression, DeflateCompression, Filter};
+    pub use zenpng::{Compression, Filter};
 }
 
 /// AVIF decode configuration from zenavif.
@@ -105,11 +105,11 @@ pub struct CodecConfig {
 
     /// PNG compression level.
     #[cfg(feature = "png")]
-    pub png_compression: Option<png::Compression>,
+    pub png_compression: Option<zenpng::Compression>,
 
     /// PNG filter strategy.
     #[cfg(feature = "png")]
-    pub png_filter: Option<png::Filter>,
+    pub png_filter: Option<zenpng::Filter>,
 
     /// AVIF decoder configuration.
     #[cfg(feature = "avif-decode")]
@@ -175,14 +175,14 @@ impl CodecConfig {
 
     /// Set PNG compression level.
     #[cfg(feature = "png")]
-    pub fn with_png_compression(mut self, compression: png::Compression) -> Self {
+    pub fn with_png_compression(mut self, compression: zenpng::Compression) -> Self {
         self.png_compression = Some(compression);
         self
     }
 
     /// Set PNG filter strategy.
     #[cfg(feature = "png")]
-    pub fn with_png_filter(mut self, filter: png::Filter) -> Self {
+    pub fn with_png_filter(mut self, filter: zenpng::Filter) -> Self {
         self.png_filter = Some(filter);
         self
     }

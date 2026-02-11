@@ -1,55 +1,15 @@
-//! PNG codec adapter using png crate.
-//!
-//! Note: PNG codec requires std due to png crate's use of std::io traits.
-
-extern crate std;
-
-use std::io::Cursor;
+//! PNG codec adapter — delegates to zenpng.
 
 use crate::config::CodecConfig;
-use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
+use crate::pixel::{ImgRef, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, ImageMetadata, Limits,
-    PixelData, Stop,
+    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, ImageMetadata, Limits, Stop,
 };
 
 /// Probe PNG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    let cursor = Cursor::new(data);
-    let decoder = png::Decoder::new(cursor);
-
-    let reader = decoder
-        .read_info()
-        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-
-    let info = reader.info();
-    let has_alpha = matches!(
-        info.color_type,
-        png::ColorType::Rgba | png::ColorType::GrayscaleAlpha
-    );
-
-    let has_animation = info.animation_control.is_some();
-    let frame_count = if let Some(actl) = &info.animation_control {
-        actl.num_frames
-    } else {
-        1
-    };
-
-    let icc_profile = info.icc_profile.as_ref().map(|p| p.to_vec());
-    let exif = info.exif_metadata.as_ref().map(|p| p.to_vec());
-    let xmp = extract_xmp_from_itxt(info);
-
-    Ok(ImageInfo {
-        width: info.width,
-        height: info.height,
-        format: ImageFormat::Png,
-        has_alpha,
-        has_animation,
-        frame_count: Some(frame_count),
-        icc_profile,
-        exif,
-        xmp,
-    })
+    let info = zenpng::probe(data).map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
+    Ok(convert_info(&info))
 }
 
 /// Decode PNG to pixels.
@@ -58,123 +18,20 @@ pub(crate) fn decode(
     limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    let cursor = Cursor::new(data);
-    let decoder = if let Some(lim) = limits {
-        let png_limits = png::Limits {
-            bytes: lim.max_memory_bytes.unwrap_or(64 * 1024 * 1024) as usize,
-        };
-        png::Decoder::new_with_limits(cursor, png_limits)
-    } else {
-        png::Decoder::new(cursor)
-    };
+    let png_limits = limits.map(|lim| zenpng::PngLimits {
+        max_pixels: lim.max_pixels,
+        max_memory_bytes: lim.max_memory_bytes,
+    });
 
-    let mut reader = decoder
-        .read_info()
+    let result = zenpng::decode(data, png_limits.as_ref())
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-
-    let info = reader.info();
-    let width = info.width;
-    let height = info.height;
-    let has_alpha = matches!(
-        info.color_type,
-        png::ColorType::Rgba | png::ColorType::GrayscaleAlpha
-    );
-    let has_animation = info.animation_control.is_some();
-    let frame_count = if let Some(actl) = &info.animation_control {
-        actl.num_frames
-    } else {
-        1
-    };
-    // Check dimension limits
-    if let Some(lim) = limits {
-        let bpp: u32 = if has_alpha { 4 } else { 3 };
-        lim.validate(width, height, bpp)?;
-    }
-
-    let icc_profile = info.icc_profile.as_ref().map(|p| p.to_vec());
-    let exif = info.exif_metadata.as_ref().map(|p| p.to_vec());
-    let xmp = extract_xmp_from_itxt(info);
-
-    let buffer_size = reader.output_buffer_size().ok_or_else(|| {
-        CodecError::InvalidInput("cannot determine PNG output buffer size".into())
-    })?;
-    let mut raw_pixels = alloc::vec![0u8; buffer_size];
-
-    let output_info = reader
-        .next_frame(&mut raw_pixels)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-
-    raw_pixels.truncate(output_info.buffer_size());
-
-    let (decoded_color_type, _bit_depth) = reader.output_color_type();
-    let w = width as usize;
-    let h = height as usize;
-
-    let pixels = match decoded_color_type {
-        png::ColorType::Rgba => {
-            let rgba: &[Rgba<u8>] = bytemuck::cast_slice(&raw_pixels);
-            PixelData::Rgba8(ImgVec::new(rgba.to_vec(), w, h))
-        }
-        png::ColorType::Rgb => {
-            let rgb: &[Rgb<u8>] = bytemuck::cast_slice(&raw_pixels);
-            PixelData::Rgb8(ImgVec::new(rgb.to_vec(), w, h))
-        }
-        png::ColorType::GrayscaleAlpha => {
-            let rgba: alloc::vec::Vec<Rgba<u8>> = raw_pixels
-                .chunks_exact(2)
-                .map(|ga| Rgba {
-                    r: ga[0],
-                    g: ga[0],
-                    b: ga[0],
-                    a: ga[1],
-                })
-                .collect();
-            PixelData::Rgba8(ImgVec::new(rgba, w, h))
-        }
-        png::ColorType::Grayscale => {
-            let gray: alloc::vec::Vec<rgb::Gray<u8>> =
-                raw_pixels.iter().map(|&g| rgb::Gray(g)).collect();
-            PixelData::Gray8(ImgVec::new(gray, w, h))
-        }
-        png::ColorType::Indexed => {
-            if has_alpha {
-                let rgba: &[Rgba<u8>] = bytemuck::cast_slice(&raw_pixels);
-                PixelData::Rgba8(ImgVec::new(rgba.to_vec(), w, h))
-            } else {
-                let rgb: &[Rgb<u8>] = bytemuck::cast_slice(&raw_pixels);
-                PixelData::Rgb8(ImgVec::new(rgb.to_vec(), w, h))
-            }
-        }
-    };
 
     Ok(DecodeOutput {
-        pixels,
-        info: ImageInfo {
-            width,
-            height,
-            format: ImageFormat::Png,
-            has_alpha,
-            has_animation,
-            frame_count: Some(frame_count),
-            icc_profile,
-            exif,
-            xmp,
-        },
+        pixels: convert_pixels(result.pixels),
+        info: convert_info(&result.info),
         #[cfg(feature = "jpeg")]
         jpeg_extras: None,
     })
-}
-
-/// Apply PNG-specific config to an encoder.
-fn apply_png_config<W: std::io::Write>(encoder: &mut png::Encoder<'_, W>, codec_config: Option<&CodecConfig>) {
-    if let Some(cfg) = codec_config {
-        if let Some(compression) = cfg.png_compression {
-            encoder.set_compression(compression);
-        }
-        if let Some(filter) = cfg.png_filter {
-            encoder.set_filter(filter);
-        }
-    }
 }
 
 /// Encode RGB8 pixels to PNG.
@@ -185,29 +42,12 @@ pub(crate) fn encode_rgb8(
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let width = img.width() as u32;
-    let height = img.height() as u32;
-    let (buf, _, _) = img.to_contiguous_buf();
-    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
-
-    let mut output = alloc::vec::Vec::new();
-    let info = make_png_info(width, height, png::ColorType::Rgb, metadata);
-    let mut encoder = png::Encoder::with_info(&mut output, info)
+    let config = build_encode_config(codec_config);
+    let meta = metadata.map(convert_metadata);
+    let data = zenpng::encode_rgb8(img, meta.as_ref(), &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-    apply_png_config(&mut encoder, codec_config);
-
-    let mut writer = encoder
-        .write_header()
-        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-
-    writer
-        .write_image_data(bytes)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-
-    drop(writer);
-
     Ok(EncodeOutput {
-        data: output,
+        data,
         format: ImageFormat::Png,
     })
 }
@@ -220,75 +60,60 @@ pub(crate) fn encode_rgba8(
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let width = img.width() as u32;
-    let height = img.height() as u32;
-    let (buf, _, _) = img.to_contiguous_buf();
-    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
-
-    let mut output = alloc::vec::Vec::new();
-    let info = make_png_info(width, height, png::ColorType::Rgba, metadata);
-    let mut encoder = png::Encoder::with_info(&mut output, info)
+    let config = build_encode_config(codec_config);
+    let meta = metadata.map(convert_metadata);
+    let data = zenpng::encode_rgba8(img, meta.as_ref(), &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-    apply_png_config(&mut encoder, codec_config);
-
-    let mut writer = encoder
-        .write_header()
-        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-
-    writer
-        .write_image_data(bytes)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-
-    drop(writer);
-
     Ok(EncodeOutput {
-        data: output,
+        data,
         format: ImageFormat::Png,
     })
 }
 
-/// Create a PNG Info struct with metadata applied.
-fn make_png_info<'a>(
-    width: u32,
-    height: u32,
-    color_type: png::ColorType,
-    metadata: Option<&'a ImageMetadata<'a>>,
-) -> png::Info<'a> {
-    let mut info = png::Info::with_size(width, height);
-    info.color_type = color_type;
-    info.bit_depth = png::BitDepth::Eight;
-
-    if let Some(meta) = metadata {
-        if let Some(icc) = meta.icc_profile {
-            info.icc_profile = Some(icc.into());
+fn build_encode_config(codec_config: Option<&CodecConfig>) -> zenpng::EncodeConfig {
+    let mut config = zenpng::EncodeConfig::default();
+    if let Some(cfg) = codec_config {
+        if let Some(compression) = cfg.png_compression {
+            config.compression = compression;
         }
-        if let Some(exif) = meta.exif {
-            info.exif_metadata = Some(exif.into());
-        }
-        if let Some(xmp) = meta.xmp {
-            let xmp_str = core::str::from_utf8(xmp).unwrap_or_default();
-            if !xmp_str.is_empty() {
-                info.utf8_text.push(png::text_metadata::ITXtChunk::new(
-                    "XML:com.adobe.xmp",
-                    xmp_str,
-                ));
-            }
+        if let Some(filter) = cfg.png_filter {
+            config.filter = filter;
         }
     }
-
-    info
+    config
 }
 
-/// Extract XMP from iTXt chunks with keyword "XML:com.adobe.xmp".
-fn extract_xmp_from_itxt(info: &png::Info<'_>) -> Option<alloc::vec::Vec<u8>> {
-    for chunk in &info.utf8_text {
-        if chunk.keyword == "XML:com.adobe.xmp" {
-            if let Ok(text) = chunk.get_text() {
-                if !text.is_empty() {
-                    return Some(text.into_bytes());
-                }
-            }
-        }
+fn convert_metadata<'a>(meta: &ImageMetadata<'a>) -> zencodec_types::ImageMetadata<'a> {
+    zencodec_types::ImageMetadata {
+        icc_profile: meta.icc_profile,
+        exif: meta.exif,
+        xmp: meta.xmp,
     }
-    None
+}
+
+fn convert_info(info: &zenpng::PngInfo) -> ImageInfo {
+    ImageInfo {
+        width: info.width,
+        height: info.height,
+        format: ImageFormat::Png,
+        has_alpha: info.has_alpha,
+        has_animation: info.has_animation,
+        frame_count: Some(info.frame_count),
+        icc_profile: info.icc_profile.clone(),
+        exif: info.exif.clone(),
+        xmp: info.xmp.clone(),
+    }
+}
+
+fn convert_pixels(pixels: zencodec_types::PixelData) -> crate::PixelData {
+    match pixels {
+        zencodec_types::PixelData::Rgb8(img) => crate::PixelData::Rgb8(img),
+        zencodec_types::PixelData::Rgba8(img) => crate::PixelData::Rgba8(img),
+        zencodec_types::PixelData::Rgb16(img) => crate::PixelData::Rgb16(img),
+        zencodec_types::PixelData::Rgba16(img) => crate::PixelData::Rgba16(img),
+        zencodec_types::PixelData::RgbF32(img) => crate::PixelData::RgbF32(img),
+        zencodec_types::PixelData::RgbaF32(img) => crate::PixelData::RgbaF32(img),
+        zencodec_types::PixelData::Gray8(img) => crate::PixelData::Gray8(img),
+        _ => unreachable!("unknown PixelData variant"),
+    }
 }

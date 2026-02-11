@@ -268,9 +268,13 @@ impl<'a> EncodeRequest<'a> {
             ImageFormat::Gif => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "png")]
-            ImageFormat::Png => {
-                crate::codecs::png::encode_rgb8(img, self.metadata, self.codec_config, self.limits, self.stop)
-            }
+            ImageFormat::Png => crate::codecs::png::encode_rgb8(
+                img,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
             #[cfg(not(feature = "png"))]
             ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
 
@@ -286,7 +290,16 @@ impl<'a> EncodeRequest<'a> {
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
 
-            // No JXL encode support
+            #[cfg(feature = "jxl-encode")]
+            ImageFormat::Jxl => crate::codecs::jxl_enc::encode_rgb8(
+                img,
+                self.quality,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
+            #[cfg(not(feature = "jxl-encode"))]
             ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
         }
     }
@@ -330,9 +343,13 @@ impl<'a> EncodeRequest<'a> {
             ImageFormat::Gif => Err(CodecError::UnsupportedFormat(format)),
 
             #[cfg(feature = "png")]
-            ImageFormat::Png => {
-                crate::codecs::png::encode_rgba8(img, self.metadata, self.codec_config, self.limits, self.stop)
-            }
+            ImageFormat::Png => crate::codecs::png::encode_rgba8(
+                img,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
             #[cfg(not(feature = "png"))]
             ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
 
@@ -348,7 +365,16 @@ impl<'a> EncodeRequest<'a> {
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
 
-            // No JXL encode support
+            #[cfg(feature = "jxl-encode")]
+            ImageFormat::Jxl => crate::codecs::jxl_enc::encode_rgba8(
+                img,
+                self.quality,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
+            #[cfg(not(feature = "jxl-encode"))]
             ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
         }
     }

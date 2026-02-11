@@ -24,14 +24,15 @@ zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder"]
 zenwebp = { path = "../zenwebp", optional = true }
 zengif = { path = "../zengif", optional = true }
 zenavif = { path = "../zenavif", optional = true }
-png = { version = "0.18", optional = true }
+zenpng = { path = "../zenpng", optional = true }
 ravif = { version = "0.13", optional = true }
-jxl = { version = "0.3.0", optional = true }
+zenjxl = { path = "../zenjxl", optional = true, default-features = false }
 
 # Color management (optional)
 # moxcms = { version = "0.8", optional = true, default-features = false }  # Disabled for now
 
 [dev-dependencies]
+png = "0.18"
 
 [features]
 default = ["jpeg", "webp", "gif", "gif-quantizr", "png"]
@@ -43,15 +44,17 @@ webp = ["dep:zenwebp"]
 gif = ["dep:zengif"]
 gif-quantizr = ["gif", "zengif/quantizr"]
 gif-imagequant = ["gif", "zengif/imagequant"]
-png = ["dep:png"]
+png = ["dep:zenpng"]
 avif-decode = ["dep:zenavif"]
 avif-encode = ["dep:ravif"]
-jxl-decode = ["dep:jxl"]
+jxl-decode = ["dep:zenjxl", "zenjxl/decode"]
+jxl-encode = ["dep:zenjxl", "zenjxl/encode"]
 
 # Color management
 moxcms = []  # Disabled for now
 
 # All codecs
+# Note: jxl-encode excluded due to jxl-encoder-simd/magetypes API incompatibility
 all = ["jpeg", "webp", "gif", "gif-quantizr", "png", "avif-decode", "avif-encode", "jxl-decode"]
 
 [[example]]
