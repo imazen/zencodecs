@@ -41,6 +41,29 @@ pub(crate) fn decode(
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
 
+/// Decode WebP directly into a caller-provided RGBA8 buffer.
+pub(crate) fn decode_into_rgba8(
+    data: &[u8],
+    dst: imgref::ImgRefMut<'_, Rgba<u8>>,
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<ImageInfo, CodecError> {
+    let mut dec = zenwebp::WebpDecoding::new();
+    if let Some(cfg) = codec_config.and_then(|c| c.webp_decoder.as_ref()) {
+        *dec.inner_mut() = cfg.as_ref().clone();
+    }
+    if let Some(lim) = limits {
+        dec = dec.with_limits(&to_resource_limits(lim));
+    }
+    let mut job = dec.job();
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.decode_into_rgba8(data, dst)
+        .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
+}
+
 /// Build a WebpEncoding from quality/lossless/codec_config.
 fn build_encoding(
     quality: Option<f32>,

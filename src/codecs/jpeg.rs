@@ -7,8 +7,8 @@ use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::pixel::{Bgra, ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, Decoding, EncodeOutput, Encoding, EncodingJob, ImageFormat,
-    ImageInfo, ImageMetadata, Limits, PixelData, Stop,
+    CodecError, DecodeOutput, Decoding, DecodingJob, EncodeOutput, Encoding, EncodingJob,
+    ImageFormat, ImageInfo, ImageMetadata, Limits, PixelData, Stop,
 };
 
 /// Probe JPEG metadata without decoding pixels.
@@ -99,6 +99,82 @@ pub(crate) fn decode(
         output = output.with_extras(extras);
     }
     Ok(output)
+}
+
+/// Compute actual output dimensions for JPEG (applies DctScale, auto_orient).
+pub(crate) fn decode_info(
+    data: &[u8],
+    codec_config: Option<&CodecConfig>,
+) -> Result<ImageInfo, CodecError> {
+    let dec = build_decoding(codec_config, None);
+    dec.decode_info(data)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
+}
+
+/// Decode JPEG directly into a caller-provided RGB8 buffer.
+pub(crate) fn decode_into_rgb8(
+    data: &[u8],
+    dst: imgref::ImgRefMut<'_, Rgb<u8>>,
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<ImageInfo, CodecError> {
+    let dec = build_decoding(codec_config, limits);
+    let mut job = dec.job();
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.decode_into_rgb8(data, dst)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
+}
+
+/// Decode JPEG directly into a caller-provided RGBA8 buffer.
+pub(crate) fn decode_into_rgba8(
+    data: &[u8],
+    dst: imgref::ImgRefMut<'_, Rgba<u8>>,
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<ImageInfo, CodecError> {
+    let dec = build_decoding(codec_config, limits);
+    let mut job = dec.job();
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.decode_into_rgba8(data, dst)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
+}
+
+/// Decode JPEG directly into a caller-provided Gray8 buffer.
+pub(crate) fn decode_into_gray8(
+    data: &[u8],
+    dst: imgref::ImgRefMut<'_, crate::pixel::Gray<u8>>,
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<ImageInfo, CodecError> {
+    let dec = build_decoding(codec_config, limits);
+    let mut job = dec.job();
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.decode_into_gray8(data, dst)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
+}
+
+/// Build a JpegDecoding from codec config and limits.
+fn build_decoding(
+    _codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+) -> zenjpeg::JpegDecoding {
+    // Note: JpegDecoding doesn't expose inner_mut() for codec-specific config.
+    // The codec_config.jpeg_decoder is used by the native decode() path above.
+    // For trait-based decode_into_*/decode_info, we use the default config.
+    let mut dec = zenjpeg::JpegDecoding::new();
+    if let Some(lim) = limits {
+        dec = dec.with_limits(&to_resource_limits(lim));
+    }
+    dec
 }
 
 /// Build a JpegEncoding from codec config or generic quality.

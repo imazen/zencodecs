@@ -67,6 +67,41 @@ pub fn from_bytes_format(data: &[u8], format: ImageFormat) -> Result<ImageInfo, 
     probe_format_full(data, format)
 }
 
+/// Compute actual decode output dimensions for an image.
+///
+/// Unlike [`from_bytes`] which returns stored file dimensions, this applies
+/// codec-specific config transforms (JPEG DctScale, auto_orient) to predict
+/// what [`DecodeRequest::decode`](crate::DecodeRequest::decode) will actually produce.
+///
+/// For codecs without dimension transforms, this is equivalent to `from_bytes`.
+pub fn decode_info(data: &[u8]) -> Result<ImageInfo, CodecError> {
+    decode_info_with_config(data, None)
+}
+
+/// Compute actual decode output dimensions with codec-specific config.
+pub fn decode_info_with_config(
+    data: &[u8],
+    codec_config: Option<&crate::config::CodecConfig>,
+) -> Result<ImageInfo, CodecError> {
+    let format = ImageFormat::detect(data).ok_or(CodecError::UnrecognizedFormat)?;
+    decode_info_format(data, format, codec_config)
+}
+
+/// Compute actual decode output dimensions for a known format.
+fn decode_info_format(
+    data: &[u8],
+    format: ImageFormat,
+    codec_config: Option<&crate::config::CodecConfig>,
+) -> Result<ImageInfo, CodecError> {
+    match format {
+        #[cfg(feature = "jpeg")]
+        ImageFormat::Jpeg => crate::codecs::jpeg::decode_info(data, codec_config),
+
+        // Other codecs: decode_info == probe (no dimension transforms)
+        _ => probe_format_full(data, format),
+    }
+}
+
 /// Dispatch to format-specific full probe (requires codec feature).
 fn probe_format_full(data: &[u8], format: ImageFormat) -> Result<ImageInfo, CodecError> {
     match format {

@@ -3,7 +3,7 @@
 pub use zencodec_types::DecodeOutput;
 
 use crate::config::CodecConfig;
-use crate::{CodecError, CodecRegistry, ImageFormat, Limits, Stop};
+use crate::{CodecError, CodecRegistry, ImageFormat, ImageInfo, Limits, Stop};
 
 /// Image decode request builder.
 ///
@@ -70,6 +70,161 @@ impl<'a> DecodeRequest<'a> {
     pub fn with_codec_config(mut self, config: &'a CodecConfig) -> Self {
         self.codec_config = Some(config);
         self
+    }
+
+    /// Decode directly into a caller-provided RGB8 buffer.
+    ///
+    /// Uses zero-copy path when the codec supports it (e.g. JPEG scanline reader).
+    /// Falls back to decode + copy for other codecs.
+    pub fn decode_into_rgb8(
+        self,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Rgb<u8>>,
+    ) -> Result<ImageInfo, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+        let format = match self.format {
+            Some(f) => f,
+            None => ImageFormat::detect(self.data).ok_or(CodecError::UnrecognizedFormat)?,
+        };
+        if !registry.can_decode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        self.decode_into_rgb8_format(format, dst)
+    }
+
+    fn decode_into_rgb8_format(
+        self,
+        format: ImageFormat,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Rgb<u8>>,
+    ) -> Result<ImageInfo, CodecError> {
+        match format {
+            #[cfg(feature = "jpeg")]
+            ImageFormat::Jpeg => crate::codecs::jpeg::decode_into_rgb8(
+                self.data,
+                dst,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
+            // Other codecs: fall back to decode + copy
+            _ => {
+                let output = self.decode_format(format)?;
+                let info = output.info().clone();
+                let src = output.into_rgb8();
+                let mut dst = dst;
+                for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+                    let n = src_row.len().min(dst_row.len());
+                    dst_row[..n].copy_from_slice(&src_row[..n]);
+                }
+                Ok(info)
+            }
+        }
+    }
+
+    /// Decode directly into a caller-provided RGBA8 buffer.
+    ///
+    /// Uses zero-copy path when the codec supports it (e.g. JPEG, WebP).
+    /// Falls back to decode + copy for other codecs.
+    pub fn decode_into_rgba8(
+        self,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Rgba<u8>>,
+    ) -> Result<ImageInfo, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+        let format = match self.format {
+            Some(f) => f,
+            None => ImageFormat::detect(self.data).ok_or(CodecError::UnrecognizedFormat)?,
+        };
+        if !registry.can_decode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        self.decode_into_rgba8_format(format, dst)
+    }
+
+    fn decode_into_rgba8_format(
+        self,
+        format: ImageFormat,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Rgba<u8>>,
+    ) -> Result<ImageInfo, CodecError> {
+        match format {
+            #[cfg(feature = "jpeg")]
+            ImageFormat::Jpeg => crate::codecs::jpeg::decode_into_rgba8(
+                self.data,
+                dst,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
+            #[cfg(feature = "webp")]
+            ImageFormat::WebP => crate::codecs::webp::decode_into_rgba8(
+                self.data,
+                dst,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
+            // Other codecs: fall back to decode + copy
+            _ => {
+                let output = self.decode_format(format)?;
+                let info = output.info().clone();
+                let src = output.into_rgba8();
+                let mut dst = dst;
+                for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+                    let n = src_row.len().min(dst_row.len());
+                    dst_row[..n].copy_from_slice(&src_row[..n]);
+                }
+                Ok(info)
+            }
+        }
+    }
+
+    /// Decode directly into a caller-provided Gray8 buffer.
+    ///
+    /// Uses zero-copy path when the codec supports it (e.g. JPEG).
+    /// Falls back to decode + copy for other codecs.
+    pub fn decode_into_gray8(
+        self,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Gray<u8>>,
+    ) -> Result<ImageInfo, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+        let format = match self.format {
+            Some(f) => f,
+            None => ImageFormat::detect(self.data).ok_or(CodecError::UnrecognizedFormat)?,
+        };
+        if !registry.can_decode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        self.decode_into_gray8_format(format, dst)
+    }
+
+    fn decode_into_gray8_format(
+        self,
+        format: ImageFormat,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Gray<u8>>,
+    ) -> Result<ImageInfo, CodecError> {
+        match format {
+            #[cfg(feature = "jpeg")]
+            ImageFormat::Jpeg => crate::codecs::jpeg::decode_into_gray8(
+                self.data,
+                dst,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
+            // Other codecs: fall back to decode + copy
+            _ => {
+                let output = self.decode_format(format)?;
+                let info = output.info().clone();
+                let src = output.into_gray8();
+                let mut dst = dst;
+                for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+                    let n = src_row.len().min(dst_row.len());
+                    dst_row[..n].copy_from_slice(&src_row[..n]);
+                }
+                Ok(info)
+            }
+        }
     }
 
     /// Decode the image to pixels.
