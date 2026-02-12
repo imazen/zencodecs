@@ -144,10 +144,7 @@ pub(crate) fn encode_rgb8(
     )
     .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
 
-    Ok(EncodeOutput {
-        data: gif_data,
-        format: ImageFormat::Gif,
-    })
+    Ok(EncodeOutput::new(gif_data, ImageFormat::Gif))
 }
 
 /// Encode RGBA8 pixels to GIF (single frame).
@@ -185,8 +182,5 @@ pub(crate) fn encode_rgba8(
     )
     .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
 
-    Ok(EncodeOutput {
-        data: gif_data,
-        format: ImageFormat::Gif,
-    })
+    Ok(EncodeOutput::new(gif_data, ImageFormat::Gif))
 }

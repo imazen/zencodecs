@@ -64,7 +64,7 @@ fn main() {
             .expect("encode failed");
 
         // Decode the re-encoded image to verify metadata survived
-        let re_decoded = DecodeRequest::new(&encoded.data)
+        let re_decoded = DecodeRequest::new(encoded.bytes())
             .decode()
             .expect("re-decode failed");
 
@@ -86,7 +86,7 @@ fn main() {
 
         println!(
             "  {name}: {size} bytes, ICC={icc_match}, EXIF={exif}, XMP={xmp} (supports: {expected})",
-            size = encoded.data.len(),
+            size = encoded.len(),
             exif = if exif_ok { "preserved" } else { "LOST" },
             xmp = if xmp_ok { "preserved" } else { "LOST" },
         );

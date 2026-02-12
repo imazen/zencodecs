@@ -147,10 +147,7 @@ pub(crate) fn encode_rgb8(
         )
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
-    Ok(EncodeOutput {
-        data: jpeg_data,
-        format: ImageFormat::Jpeg,
-    })
+    Ok(EncodeOutput::new(jpeg_data, ImageFormat::Jpeg))
 }
 
 /// Encode RGBA8 pixels to JPEG (alpha is discarded).
@@ -192,10 +189,7 @@ pub(crate) fn encode_rgba8(
         )
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
-    Ok(EncodeOutput {
-        data: jpeg_data,
-        format: ImageFormat::Jpeg,
-    })
+    Ok(EncodeOutput::new(jpeg_data, ImageFormat::Jpeg))
 }
 
 /// Encode BGRA8 pixels to JPEG (native BGRA path, alpha discarded).
@@ -237,10 +231,7 @@ pub(crate) fn encode_bgra8(
         )
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
-    Ok(EncodeOutput {
-        data: jpeg_data,
-        format: ImageFormat::Jpeg,
-    })
+    Ok(EncodeOutput::new(jpeg_data, ImageFormat::Jpeg))
 }
 
 /// Encode BGRX8 pixels to JPEG (native BGRX path, padding byte ignored).
@@ -282,10 +273,7 @@ pub(crate) fn encode_bgrx8(
         )
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
-    Ok(EncodeOutput {
-        data: jpeg_data,
-        format: ImageFormat::Jpeg,
-    })
+    Ok(EncodeOutput::new(jpeg_data, ImageFormat::Jpeg))
 }
 
 /// Apply zencodecs ImageMetadata to a zenjpeg EncodeRequest.

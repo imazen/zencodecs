@@ -1,19 +1,10 @@
 //! Image encoding.
 
-use alloc::vec::Vec;
-
 use crate::config::CodecConfig;
 use crate::pixel::{Bgra, ImgRef, Rgb, Rgba};
 use crate::{CodecError, CodecRegistry, ImageFormat, ImageMetadata, Limits, Stop};
 
-/// Encoded image output.
-#[derive(Clone, Debug)]
-pub struct EncodeOutput {
-    /// Encoded image data.
-    pub data: Vec<u8>,
-    /// Format used for encoding (useful when auto-selected).
-    pub format: ImageFormat,
-}
+pub use zencodec_types::EncodeOutput;
 
 /// Image encode request builder.
 ///

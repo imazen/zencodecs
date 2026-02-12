@@ -48,7 +48,7 @@ fn main() {
         .encode_rgb8(img)
         .expect("encode failed");
 
-    current_data = first_encoded.data;
+    current_data = first_encoded.into_vec();
 
     // Verify first hop
     let step1 = DecodeRequest::new(&current_data)
@@ -83,7 +83,7 @@ fn main() {
             .encode_rgb8(step_img)
             .expect("encode failed");
 
-        current_data = encoded.data;
+        current_data = encoded.into_vec();
 
         let re_decoded = DecodeRequest::new(&current_data)
             .decode()

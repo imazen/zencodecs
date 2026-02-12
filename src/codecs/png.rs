@@ -45,10 +45,7 @@ pub(crate) fn encode_rgb8(
     let config = build_encode_config(codec_config);
     let data = zenpng::encode_rgb8(img, metadata, &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-    Ok(EncodeOutput {
-        data,
-        format: ImageFormat::Png,
-    })
+    Ok(EncodeOutput::new(data, ImageFormat::Png))
 }
 
 /// Encode RGBA8 pixels to PNG.
@@ -62,10 +59,7 @@ pub(crate) fn encode_rgba8(
     let config = build_encode_config(codec_config);
     let data = zenpng::encode_rgba8(img, metadata, &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-    Ok(EncodeOutput {
-        data,
-        format: ImageFormat::Png,
-    })
+    Ok(EncodeOutput::new(data, ImageFormat::Png))
 }
 
 fn build_encode_config(codec_config: Option<&CodecConfig>) -> zenpng::EncodeConfig {

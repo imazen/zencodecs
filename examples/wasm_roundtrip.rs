@@ -46,7 +46,7 @@ fn main() {
             .encode_rgb8(img)
             .expect("encode failed");
 
-        println!("{name}: {} bytes", encoded.data.len());
+        println!("{name}: {} bytes", encoded.len());
     }
 
     println!("All roundtrips OK");

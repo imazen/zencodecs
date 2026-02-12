@@ -19,10 +19,7 @@ pub(crate) fn encode_rgb8(
         .encode_rgb(img)
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))?;
 
-    Ok(EncodeOutput {
-        data: result.avif_file,
-        format: ImageFormat::Avif,
-    })
+    Ok(EncodeOutput::new(result.avif_file, ImageFormat::Avif))
 }
 
 /// Encode RGBA8 pixels to AVIF.
@@ -40,10 +37,7 @@ pub(crate) fn encode_rgba8(
         .encode_rgba(img)
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))?;
 
-    Ok(EncodeOutput {
-        data: result.avif_file,
-        format: ImageFormat::Avif,
-    })
+    Ok(EncodeOutput::new(result.avif_file, ImageFormat::Avif))
 }
 
 /// Build a ravif Encoder from zencodecs parameters.

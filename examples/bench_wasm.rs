@@ -68,8 +68,8 @@ fn bench_image(path: &str) {
         });
         match result {
             Ok(encoded) => {
-                let ratio = encoded.data.len() as f64 / (w * h * 3) as f64 * 100.0;
-                println!("    -> {} bytes ({ratio:.1}% of raw)", encoded.data.len());
+                let ratio = encoded.len() as f64 / (w * h * 3) as f64 * 100.0;
+                println!("    -> {} bytes ({ratio:.1}% of raw)", encoded.len());
             }
             Err(e) => println!("    FAILED: {e}"),
         }
@@ -99,7 +99,7 @@ fn bench_image(path: &str) {
             }
         };
         match bench(&format!("Decode {name}"), ITERS, || {
-            DecodeRequest::new(&encoded.data).decode()
+            DecodeRequest::new(encoded.bytes()).decode()
         }) {
             Ok(_) => {}
             Err(e) => println!("    FAILED: {e}"),

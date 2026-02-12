@@ -120,12 +120,12 @@ fn main() {
 
     println!(
         "\nRe-encoded JPEG: {} bytes (original: {} bytes)",
-        re_encoded.data.len(),
+        re_encoded.len(),
         jpeg_data.len()
     );
 
     // Verify segments survived
-    let re_decoded = DecodeRequest::new(&re_encoded.data)
+    let re_decoded = DecodeRequest::new(re_encoded.bytes())
         .decode()
         .expect("failed to re-decode");
 

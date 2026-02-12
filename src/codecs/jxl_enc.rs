@@ -16,10 +16,7 @@ pub(crate) fn encode_rgb8(
     let config = build_lossy_config(quality);
     let data = zenjxl::encode_rgb8(img, &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?;
-    Ok(EncodeOutput {
-        data,
-        format: ImageFormat::Jxl,
-    })
+    Ok(EncodeOutput::new(data, ImageFormat::Jxl))
 }
 
 /// Encode RGBA8 pixels to JXL.
@@ -34,10 +31,7 @@ pub(crate) fn encode_rgba8(
     let config = build_lossy_config(quality);
     let data = zenjxl::encode_rgba8(img, &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?;
-    Ok(EncodeOutput {
-        data,
-        format: ImageFormat::Jxl,
-    })
+    Ok(EncodeOutput::new(data, ImageFormat::Jxl))
 }
 
 /// Encode BGRA8 pixels to JXL (native BGRA path).
@@ -52,10 +46,7 @@ pub(crate) fn encode_bgra8(
     let config = build_lossy_config(quality);
     let data = zenjxl::encode_bgra8(img, &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?;
-    Ok(EncodeOutput {
-        data,
-        format: ImageFormat::Jxl,
-    })
+    Ok(EncodeOutput::new(data, ImageFormat::Jxl))
 }
 
 fn build_lossy_config(quality: Option<f32>) -> zenjxl::LossyConfig {

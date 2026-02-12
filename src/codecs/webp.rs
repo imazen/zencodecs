@@ -195,10 +195,7 @@ pub(crate) fn encode_rgb8(
             .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
     };
 
-    Ok(EncodeOutput {
-        data: webp_data,
-        format: ImageFormat::WebP,
-    })
+    Ok(EncodeOutput::new(webp_data, ImageFormat::WebP))
 }
 
 /// Encode RGBA8 pixels to WebP.
@@ -258,10 +255,7 @@ pub(crate) fn encode_rgba8(
             .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
     };
 
-    Ok(EncodeOutput {
-        data: webp_data,
-        format: ImageFormat::WebP,
-    })
+    Ok(EncodeOutput::new(webp_data, ImageFormat::WebP))
 }
 
 /// Encode BGRA8 pixels to WebP (native BGRA path).
@@ -321,8 +315,5 @@ pub(crate) fn encode_bgra8(
             .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
     };
 
-    Ok(EncodeOutput {
-        data: webp_data,
-        format: ImageFormat::WebP,
-    })
+    Ok(EncodeOutput::new(webp_data, ImageFormat::WebP))
 }

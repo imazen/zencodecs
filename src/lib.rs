@@ -41,7 +41,7 @@
 //! let webp = EncodeRequest::new(ImageFormat::WebP)
 //!     .with_quality(85.0)
 //!     .encode_rgba8(pixels.as_ref())?;
-//! println!("Encoded {} bytes", webp.data.len());
+//! println!("Encoded {} bytes", webp.len());
 //! # Ok::<(), zencodecs::CodecError>(())
 //! ```
 //!
