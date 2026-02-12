@@ -1,6 +1,6 @@
 //! Runtime codec registry for enabling/disabling formats.
 
-use crate::format::ImageFormat;
+use crate::ImageFormat;
 
 /// Set of image formats represented as bitflags.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -79,6 +79,7 @@ impl FormatSet {
             ImageFormat::Png => Self::PNG,
             ImageFormat::Avif => Self::AVIF,
             ImageFormat::Jxl => Self::JXL,
+            _ => return false,
         };
         (self.0 & bit) != 0
     }
@@ -91,6 +92,7 @@ impl FormatSet {
             ImageFormat::Png => Self::PNG,
             ImageFormat::Avif => Self::AVIF,
             ImageFormat::Jxl => Self::JXL,
+            _ => return,
         };
         self.0 |= bit;
     }
@@ -103,6 +105,7 @@ impl FormatSet {
             ImageFormat::Png => Self::PNG,
             ImageFormat::Avif => Self::AVIF,
             ImageFormat::Jxl => Self::JXL,
+            _ => return,
         };
         self.0 &= !bit;
     }
@@ -209,6 +212,8 @@ impl CodecRegistry {
             ImageFormat::Jxl => true,
             #[cfg(not(feature = "jxl-decode"))]
             ImageFormat::Jxl => false,
+
+            _ => false,
         }
     }
 
@@ -249,6 +254,8 @@ impl CodecRegistry {
             ImageFormat::Jxl => true,
             #[cfg(not(feature = "jxl-encode"))]
             ImageFormat::Jxl => false,
+
+            _ => false,
         }
     }
 

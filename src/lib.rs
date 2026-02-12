@@ -89,7 +89,6 @@ pub mod config;
 mod decode;
 mod encode;
 mod error;
-mod format;
 mod info;
 mod limits;
 pub mod pixel;
@@ -100,12 +99,12 @@ mod registry;
 pub use decode::{DecodeOutput, DecodeRequest};
 pub use encode::{EncodeOutput, EncodeRequest};
 pub use error::CodecError;
-pub use format::ImageFormat;
 pub use info::ImageInfo;
 pub use limits::{ImageMetadata, Limits, Stop};
 pub use pixel::PixelData;
 pub use probe::ProbeResult;
 pub use registry::CodecRegistry;
+pub use zencodec_types::ImageFormat;
 
 // zencodec-types trait re-exports
 pub use zencodec_types::{Decoding, DecodingJob, Encoding, EncodingJob};

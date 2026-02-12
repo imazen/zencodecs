@@ -366,6 +366,8 @@ impl<'a> EncodeRequest<'a> {
             ),
             #[cfg(not(feature = "jxl-encode"))]
             ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
+
+            _ => Err(CodecError::UnsupportedFormat(format)),
         }
     }
 
@@ -441,6 +443,8 @@ impl<'a> EncodeRequest<'a> {
             ),
             #[cfg(not(feature = "jxl-encode"))]
             ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
+
+            _ => Err(CodecError::UnsupportedFormat(format)),
         }
     }
 

@@ -211,6 +211,8 @@ impl<'a> DecodeRequest<'a> {
             ImageFormat::Jxl => self.decode_jxl(),
             #[cfg(not(feature = "jxl-decode"))]
             ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
+
+            _ => Err(CodecError::UnsupportedFormat(format)),
         }
     }
 

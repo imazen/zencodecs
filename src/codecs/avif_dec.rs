@@ -56,15 +56,11 @@ pub(crate) fn decode(
     }
 
     let pixels = match image {
-        zenavif::DecodedImage::Rgb8(img_vec) => PixelData::Rgb8(img_vec),
-        zenavif::DecodedImage::Rgba8(img_vec) => PixelData::Rgba8(img_vec),
-        zenavif::DecodedImage::Rgb16(img_vec) => PixelData::Rgb16(img_vec),
-        zenavif::DecodedImage::Rgba16(img_vec) => PixelData::Rgba16(img_vec),
-        zenavif::DecodedImage::Gray8(img_vec) => {
-            let (buf, w, h) = img_vec.into_contiguous_buf();
-            let gray: alloc::vec::Vec<rgb::Gray<u8>> = buf.into_iter().map(rgb::Gray).collect();
-            PixelData::Gray8(imgref::ImgVec::new(gray, w, h))
-        }
+        zencodec_types::PixelData::Rgb8(img_vec) => PixelData::Rgb8(img_vec),
+        zencodec_types::PixelData::Rgba8(img_vec) => PixelData::Rgba8(img_vec),
+        zencodec_types::PixelData::Rgb16(img_vec) => PixelData::Rgb16(img_vec),
+        zencodec_types::PixelData::Rgba16(img_vec) => PixelData::Rgba16(img_vec),
+        zencodec_types::PixelData::Gray8(img_vec) => PixelData::Gray8(img_vec),
         _ => {
             return Err(CodecError::UnsupportedOperation {
                 format: ImageFormat::Avif,

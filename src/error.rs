@@ -4,7 +4,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use core::fmt;
 
-use crate::format::ImageFormat;
+use crate::ImageFormat;
 
 /// Unified error type for codec operations.
 #[derive(Debug)]

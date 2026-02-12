@@ -140,6 +140,8 @@ impl ImageInfo {
             ImageFormat::Jxl => Self::probe_jxl(data),
             #[cfg(not(feature = "jxl-decode"))]
             ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
+
+            _ => Err(CodecError::UnsupportedFormat(format)),
         }
     }
 

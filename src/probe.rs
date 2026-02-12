@@ -7,7 +7,7 @@
 //! All parsers are pure byte parsing — no codec crate dependencies. This means
 //! probing works even if a codec feature isn't compiled in.
 
-use crate::format::ImageFormat;
+use crate::ImageFormat;
 use crate::info::ImageInfo;
 
 /// Result of probing partial image data.
@@ -68,6 +68,16 @@ impl ProbeResult {
             ImageFormat::Jpeg => probe_jpeg(data),
             ImageFormat::Avif => probe_avif(data),
             ImageFormat::Jxl => probe_jxl(data),
+            _ => ProbeResult {
+                format,
+                width: None,
+                height: None,
+                has_alpha: None,
+                has_animation: None,
+                frame_count: None,
+                bit_depth: None,
+                bytes_examined: 0,
+            },
         }
     }
 }
