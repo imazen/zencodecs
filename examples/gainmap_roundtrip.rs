@@ -1,6 +1,6 @@
 //! Gain map inspection: decode an UltraHDR JPEG and inspect its JPEG extras.
 //!
-//! Demonstrates accessing JPEG-specific extras via `DecodeOutput::jpeg_extras`,
+//! Demonstrates accessing JPEG-specific extras via `DecodeOutput::extras()`,
 //! including MPF directory, secondary images, and gain maps. If a gain map is
 //! found, it's decoded as a separate image and the full extras are roundtripped
 //! via `DecodedExtras::to_encoder_segments()`.
@@ -8,7 +8,7 @@
 //! Run: `cargo run --example gainmap_roundtrip --features all,std`
 
 use zencodecs::config::CodecConfig;
-use zencodecs::config::jpeg::{ChromaSubsampling, EncoderConfig};
+use zencodecs::config::jpeg::{ChromaSubsampling, DecodedExtras, EncoderConfig};
 use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat};
 
 fn main() {
@@ -23,13 +23,12 @@ fn main() {
         "Primary image: {}x{} {:?}",
         decoded.width(),
         decoded.height(),
-        decoded.info.format,
+        decoded.format(),
     );
 
-    // Access JPEG-specific extras
+    // Access JPEG-specific extras via typed extras
     let extras = decoded
-        .jpeg_extras
-        .as_ref()
+        .extras::<DecodedExtras>()
         .expect("no jpeg extras — was this a JPEG?");
 
     println!("\nPreserved segments:");
@@ -110,7 +109,7 @@ fn main() {
 
     let config = CodecConfig::default().with_jpeg_encoder(encoder_config);
 
-    let rgb8 = decoded.pixels.to_rgb8();
+    let rgb8 = decoded.into_pixels().to_rgb8();
     let img = rgb8.as_ref();
 
     let re_encoded = EncodeRequest::new(ImageFormat::Jpeg)
@@ -129,7 +128,7 @@ fn main() {
         .decode()
         .expect("failed to re-decode");
 
-    if let Some(re_extras) = re_decoded.jpeg_extras.as_ref() {
+    if let Some(re_extras) = re_decoded.extras::<DecodedExtras>() {
         println!(
             "Preserved {} segments after roundtrip",
             re_extras.segments().len()

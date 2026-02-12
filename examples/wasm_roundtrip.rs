@@ -20,10 +20,10 @@ fn main() {
         "Decoded: {}x{} {:?}",
         decoded.width(),
         decoded.height(),
-        decoded.info.format,
+        decoded.format(),
     );
 
-    let meta = decoded.info.metadata();
+    let meta = decoded.metadata();
     println!(
         "Metadata: ICC={} EXIF={} XMP={}",
         meta.icc_profile.map_or(0, |p| p.len()),
@@ -31,7 +31,7 @@ fn main() {
         meta.xmp.map_or(0, |p| p.len()),
     );
 
-    let rgb8 = decoded.pixels.to_rgb8();
+    let rgb8 = decoded.pixels().to_rgb8();
     let img = rgb8.as_ref();
 
     for (name, format) in [

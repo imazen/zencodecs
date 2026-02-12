@@ -52,12 +52,10 @@ pub(crate) fn decode(
     // zenavif returns zencodec_types::PixelData, which is our PixelData
     let pixels = image;
 
-    Ok(DecodeOutput {
+    Ok(DecodeOutput::new(
         pixels,
-        info: ImageInfo::new(width, height, ImageFormat::Avif)
+        ImageInfo::new(width, height, ImageFormat::Avif)
             .with_alpha(has_alpha)
             .with_frame_count(1),
-        #[cfg(feature = "jpeg")]
-        jpeg_extras: None,
-    })
+    ))
 }

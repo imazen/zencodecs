@@ -19,11 +19,11 @@ fn main() {
         "Decoded: {}x{} {:?}",
         decoded.width(),
         decoded.height(),
-        decoded.info.format
+        decoded.format()
     );
 
     // Extract metadata via the convenience method
-    let meta = decoded.info.metadata();
+    let meta = decoded.metadata();
     println!("\nMetadata from decode:");
     println!(
         "  ICC profile: {}",
@@ -45,7 +45,7 @@ fn main() {
     );
 
     // Convert to RGB8 for encoding
-    let rgb8 = decoded.pixels.to_rgb8();
+    let rgb8 = decoded.pixels().to_rgb8();
     let img = rgb8.as_ref();
 
     // Re-encode to each format that supports metadata
@@ -68,7 +68,7 @@ fn main() {
             .decode()
             .expect("re-decode failed");
 
-        let re_meta = re_decoded.info.metadata();
+        let re_meta = re_decoded.metadata();
         let icc_match = match (meta.icc_profile, re_meta.icc_profile) {
             (Some(a), Some(b)) => {
                 if a == b {

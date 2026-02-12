@@ -26,12 +26,7 @@ pub(crate) fn decode(
     let result = zenpng::decode(data, png_limits.as_ref())
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
 
-    Ok(DecodeOutput {
-        pixels: result.pixels,
-        info: convert_info(&result.info),
-        #[cfg(feature = "jpeg")]
-        jpeg_extras: None,
-    })
+    Ok(DecodeOutput::new(result.pixels, convert_info(&result.info)))
 }
 
 /// Encode RGB8 pixels to PNG.

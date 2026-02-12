@@ -16,7 +16,7 @@ fn main() {
         .expect("failed to decode JPEG");
 
     let original_icc = decoded
-        .info
+        .info()
         .icc_profile
         .as_deref()
         .expect("no ICC profile in test JPEG");
@@ -27,7 +27,8 @@ fn main() {
         original_icc[0], original_icc[1], original_icc[2], original_icc[3]
     );
 
-    let rgb8 = decoded.pixels.to_rgb8();
+    let meta = decoded.metadata();
+    let rgb8 = decoded.pixels().to_rgb8();
     let img = rgb8.as_ref();
 
     // Chain: JPEG → WebP → PNG → JPEG
@@ -39,9 +40,6 @@ fn main() {
 
     let mut current_data: Vec<u8>;
     let mut prev_icc = original_icc.to_vec();
-
-    // First encode from the decoded pixels
-    let meta = decoded.info.metadata();
     let first_encoded = EncodeRequest::new(chain[0].1)
         .with_quality(95.0)
         .with_metadata(&meta)
@@ -54,7 +52,7 @@ fn main() {
     let step1 = DecodeRequest::new(&current_data)
         .decode()
         .expect("decode failed");
-    let step1_icc = step1.info.icc_profile.as_deref().unwrap_or(&[]);
+    let step1_icc = step1.info().icc_profile.as_deref().unwrap_or(&[]);
     let match_str = if step1_icc == prev_icc {
         "MATCH"
     } else {
@@ -73,8 +71,8 @@ fn main() {
             .decode()
             .expect("decode failed");
 
-        let step_meta = step.info.metadata();
-        let step_rgb8 = step.pixels.to_rgb8();
+        let step_meta = step.metadata();
+        let step_rgb8 = step.pixels().to_rgb8();
         let step_img = step_rgb8.as_ref();
 
         let encoded = EncodeRequest::new(format)
@@ -89,7 +87,7 @@ fn main() {
             .decode()
             .expect("decode failed");
 
-        let new_icc = re_decoded.info.icc_profile.as_deref().unwrap_or(&[]);
+        let new_icc = re_decoded.info().icc_profile.as_deref().unwrap_or(&[]);
         let match_str = if new_icc == prev_icc {
             "MATCH"
         } else {

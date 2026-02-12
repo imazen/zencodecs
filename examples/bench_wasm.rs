@@ -43,9 +43,9 @@ fn bench_image(path: &str) {
     let w = decoded.width();
     let h = decoded.height();
     let mpx = (w as f64 * h as f64) / 1_000_000.0;
-    println!("  {w}x{h} ({mpx:.1} MP) {:?}", decoded.info.format);
+    println!("  {w}x{h} ({mpx:.1} MP) {:?}", decoded.format());
 
-    let rgb = decoded.pixels.to_rgb8();
+    let rgb = decoded.into_pixels().to_rgb8();
     let img = rgb.as_ref();
 
     // Encode to each format

@@ -22,12 +22,7 @@ pub(crate) fn decode(
     let result = zenjxl::decode(data, jxl_limits.as_ref())
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?;
 
-    Ok(DecodeOutput {
-        pixels: result.pixels,
-        info: convert_info(&result.info),
-        #[cfg(feature = "jpeg")]
-        jpeg_extras: None,
-    })
+    Ok(DecodeOutput::new(result.pixels, convert_info(&result.info)))
 }
 
 fn convert_info(info: &zenjxl::JxlInfo) -> ImageInfo {

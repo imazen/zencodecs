@@ -93,25 +93,24 @@ pub(crate) fn decode(
     let rgb_pixels: &[Rgb<u8>] = bytemuck::cast_slice(raw_pixels);
     let img = ImgVec::new(rgb_pixels.to_vec(), width as usize, height as usize);
 
-    let jpeg_extras = result.take_extras().map(alloc::boxed::Box::new);
+    let jpeg_extras = result.take_extras();
 
-    Ok(DecodeOutput {
-        pixels: PixelData::Rgb8(img),
-        info: {
-            let mut ii = ImageInfo::new(width, height, ImageFormat::Jpeg).with_frame_count(1);
-            if let Some(icc) = icc_profile {
-                ii = ii.with_icc_profile(icc);
-            }
-            if let Some(exif) = exif {
-                ii = ii.with_exif(exif);
-            }
-            if let Some(xmp) = xmp {
-                ii = ii.with_xmp(xmp);
-            }
-            ii
-        },
-        jpeg_extras,
-    })
+    let mut ii = ImageInfo::new(width, height, ImageFormat::Jpeg).with_frame_count(1);
+    if let Some(icc) = icc_profile {
+        ii = ii.with_icc_profile(icc);
+    }
+    if let Some(exif) = exif {
+        ii = ii.with_exif(exif);
+    }
+    if let Some(xmp) = xmp {
+        ii = ii.with_xmp(xmp);
+    }
+
+    let mut output = DecodeOutput::new(PixelData::Rgb8(img), ii);
+    if let Some(extras) = jpeg_extras {
+        output = output.with_extras(extras);
+    }
+    Ok(output)
 }
 
 /// Encode RGB8 pixels to JPEG.

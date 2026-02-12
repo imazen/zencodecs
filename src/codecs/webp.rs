@@ -106,27 +106,20 @@ pub(crate) fn decode(
         lim.validate(width, height, bpp)?;
     }
 
-    Ok(DecodeOutput {
-        pixels,
-        info: {
-            let mut ii = ImageInfo::new(width, height, ImageFormat::WebP)
-                .with_alpha(webp_info.has_alpha)
-                .with_animation(webp_info.has_animation)
-                .with_frame_count(webp_info.frame_count);
-            if let Some(icc) = webp_info.icc_profile {
-                ii = ii.with_icc_profile(icc);
-            }
-            if let Some(exif) = webp_info.exif {
-                ii = ii.with_exif(exif);
-            }
-            if let Some(xmp) = webp_info.xmp {
-                ii = ii.with_xmp(xmp);
-            }
-            ii
-        },
-        #[cfg(feature = "jpeg")]
-        jpeg_extras: None,
-    })
+    let mut ii = ImageInfo::new(width, height, ImageFormat::WebP)
+        .with_alpha(webp_info.has_alpha)
+        .with_animation(webp_info.has_animation)
+        .with_frame_count(webp_info.frame_count);
+    if let Some(icc) = webp_info.icc_profile {
+        ii = ii.with_icc_profile(icc);
+    }
+    if let Some(exif) = webp_info.exif {
+        ii = ii.with_exif(exif);
+    }
+    if let Some(xmp) = webp_info.xmp {
+        ii = ii.with_xmp(xmp);
+    }
+    Ok(DecodeOutput::new(pixels, ii))
 }
 
 /// Convert zencodecs ImageMetadata to zenwebp ImageMetadata.

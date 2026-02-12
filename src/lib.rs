@@ -27,7 +27,7 @@
 //!
 //! let data: &[u8] = &[]; // your image bytes
 //! let decoded = DecodeRequest::new(data).decode()?;
-//! println!("{}x{} {:?}", decoded.width(), decoded.height(), decoded.pixels);
+//! println!("{}x{} {:?}", decoded.width(), decoded.height(), decoded.pixels());
 //! # Ok::<(), zencodecs::CodecError>(())
 //! ```
 //!

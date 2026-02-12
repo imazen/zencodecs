@@ -87,15 +87,13 @@ pub(crate) fn decode(
         frame_count += 1;
     }
 
-    Ok(DecodeOutput {
-        pixels: PixelData::Rgba8(img),
-        info: ImageInfo::new(width as u32, height as u32, ImageFormat::Gif)
+    Ok(DecodeOutput::new(
+        PixelData::Rgba8(img),
+        ImageInfo::new(width as u32, height as u32, ImageFormat::Gif)
             .with_alpha(true)
             .with_animation(frame_count > 1)
             .with_frame_count(frame_count),
-        #[cfg(feature = "jpeg")]
-        jpeg_extras: None,
-    })
+    ))
 }
 
 /// Encode RGB8 pixels to GIF (single frame).
