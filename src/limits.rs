@@ -84,12 +84,12 @@ pub(crate) fn stop_or_default(stop: Option<&dyn Stop>) -> &dyn Stop {
     stop.unwrap_or(&enough::Unstoppable)
 }
 
-/// Re-export `enough::Stop` for cooperative cancellation.
+/// Re-export `Stop` for cooperative cancellation.
 ///
 /// Codecs periodically call `stop.check()` and return `CodecError::Cancelled`
 /// if the operation should be cancelled. Use `enough::Unstoppable` when you
 /// don't need cancellation (zero-cost).
-pub use enough::Stop;
+pub use zencodec_types::Stop;
 
 #[cfg(test)]
 mod tests {
