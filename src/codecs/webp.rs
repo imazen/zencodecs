@@ -1,7 +1,7 @@
 //! WebP codec adapter using zenwebp.
 
 use crate::config::CodecConfig;
-use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
+use crate::pixel::{Bgra, ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
     CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, ImageMetadata, Limits,
     PixelData, Stop,
@@ -246,6 +246,69 @@ pub(crate) fn encode_rgba8(
             &config,
             bytes,
             zenwebp::PixelLayout::Rgba8,
+            width,
+            height,
+        )
+        .with_metadata(webp_meta);
+        if let Some(s) = stop {
+            request = request.with_stop(s);
+        }
+        request
+            .encode()
+            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
+    };
+
+    Ok(EncodeOutput {
+        data: webp_data,
+        format: ImageFormat::WebP,
+    })
+}
+
+/// Encode BGRA8 pixels to WebP (native BGRA path).
+pub(crate) fn encode_bgra8(
+    img: ImgRef<Bgra<u8>>,
+    quality: Option<f32>,
+    lossless: bool,
+    metadata: Option<&ImageMetadata<'_>>,
+    codec_config: Option<&CodecConfig>,
+    _limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let width = img.width() as u32;
+    let height = img.height() as u32;
+    let (buf, _, _) = img.to_contiguous_buf();
+    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
+    let webp_meta = to_webp_metadata(metadata);
+
+    let webp_data = if lossless {
+        let config = codec_config
+            .and_then(|c| c.webp_lossless.as_ref())
+            .map(|c| c.as_ref().clone())
+            .unwrap_or_default();
+        let mut request = zenwebp::EncodeRequest::lossless(
+            &config,
+            bytes,
+            zenwebp::PixelLayout::Bgra8,
+            width,
+            height,
+        )
+        .with_metadata(webp_meta);
+        if let Some(s) = stop {
+            request = request.with_stop(s);
+        }
+        request
+            .encode()
+            .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
+    } else {
+        let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0);
+        let config = codec_config
+            .and_then(|c| c.webp_lossy.as_ref())
+            .map(|c| c.as_ref().clone())
+            .unwrap_or_else(|| zenwebp::LossyConfig::new().with_quality(quality));
+        let mut request = zenwebp::EncodeRequest::lossy(
+            &config,
+            bytes,
+            zenwebp::PixelLayout::Bgra8,
             width,
             height,
         )

@@ -1,7 +1,7 @@
 //! JPEG codec adapter using zenjpeg.
 
 use crate::config::CodecConfig;
-use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
+use crate::pixel::{Bgra, ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
     CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, ImageMetadata, Limits,
     PixelData, Stop,
@@ -189,6 +189,96 @@ pub(crate) fn encode_rgba8(
             width,
             height,
             zenjpeg::encoder::PixelLayout::Rgba8Srgb,
+        )
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+
+    Ok(EncodeOutput {
+        data: jpeg_data,
+        format: ImageFormat::Jpeg,
+    })
+}
+
+/// Encode BGRA8 pixels to JPEG (native BGRA path, alpha discarded).
+pub(crate) fn encode_bgra8(
+    img: ImgRef<Bgra<u8>>,
+    quality: Option<f32>,
+    metadata: Option<&ImageMetadata<'_>>,
+    codec_config: Option<&CodecConfig>,
+    _limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let config = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
+        cfg.as_ref().clone()
+    } else {
+        let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0) as u8;
+        zenjpeg::encoder::EncoderConfig::ycbcr(
+            quality,
+            zenjpeg::encoder::ChromaSubsampling::Quarter,
+        )
+    };
+
+    let width = img.width() as u32;
+    let height = img.height() as u32;
+    let (buf, _, _) = img.to_contiguous_buf();
+    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
+
+    let mut request = config.request();
+    request = apply_metadata(request, metadata);
+    if let Some(s) = stop {
+        request = request.stop(s);
+    }
+
+    let jpeg_data = request
+        .encode_bytes(
+            bytes,
+            width,
+            height,
+            zenjpeg::encoder::PixelLayout::Bgra8Srgb,
+        )
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+
+    Ok(EncodeOutput {
+        data: jpeg_data,
+        format: ImageFormat::Jpeg,
+    })
+}
+
+/// Encode BGRX8 pixels to JPEG (native BGRX path, padding byte ignored).
+pub(crate) fn encode_bgrx8(
+    img: ImgRef<Bgra<u8>>,
+    quality: Option<f32>,
+    metadata: Option<&ImageMetadata<'_>>,
+    codec_config: Option<&CodecConfig>,
+    _limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let config = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
+        cfg.as_ref().clone()
+    } else {
+        let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0) as u8;
+        zenjpeg::encoder::EncoderConfig::ycbcr(
+            quality,
+            zenjpeg::encoder::ChromaSubsampling::Quarter,
+        )
+    };
+
+    let width = img.width() as u32;
+    let height = img.height() as u32;
+    let (buf, _, _) = img.to_contiguous_buf();
+    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
+
+    let mut request = config.request();
+    request = apply_metadata(request, metadata);
+    if let Some(s) = stop {
+        request = request.stop(s);
+    }
+
+    let jpeg_data = request
+        .encode_bytes(
+            bytes,
+            width,
+            height,
+            zenjpeg::encoder::PixelLayout::Bgrx8Srgb,
         )
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 

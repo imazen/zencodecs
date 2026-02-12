@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 
 use crate::config::CodecConfig;
-use crate::pixel::{ImgRef, Rgb, Rgba};
+use crate::pixel::{Bgra, ImgRef, Rgb, Rgba};
 use crate::{CodecError, CodecRegistry, ImageFormat, ImageMetadata, Limits, Stop};
 
 /// Encoded image output.
@@ -156,6 +156,35 @@ impl<'a> EncodeRequest<'a> {
         self.validate_and_dispatch_rgba8(format, img, registry)
     }
 
+    /// Encode BGRA8 pixels (native byte order, zero-copy for codecs that support it).
+    pub fn encode_bgra8(self, img: ImgRef<Bgra<u8>>) -> Result<EncodeOutput, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+
+        let has_alpha = img.pixels().any(|p| p.a < 255);
+
+        let format = match self.format {
+            Some(f) => f,
+            None => self.auto_select_format(has_alpha, registry)?,
+        };
+
+        self.validate_and_dispatch_bgra8(format, img, registry)
+    }
+
+    /// Encode BGRX8 pixels (opaque BGRA — padding byte is ignored).
+    pub fn encode_bgrx8(self, img: ImgRef<Bgra<u8>>) -> Result<EncodeOutput, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+        let has_alpha = false;
+
+        let format = match self.format {
+            Some(f) => f,
+            None => self.auto_select_format(has_alpha, registry)?,
+        };
+
+        self.validate_and_dispatch_bgrx8(format, img, registry)
+    }
+
     fn validate_and_dispatch_rgb8(
         self,
         format: ImageFormat,
@@ -190,6 +219,42 @@ impl<'a> EncodeRequest<'a> {
             });
         }
         self.encode_format_rgba8(format, img)
+    }
+
+    fn validate_and_dispatch_bgra8(
+        self,
+        format: ImageFormat,
+        img: ImgRef<Bgra<u8>>,
+        registry: &CodecRegistry,
+    ) -> Result<EncodeOutput, CodecError> {
+        if !registry.can_encode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        if self.lossless && !format.supports_lossless() {
+            return Err(CodecError::UnsupportedOperation {
+                format,
+                detail: "lossless encoding not supported",
+            });
+        }
+        self.encode_format_bgra8(format, img)
+    }
+
+    fn validate_and_dispatch_bgrx8(
+        self,
+        format: ImageFormat,
+        img: ImgRef<Bgra<u8>>,
+        registry: &CodecRegistry,
+    ) -> Result<EncodeOutput, CodecError> {
+        if !registry.can_encode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        if self.lossless && !format.supports_lossless() {
+            return Err(CodecError::UnsupportedOperation {
+                format,
+                detail: "lossless encoding not supported",
+            });
+        }
+        self.encode_format_bgrx8(format, img)
     }
 
     fn auto_select_format(
@@ -376,6 +441,90 @@ impl<'a> EncodeRequest<'a> {
             ),
             #[cfg(not(feature = "jxl-encode"))]
             ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
+        }
+    }
+
+    fn encode_format_bgra8(
+        self,
+        format: ImageFormat,
+        img: ImgRef<Bgra<u8>>,
+    ) -> Result<EncodeOutput, CodecError> {
+        match format {
+            #[cfg(feature = "jpeg")]
+            ImageFormat::Jpeg => crate::codecs::jpeg::encode_bgra8(
+                img,
+                self.quality,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
+            #[cfg(not(feature = "jpeg"))]
+            ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
+
+            #[cfg(feature = "webp")]
+            ImageFormat::WebP => crate::codecs::webp::encode_bgra8(
+                img,
+                self.quality,
+                self.lossless,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
+            #[cfg(not(feature = "webp"))]
+            ImageFormat::WebP => Err(CodecError::UnsupportedFormat(format)),
+
+            // Codecs without native BGRA: swizzle to RGBA and delegate.
+            _ => {
+                let (buf, w, h) = img.to_contiguous_buf();
+                let rgba: alloc::vec::Vec<Rgba<u8>> = buf
+                    .iter()
+                    .map(|p| Rgba {
+                        r: p.r,
+                        g: p.g,
+                        b: p.b,
+                        a: p.a,
+                    })
+                    .collect();
+                let rgba_img = imgref::ImgVec::new(rgba, w, h);
+                self.encode_format_rgba8(format, rgba_img.as_ref())
+            }
+        }
+    }
+
+    fn encode_format_bgrx8(
+        self,
+        format: ImageFormat,
+        img: ImgRef<Bgra<u8>>,
+    ) -> Result<EncodeOutput, CodecError> {
+        match format {
+            #[cfg(feature = "jpeg")]
+            ImageFormat::Jpeg => crate::codecs::jpeg::encode_bgrx8(
+                img,
+                self.quality,
+                self.metadata,
+                self.codec_config,
+                self.limits,
+                self.stop,
+            ),
+            #[cfg(not(feature = "jpeg"))]
+            ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
+
+            // Codecs without native BGRX: swizzle to RGB and delegate.
+            _ => {
+                let (buf, w, h) = img.to_contiguous_buf();
+                let rgb: alloc::vec::Vec<Rgb<u8>> = buf
+                    .iter()
+                    .map(|p| Rgb {
+                        r: p.r,
+                        g: p.g,
+                        b: p.b,
+                    })
+                    .collect();
+                let rgb_img = imgref::ImgVec::new(rgb, w, h);
+                self.encode_format_rgb8(format, rgb_img.as_ref())
+            }
         }
     }
 }

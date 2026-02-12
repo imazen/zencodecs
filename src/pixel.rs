@@ -3,6 +3,7 @@
 //! Uses `imgref::ImgVec` for 2D pixel data with typed pixels from the `rgb` crate.
 
 pub use imgref::{Img, ImgRef, ImgVec};
+pub use rgb::alt::BGRA as Bgra;
 pub use rgb::{Gray, Rgb, Rgba};
 
 /// Decoded pixel data in a typed buffer.
@@ -18,6 +19,8 @@ pub enum PixelData {
     RgbF32(ImgVec<Rgb<f32>>),
     RgbaF32(ImgVec<Rgba<f32>>),
     Gray8(ImgVec<Gray<u8>>),
+    /// 8-bit BGRA (blue, green, red, alpha byte order).
+    Bgra8(ImgVec<Bgra<u8>>),
 }
 
 impl PixelData {
@@ -31,6 +34,7 @@ impl PixelData {
             PixelData::RgbF32(img) => img.width() as u32,
             PixelData::RgbaF32(img) => img.width() as u32,
             PixelData::Gray8(img) => img.width() as u32,
+            PixelData::Bgra8(img) => img.width() as u32,
         }
     }
 
@@ -44,6 +48,7 @@ impl PixelData {
             PixelData::RgbF32(img) => img.height() as u32,
             PixelData::RgbaF32(img) => img.height() as u32,
             PixelData::Gray8(img) => img.height() as u32,
+            PixelData::Bgra8(img) => img.height() as u32,
         }
     }
 
@@ -51,7 +56,10 @@ impl PixelData {
     pub fn has_alpha(&self) -> bool {
         matches!(
             self,
-            PixelData::Rgba8(_) | PixelData::Rgba16(_) | PixelData::RgbaF32(_)
+            PixelData::Rgba8(_)
+                | PixelData::Rgba16(_)
+                | PixelData::RgbaF32(_)
+                | PixelData::Bgra8(_)
         )
     }
 
@@ -134,6 +142,18 @@ impl PixelData {
                         r: (p.r.clamp(0.0, 1.0) * 255.0) as u8,
                         g: (p.g.clamp(0.0, 1.0) * 255.0) as u8,
                         b: (p.b.clamp(0.0, 1.0) * 255.0) as u8,
+                    })
+                    .collect();
+                ImgVec::new(rgb, w, h)
+            }
+            PixelData::Bgra8(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                let rgb: alloc::vec::Vec<Rgb<u8>> = buf
+                    .iter()
+                    .map(|p| Rgb {
+                        r: p.r,
+                        g: p.g,
+                        b: p.b,
                     })
                     .collect();
                 ImgVec::new(rgb, w, h)
@@ -230,6 +250,82 @@ impl PixelData {
                     .collect();
                 ImgVec::new(rgba, w, h)
             }
+            PixelData::Bgra8(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                let rgba: alloc::vec::Vec<Rgba<u8>> = buf
+                    .iter()
+                    .map(|p| Rgba {
+                        r: p.r,
+                        g: p.g,
+                        b: p.b,
+                        a: p.a,
+                    })
+                    .collect();
+                ImgVec::new(rgba, w, h)
+            }
+        }
+    }
+
+    /// Convert to BGRA8, allocating a new buffer.
+    ///
+    /// Bgra8 is cloned. Rgba8 swizzles R↔B. Rgb8 swizzles and adds A=255.
+    /// Other formats convert through to_rgba8() then swizzle.
+    pub fn to_bgra8(&self) -> ImgVec<Bgra<u8>> {
+        match self {
+            PixelData::Bgra8(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                ImgVec::new(buf.into_owned(), w, h)
+            }
+            PixelData::Rgba8(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                let bgra: alloc::vec::Vec<Bgra<u8>> = buf
+                    .iter()
+                    .map(|p| Bgra {
+                        b: p.b,
+                        g: p.g,
+                        r: p.r,
+                        a: p.a,
+                    })
+                    .collect();
+                ImgVec::new(bgra, w, h)
+            }
+            PixelData::Rgb8(img) => {
+                let (buf, w, h) = img.as_ref().to_contiguous_buf();
+                let bgra: alloc::vec::Vec<Bgra<u8>> = buf
+                    .iter()
+                    .map(|p| Bgra {
+                        b: p.b,
+                        g: p.g,
+                        r: p.r,
+                        a: 255,
+                    })
+                    .collect();
+                ImgVec::new(bgra, w, h)
+            }
+            _ => {
+                let rgba = self.to_rgba8();
+                let (buf, w, h) = rgba.as_ref().to_contiguous_buf();
+                let bgra: alloc::vec::Vec<Bgra<u8>> = buf
+                    .iter()
+                    .map(|p| Bgra {
+                        b: p.b,
+                        g: p.g,
+                        r: p.r,
+                        a: p.a,
+                    })
+                    .collect();
+                ImgVec::new(bgra, w, h)
+            }
+        }
+    }
+
+    /// Convert to BGRA8 consuming self.
+    ///
+    /// Zero-copy for Bgra8 variant, allocates for others.
+    pub fn into_bgra8(self) -> ImgVec<Bgra<u8>> {
+        match self {
+            PixelData::Bgra8(img) => img,
+            other => other.to_bgra8(),
         }
     }
 
@@ -267,6 +363,10 @@ impl PixelData {
                 let (buf, _, _) = img.as_ref().to_contiguous_buf();
                 buf.as_bytes().to_vec()
             }
+            PixelData::Bgra8(img) => {
+                let (buf, _, _) = img.as_ref().to_contiguous_buf();
+                buf.as_bytes().to_vec()
+            }
         }
     }
 }
@@ -281,6 +381,7 @@ impl core::fmt::Debug for PixelData {
             PixelData::RgbF32(_) => "RgbF32",
             PixelData::RgbaF32(_) => "RgbaF32",
             PixelData::Gray8(_) => "Gray8",
+            PixelData::Bgra8(_) => "Bgra8",
         };
         write!(
             f,
