@@ -27,7 +27,7 @@ pub(crate) fn decode(
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
 
     Ok(DecodeOutput {
-        pixels: convert_pixels(result.pixels),
+        pixels: result.pixels,
         info: convert_info(&result.info),
         #[cfg(feature = "jpeg")]
         jpeg_extras: None,
@@ -43,8 +43,7 @@ pub(crate) fn encode_rgb8(
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
     let config = build_encode_config(codec_config);
-    let meta = metadata.map(convert_metadata);
-    let data = zenpng::encode_rgb8(img, meta.as_ref(), &config)
+    let data = zenpng::encode_rgb8(img, metadata, &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
     Ok(EncodeOutput {
         data,
@@ -61,8 +60,7 @@ pub(crate) fn encode_rgba8(
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
     let config = build_encode_config(codec_config);
-    let meta = metadata.map(convert_metadata);
-    let data = zenpng::encode_rgba8(img, meta.as_ref(), &config)
+    let data = zenpng::encode_rgba8(img, metadata, &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
     Ok(EncodeOutput {
         data,
@@ -83,14 +81,6 @@ fn build_encode_config(codec_config: Option<&CodecConfig>) -> zenpng::EncodeConf
     config
 }
 
-fn convert_metadata<'a>(meta: &ImageMetadata<'a>) -> zencodec_types::ImageMetadata<'a> {
-    zencodec_types::ImageMetadata {
-        icc_profile: meta.icc_profile,
-        exif: meta.exif,
-        xmp: meta.xmp,
-    }
-}
-
 fn convert_info(info: &zenpng::PngInfo) -> ImageInfo {
     ImageInfo {
         width: info.width,
@@ -102,18 +92,5 @@ fn convert_info(info: &zenpng::PngInfo) -> ImageInfo {
         icc_profile: info.icc_profile.clone(),
         exif: info.exif.clone(),
         xmp: info.xmp.clone(),
-    }
-}
-
-fn convert_pixels(pixels: zencodec_types::PixelData) -> crate::PixelData {
-    match pixels {
-        zencodec_types::PixelData::Rgb8(img) => crate::PixelData::Rgb8(img),
-        zencodec_types::PixelData::Rgba8(img) => crate::PixelData::Rgba8(img),
-        zencodec_types::PixelData::Rgb16(img) => crate::PixelData::Rgb16(img),
-        zencodec_types::PixelData::Rgba16(img) => crate::PixelData::Rgba16(img),
-        zencodec_types::PixelData::RgbF32(img) => crate::PixelData::RgbF32(img),
-        zencodec_types::PixelData::RgbaF32(img) => crate::PixelData::RgbaF32(img),
-        zencodec_types::PixelData::Gray8(img) => crate::PixelData::Gray8(img),
-        _ => unreachable!("unknown PixelData variant"),
     }
 }

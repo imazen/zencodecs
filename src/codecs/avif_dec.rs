@@ -1,7 +1,7 @@
 //! AVIF decode adapter using zenavif.
 
 use crate::config::CodecConfig;
-use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop};
+use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
 
 /// Probe AVIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -55,19 +55,8 @@ pub(crate) fn decode(
         lim.validate(width, height, bpp)?;
     }
 
-    let pixels = match image {
-        zencodec_types::PixelData::Rgb8(img_vec) => PixelData::Rgb8(img_vec),
-        zencodec_types::PixelData::Rgba8(img_vec) => PixelData::Rgba8(img_vec),
-        zencodec_types::PixelData::Rgb16(img_vec) => PixelData::Rgb16(img_vec),
-        zencodec_types::PixelData::Rgba16(img_vec) => PixelData::Rgba16(img_vec),
-        zencodec_types::PixelData::Gray8(img_vec) => PixelData::Gray8(img_vec),
-        _ => {
-            return Err(CodecError::UnsupportedOperation {
-                format: ImageFormat::Avif,
-                detail: "unsupported pixel format from zenavif",
-            });
-        }
-    };
+    // zenavif returns zencodec_types::PixelData, which is our PixelData
+    let pixels = image;
 
     Ok(DecodeOutput {
         pixels,

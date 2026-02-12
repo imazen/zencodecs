@@ -100,11 +100,12 @@ pub use decode::{DecodeOutput, DecodeRequest};
 pub use encode::{EncodeOutput, EncodeRequest};
 pub use error::CodecError;
 pub use info::ImageInfo;
-pub use limits::{ImageMetadata, Limits, Stop};
+pub use limits::{Limits, Stop};
 pub use pixel::PixelData;
 pub use probe::ProbeResult;
 pub use registry::CodecRegistry;
 pub use zencodec_types::ImageFormat;
+pub use zencodec_types::ImageMetadata;
 
 // zencodec-types trait re-exports
 pub use zencodec_types::{Decoding, DecodingJob, Encoding, EncodingJob};

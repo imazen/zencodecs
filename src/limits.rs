@@ -58,26 +58,6 @@ impl Limits {
     }
 }
 
-/// Image metadata (ICC profile, EXIF, XMP).
-///
-/// Used when encoding to preserve metadata from the source image.
-#[derive(Clone, Debug, Default)]
-pub struct ImageMetadata<'a> {
-    /// ICC color profile.
-    pub icc_profile: Option<&'a [u8]>,
-    /// EXIF metadata.
-    pub exif: Option<&'a [u8]>,
-    /// XMP metadata.
-    pub xmp: Option<&'a [u8]>,
-}
-
-impl<'a> ImageMetadata<'a> {
-    /// Create empty metadata.
-    pub fn none() -> Self {
-        Self::default()
-    }
-}
-
 impl Limits {
     /// Validate dimensions and estimated memory against limits, returning CodecError on violation.
     pub(crate) fn validate(
