@@ -48,10 +48,10 @@
 //! ### Probe Image Metadata
 //!
 //! ```no_run
-//! use zencodecs::ImageInfo;
+//! use zencodecs::from_bytes;
 //!
 //! let data: &[u8] = &[]; // your image bytes
-//! let info = ImageInfo::from_bytes(data)?;
+//! let info = from_bytes(data)?;
 //! println!("{}x{} {:?}", info.width, info.height, info.format);
 //! # Ok::<(), zencodecs::CodecError>(())
 //! ```
@@ -100,6 +100,8 @@ pub use decode::{DecodeOutput, DecodeRequest};
 pub use encode::{EncodeOutput, EncodeRequest};
 pub use error::CodecError;
 pub use info::ImageInfo;
+pub use info::{from_bytes, from_bytes_format, from_bytes_with_registry};
+pub use info::{probe, probe_format, probe_with_registry};
 pub use limits::{Limits, Stop};
 pub use pixel::PixelData;
 pub use probe::ProbeResult;

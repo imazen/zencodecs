@@ -14,17 +14,22 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
         .read_info(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
 
-    Ok(ImageInfo {
-        width: info.dimensions.width,
-        height: info.dimensions.height,
-        format: ImageFormat::Jpeg,
-        has_alpha: false,
-        has_animation: false,
-        frame_count: Some(1),
-        icc_profile: info.icc_profile,
-        exif: info.exif,
-        xmp: info.xmp.map(|s| s.into_bytes()),
-    })
+    let mut image_info = ImageInfo::new(
+        info.dimensions.width,
+        info.dimensions.height,
+        ImageFormat::Jpeg,
+    )
+    .with_frame_count(1);
+    if let Some(icc) = info.icc_profile {
+        image_info = image_info.with_icc_profile(icc);
+    }
+    if let Some(exif) = info.exif {
+        image_info = image_info.with_exif(exif);
+    }
+    if let Some(xmp) = info.xmp {
+        image_info = image_info.with_xmp(xmp.into_bytes());
+    }
+    Ok(image_info)
 }
 
 /// Build a zenjpeg Decoder from codec config and limits.
@@ -92,16 +97,18 @@ pub(crate) fn decode(
 
     Ok(DecodeOutput {
         pixels: PixelData::Rgb8(img),
-        info: ImageInfo {
-            width,
-            height,
-            format: ImageFormat::Jpeg,
-            has_alpha: false,
-            has_animation: false,
-            frame_count: Some(1),
-            icc_profile,
-            exif,
-            xmp,
+        info: {
+            let mut ii = ImageInfo::new(width, height, ImageFormat::Jpeg).with_frame_count(1);
+            if let Some(icc) = icc_profile {
+                ii = ii.with_icc_profile(icc);
+            }
+            if let Some(exif) = exif {
+                ii = ii.with_exif(exif);
+            }
+            if let Some(xmp) = xmp {
+                ii = ii.with_xmp(xmp);
+            }
+            ii
         },
         jpeg_extras,
     })

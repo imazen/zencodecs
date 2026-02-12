@@ -12,17 +12,20 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     let info = zenwebp::ImageInfo::from_webp(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?;
 
-    Ok(ImageInfo {
-        width: info.width,
-        height: info.height,
-        format: ImageFormat::WebP,
-        has_alpha: info.has_alpha,
-        has_animation: info.has_animation,
-        frame_count: Some(info.frame_count),
-        icc_profile: info.icc_profile,
-        exif: info.exif,
-        xmp: info.xmp,
-    })
+    let mut image_info = ImageInfo::new(info.width, info.height, ImageFormat::WebP)
+        .with_alpha(info.has_alpha)
+        .with_animation(info.has_animation)
+        .with_frame_count(info.frame_count);
+    if let Some(icc) = info.icc_profile {
+        image_info = image_info.with_icc_profile(icc);
+    }
+    if let Some(exif) = info.exif {
+        image_info = image_info.with_exif(exif);
+    }
+    if let Some(xmp) = info.xmp {
+        image_info = image_info.with_xmp(xmp);
+    }
+    Ok(image_info)
 }
 
 /// Build zenwebp DecodeConfig from codec config and limits.
@@ -105,16 +108,21 @@ pub(crate) fn decode(
 
     Ok(DecodeOutput {
         pixels,
-        info: ImageInfo {
-            width,
-            height,
-            format: ImageFormat::WebP,
-            has_alpha: webp_info.has_alpha,
-            has_animation: webp_info.has_animation,
-            frame_count: Some(webp_info.frame_count),
-            icc_profile: webp_info.icc_profile,
-            exif: webp_info.exif,
-            xmp: webp_info.xmp,
+        info: {
+            let mut ii = ImageInfo::new(width, height, ImageFormat::WebP)
+                .with_alpha(webp_info.has_alpha)
+                .with_animation(webp_info.has_animation)
+                .with_frame_count(webp_info.frame_count);
+            if let Some(icc) = webp_info.icc_profile {
+                ii = ii.with_icc_profile(icc);
+            }
+            if let Some(exif) = webp_info.exif {
+                ii = ii.with_exif(exif);
+            }
+            if let Some(xmp) = webp_info.xmp {
+                ii = ii.with_xmp(xmp);
+            }
+            ii
         },
         #[cfg(feature = "jpeg")]
         jpeg_extras: None,

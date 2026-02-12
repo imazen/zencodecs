@@ -31,15 +31,11 @@ pub(crate) fn decode(
 }
 
 fn convert_info(info: &zenjxl::JxlInfo) -> ImageInfo {
-    ImageInfo {
-        width: info.width,
-        height: info.height,
-        format: ImageFormat::Jxl,
-        has_alpha: info.has_alpha,
-        has_animation: info.has_animation,
-        frame_count: None,
-        icc_profile: info.icc_profile.clone(),
-        exif: None,
-        xmp: None,
+    let mut ii = ImageInfo::new(info.width, info.height, ImageFormat::Jxl)
+        .with_alpha(info.has_alpha)
+        .with_animation(info.has_animation);
+    if let Some(ref icc) = info.icc_profile {
+        ii = ii.with_icc_profile(icc.clone());
     }
+    ii
 }

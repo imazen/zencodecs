@@ -7,17 +7,11 @@ use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     let image = zenavif::decode(data).map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))?;
 
-    Ok(ImageInfo {
-        width: image.width() as u32,
-        height: image.height() as u32,
-        format: ImageFormat::Avif,
-        has_alpha: image.has_alpha(),
-        has_animation: false,
-        frame_count: Some(1),
-        icc_profile: None,
-        exif: None,
-        xmp: None,
-    })
+    Ok(
+        ImageInfo::new(image.width(), image.height(), ImageFormat::Avif)
+            .with_alpha(image.has_alpha())
+            .with_frame_count(1),
+    )
 }
 
 /// Decode AVIF to pixels.
@@ -60,17 +54,9 @@ pub(crate) fn decode(
 
     Ok(DecodeOutput {
         pixels,
-        info: ImageInfo {
-            width,
-            height,
-            format: ImageFormat::Avif,
-            has_alpha,
-            has_animation: false,
-            frame_count: Some(1),
-            icc_profile: None,
-            exif: None,
-            xmp: None,
-        },
+        info: ImageInfo::new(width, height, ImageFormat::Avif)
+            .with_alpha(has_alpha)
+            .with_frame_count(1),
         #[cfg(feature = "jpeg")]
         jpeg_extras: None,
     })

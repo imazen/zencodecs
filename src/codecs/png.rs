@@ -76,15 +76,18 @@ fn build_encode_config(codec_config: Option<&CodecConfig>) -> zenpng::EncodeConf
 }
 
 fn convert_info(info: &zenpng::PngInfo) -> ImageInfo {
-    ImageInfo {
-        width: info.width,
-        height: info.height,
-        format: ImageFormat::Png,
-        has_alpha: info.has_alpha,
-        has_animation: info.has_animation,
-        frame_count: Some(info.frame_count),
-        icc_profile: info.icc_profile.clone(),
-        exif: info.exif.clone(),
-        xmp: info.xmp.clone(),
+    let mut ii = ImageInfo::new(info.width, info.height, ImageFormat::Png)
+        .with_alpha(info.has_alpha)
+        .with_animation(info.has_animation)
+        .with_frame_count(info.frame_count);
+    if let Some(ref icc) = info.icc_profile {
+        ii = ii.with_icc_profile(icc.clone());
     }
+    if let Some(ref exif) = info.exif {
+        ii = ii.with_exif(exif.clone());
+    }
+    if let Some(ref xmp) = info.xmp {
+        ii = ii.with_xmp(xmp.clone());
+    }
+    ii
 }

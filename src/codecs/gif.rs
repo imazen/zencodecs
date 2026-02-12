@@ -21,17 +21,13 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
 
     let metadata = decoder.metadata();
 
-    Ok(ImageInfo {
-        width: metadata.width as u32,
-        height: metadata.height as u32,
-        format: ImageFormat::Gif,
-        has_alpha: true,
-        has_animation: true, // Can't know without parsing all frames; assume animated
-        frame_count: None,   // Requires full decode to determine
-        icc_profile: None,
-        exif: None,
-        xmp: None,
-    })
+    Ok(ImageInfo::new(
+        metadata.width as u32,
+        metadata.height as u32,
+        ImageFormat::Gif,
+    )
+    .with_alpha(true)
+    .with_animation(true))
 }
 
 /// Convert zencodecs Limits to zengif Limits.
@@ -93,17 +89,10 @@ pub(crate) fn decode(
 
     Ok(DecodeOutput {
         pixels: PixelData::Rgba8(img),
-        info: ImageInfo {
-            width: width as u32,
-            height: height as u32,
-            format: ImageFormat::Gif,
-            has_alpha: true,
-            has_animation: frame_count > 1,
-            frame_count: Some(frame_count),
-            icc_profile: None,
-            exif: None,
-            xmp: None,
-        },
+        info: ImageInfo::new(width as u32, height as u32, ImageFormat::Gif)
+            .with_alpha(true)
+            .with_animation(frame_count > 1)
+            .with_frame_count(frame_count),
         #[cfg(feature = "jpeg")]
         jpeg_extras: None,
     })

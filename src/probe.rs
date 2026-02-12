@@ -43,17 +43,13 @@ impl ProbeResult {
         let width = self.width?;
         let height = self.height?;
 
-        Some(ImageInfo {
-            width,
-            height,
-            format: self.format,
-            has_alpha: self.has_alpha.unwrap_or(false),
-            has_animation: self.has_animation.unwrap_or(false),
-            frame_count: self.frame_count,
-            icc_profile: None,
-            exif: None,
-            xmp: None,
-        })
+        let mut ii = ImageInfo::new(width, height, self.format)
+            .with_alpha(self.has_alpha.unwrap_or(false))
+            .with_animation(self.has_animation.unwrap_or(false));
+        if let Some(count) = self.frame_count {
+            ii = ii.with_frame_count(count);
+        }
+        Some(ii)
     }
 
     /// Probe data for a specific format.
@@ -1024,7 +1020,7 @@ mod tests {
         assert_eq!(result.bit_depth, Some(8));
 
         // Matches codec probe
-        let info = crate::ImageInfo::from_bytes(&encoded).unwrap();
+        let info = crate::from_bytes(&encoded).unwrap();
         assert_eq!(result.width, Some(info.width));
         assert_eq!(result.height, Some(info.height));
 
@@ -1153,7 +1149,7 @@ mod tests {
             writer.write_image_data(&pixels).unwrap();
         }
 
-        let probe = crate::ImageInfo::probe(&png_buf).unwrap();
+        let probe = crate::info::probe(&png_buf).unwrap();
         assert_eq!(probe.format, ImageFormat::Png);
         assert_eq!(probe.width, Some(w));
         assert_eq!(probe.height, Some(h));
@@ -1177,8 +1173,8 @@ mod tests {
             .encode_bytes(&pixels, w, h, zenjpeg::encoder::PixelLayout::Rgb8Srgb)
             .unwrap();
 
-        let probe = crate::ImageInfo::probe(&encoded).unwrap();
-        let full = crate::ImageInfo::from_bytes(&encoded).unwrap();
+        let probe = crate::info::probe(&encoded).unwrap();
+        let full = crate::from_bytes(&encoded).unwrap();
 
         assert_eq!(probe.width, Some(full.width));
         assert_eq!(probe.height, Some(full.height));
@@ -1187,7 +1183,7 @@ mod tests {
     #[test]
     fn image_info_probe_unrecognized() {
         let data = b"not an image format at all";
-        let result = crate::ImageInfo::probe(data);
+        let result = crate::info::probe(data);
         assert!(matches!(result, Err(crate::CodecError::UnrecognizedFormat)));
     }
 
@@ -1195,7 +1191,7 @@ mod tests {
     fn image_info_probe_with_registry_disabled() {
         let jpeg_data = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
         let registry = crate::CodecRegistry::none();
-        let result = crate::ImageInfo::probe_with_registry(&jpeg_data, &registry);
+        let result = crate::info::probe_with_registry(&jpeg_data, &registry);
         assert!(matches!(result, Err(crate::CodecError::DisabledFormat(_))));
     }
 
