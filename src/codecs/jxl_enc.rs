@@ -1,7 +1,7 @@
 //! JXL encode adapter — delegates to zenjxl.
 
 use crate::config::CodecConfig;
-use crate::pixel::{ImgRef, Rgb, Rgba};
+use crate::pixel::{Bgra, ImgRef, Rgb, Rgba};
 use crate::{CodecError, EncodeOutput, ImageFormat, ImageMetadata, Limits, Stop};
 
 /// Encode RGB8 pixels to JXL.
@@ -33,6 +33,24 @@ pub(crate) fn encode_rgba8(
 ) -> Result<EncodeOutput, CodecError> {
     let config = build_lossy_config(quality);
     let data = zenjxl::encode_rgba8(img, &config)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?;
+    Ok(EncodeOutput {
+        data,
+        format: ImageFormat::Jxl,
+    })
+}
+
+/// Encode BGRA8 pixels to JXL (native BGRA path).
+pub(crate) fn encode_bgra8(
+    img: ImgRef<Bgra<u8>>,
+    quality: Option<f32>,
+    _metadata: Option<&ImageMetadata<'_>>,
+    _codec_config: Option<&CodecConfig>,
+    _limits: Option<&Limits>,
+    _stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let config = build_lossy_config(quality);
+    let data = zenjxl::encode_bgra8(img, &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?;
     Ok(EncodeOutput {
         data,
