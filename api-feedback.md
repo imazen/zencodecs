@@ -1,119 +1,208 @@
-# API Feedback - Codec Adapter Implementation
+# Upstream Codec API Feedback
 
-This document tracks API issues encountered while implementing codec adapters for zencodecs.
+Issues discovered while implementing zencodecs adapters (src/codecs/*.rs).
+Updated 2026-02-07 after full Limits/Stop/Config wiring pass.
+
+---
 
 ## zenjpeg
 
-**Date:** 2026-02-06
-**Adapter:** src/codecs/jpeg.rs
-**API Issues:**
+### 1. Probe requires full decode
 
-1. **Feature gate not obvious:** Had to enable "decoder" feature in Cargo.toml to access `zenjpeg::decoder` module. The compilation error didn't make this clear.
+`read_info()` returns `JpegInfo` but doesn't extract ICC/EXIF/XMP. The adapter does a full `decode()` just for `probe()` (metadata-only inspection).
 
-2. **Private modules:** Initial attempt used `zenjpeg::types` module which is private. Had to switch to using public `decoder::` and `encoder::` modules.
+**Fix:** `read_info()` should parse APP markers and expose ICC/EXIF/XMP.
 
-3. **Type confusion:** Decoder result has `PixelFormat` enum, but encoder expects `encoder::PixelLayout` enum. These are different types for the same concept (pixel format/layout).
+### 2. Limits are public fields, not builder methods
 
-4. **No ICC profile extraction:** Expected `icc_profile()` method on decoder result, but it doesn't exist. Had to return None with TODO comment.
+`DecodeConfig` uses builder methods for everything (`output_format()`, `chroma_upsampling()`, etc.) but `max_pixels` and `max_memory` are bare `pub` fields. Inconsistent.
 
-5. **Limits/Stop not integrated:** No obvious way to pass zencodecs Limits or Stop through to the decoder/encoder. Simplified to use `Decoder::new().decode()` without configuration.
+**Fix:** Add `with_max_pixels()` / `with_max_memory()` builder methods.
 
-**Resolution:** Simplified implementation to use basic `Decoder::new().decode()` and `EncoderConfig::ycbcr()` APIs. Marked limits/stop/ICC support as TODOs.
+### 3. `max_memory` is `usize`, not `u64`
+
+zenwebp, zengif, and zencodecs all use `u64` for memory limits. zenjpeg uses `usize`. Requires a cast (`max_mem as usize`). On 32-bit targets this silently truncates.
+
+**Fix:** Change to `u64`.
+
+### 4. Encoder metadata methods require owned `Vec<u8>`
+
+`EncoderConfig::icc_profile()`, `xmp()` take owned `Vec<u8>`. The adapter has borrowed `&[u8]` from `ImageMetadata` and must `.to_vec()` every time. `EncodeRequest` has both borrowed and `_owned` variants, but `EncoderConfig` doesn't.
+
+**Fix:** Accept `impl Into<Cow<'_, [u8]>>` or add borrowed variants.
+
+### 5. `Decoder` vs `DecodeConfig` naming
+
+The main type is `DecodeConfig` but it has `decode()`, `scanline_reader()`, `ultrahdr_reader()` — it *is* the decoder. The old `Decoder` name exists as an alias. Both are in scope.
+
+**Fix:** Pick one name. `Decoder` is more natural since users call `.decode()` on it.
+
+### 6. `decode_f32()` is redundant
+
+Identical to `decode()` with `.output_target(OutputTarget::SrgbF32)`. Extra API surface with no additional capability.
+
+**Suggestion:** Deprecate in favor of `OutputTarget`.
+
+### 7. PixelFormat vs PixelLayout
+
+Decoder result has `PixelFormat`, encoder expects `PixelLayout`. Different types for the same concept. Requires manual mapping in the adapter.
+
+**Fix:** Unify or add explicit conversions between them.
+
+### What works well
+
+- `DecodedExtras` API for segment preservation — `segments()`, `mpf()`, `secondary_images()`, `gainmap()`, `to_encoder_segments()` is a clean roundtrip story
+- `GainMapHandling` enum gives fine-grained control over gain map processing cost
+- `PreserveConfig` letting callers choose what to preserve
+- `EncodeRequest` → `RgbEncoder` → `push_packed()` → `finish()` streaming pipeline
+- `EncoderSegments::add_gainmap()` makes gain map roundtrip trivial
+- Quality 0-100 native scale is intuitive
+- `ChromaSubsampling` enum is clear and self-documenting
+
+---
 
 ## zenwebp
 
-**Date:** 2026-02-06
-**Adapter:** src/codecs/webp.rs
-**API Issues:**
+### 8. Probe requires two parsers
 
-1. **Method name mismatch:** Expected `frame_count()` method on `WebPDemuxer`, but actual method is `num_frames()`.
+`WebPDecoder::new()` for dimensions/alpha, then `WebPDemuxer::new()` for metadata and animation info. Both parse the same data.
 
-2. **Redundant check:** Initially wrote `demuxer.frame_count() > 1` to check animation, but `is_animated()` method exists and is more direct.
+**Fix:** Single `probe()` or `ImageInfo` that returns everything in one pass.
 
-**Resolution:** Used `num_frames()` and `is_animated()` methods. Otherwise the API matched expectations well.
+### 9. `has_alpha` not available from `DecodeRequest`
+
+The adapter creates a `WebPDecoder` just to check `has_alpha()` before calling `DecodeRequest::decode_rgba()` or `decode_rgb()`. `DecodeRequest` doesn't expose image info after construction.
+
+**Fix:** Add `DecodeRequest::has_alpha()` / `info()`, or provide a single `decode()` that returns pixels in native format without the caller needing to choose.
+
+### 10. Triple re-parse for metadata embedding
+
+`embed_icc()`, `embed_exif()`, `embed_xmp()` each re-parse and re-serialize the entire RIFF container. Three metadata chunks = three full RIFF re-parses.
+
+**Fix:** Single `embed_metadata(data, icc, exif, xmp)` or a mux builder that batches mutations.
+
+### 11. `EncodeRequest` doesn't accept metadata
+
+Metadata has to be embedded post-encode via separate mux functions. Every other codec (zenjpeg, png, ravif) accepts metadata as part of the encode config.
+
+**Fix:** Add `.with_icc()` / `.with_exif()` / `.with_xmp()` on `EncodeRequest`.
+
+### 12. `DecodeRequest::decode_rgba()` buffer size bug (FIXED)
+
+Allocated `w*h*4` for all images but `read_image()` expects `output_buffer_size()` which is `w*h*3` for non-alpha images. Caused `ImageTooLarge` on valid non-alpha extended-format WebP.
+
+**Status:** Fixed in zenwebp commit 82994d9.
+
+### What works well
+
+- `WebPDemuxer` metadata extraction (ICC/EXIF/XMP) is clean
+- `LossyConfig` / `LosslessConfig` separation is clear
+- `EncodeRequest::lossy()` / `lossless()` factory methods are intuitive
+- Limits struct with named fields is more readable than positional
+
+---
 
 ## zengif
 
-**Date:** 2026-02-06
-**Adapter:** src/codecs/gif.rs
-**API Issues:**
+### 13. `Stop` requires `Clone`
 
-1. **Type mismatch:** `decode_gif()` returns `Vec<ComposedFrame>` where `pixels` field is `Vec<Rgba>`, not `Vec<u8>`. Expected flat byte array like other codecs.
+`Decoder::new(reader, limits, stop)` requires `S: Stop + Clone`. `&dyn Stop` doesn't implement `Clone`, so the adapter can't forward the stop token from zencodecs. Has to pass `enough::Unstoppable` instead.
 
-2. **Encoder input type:** `FrameInput::new()` expects `Vec<Rgba>`, not `Vec<u8>`. Had to convert from flat RGBA bytes to structured `Rgba` values.
+**Fix:** Remove the `Clone` bound on `Stop`. Accept `&dyn Stop` or `impl Stop` without `Clone`.
 
-3. **Compilation error in zengif itself:** Fixed upstream issue where `default_buffer_frames` import wasn't feature-gated (encoder.rs:7).
+### 14. No metadata support
 
-**Resolution:**
-- Decode: Convert `Vec<Rgba>` to flat `Vec<u8>` using `flat_map(|rgba| [rgba.r, rgba.g, rgba.b, rgba.a])`
-- Encode: Convert flat bytes to `Vec<Rgba>` using `chunks_exact(4).map(|c| Rgba::new(...))`
-- Fixed zengif compilation error upstream
+GIF supports XMP via application extension block (`XMP DataXMP`) and ICC via application extension (`ICCRGBG1012`). Neither is extracted on decode or embeddable on encode. Not a blocker for v1 but worth noting.
 
-## png (external crate)
+### What works well
 
-**Date:** 2026-02-06
-**Adapter:** src/codecs/png.rs
-**API Issues:**
+- `Decoder::new()` gives metadata without decoding frames — good for probe
+- `Limits` struct is clean and consistent with zenwebp
+- `FrameInput::from_bytes()` is convenient
+- `EncoderConfig` builder pattern is straightforward
 
-None! The png crate API worked smoothly on first try.
-
-**Implementation notes:**
-- Uses `Decoder::new(Cursor::new(data))` → `read_info()` → `next_frame(&mut buf)` pattern
-- Encoder uses builder: `Encoder::new()` → `set_color()` / `set_depth()` → `write_header()` → `write_image_data()`
-- Decoder automatically handles transformations (indexed → RGB, grayscale expansion)
-- Requires `extern crate std` due to std::io traits
-- APNG support exposed via `info.animation_control`
-- ICC profile extraction works: `info.icc_profile`
-
-**Resolution:** No issues encountered. Implementation was straightforward based on documentation examples.
+---
 
 ## zenavif
 
-**Date:** 2026-02-06
-**Adapter:** src/codecs/avif_dec.rs
-**API Issues:**
+### 15. No metadata extraction on decode
 
-1. **No probe-only function:** To get image metadata (width, height, alpha), had to fully decode the image. No way to get metadata without decoding pixels.
+`zenavif::decode_with()` returns `DecodedImage` with no ICC/EXIF/XMP. The AVIF container (ISOBMFF) stores these in `colr` (ICC), `Exif`, and `mime` (XMP) boxes. This is the biggest metadata gap across all codecs.
 
-2. **Stop trait incompatibility:** zenavif uses `enough::Stop` trait, but zencodecs has its own `Stop` trait. Couldn't pass stop tokens through. Used simple `decode()` without cancellation support.
+**Fix:** Extract and expose metadata from the ISOBMFF container during decode.
 
-3. **rgb crate dependency:** zenavif returns `DecodedImage::Rgb8(ImgVec<Rgb<u8>>)` and `Rgba8(ImgVec<Rgba<u8>>)`. Had to add `rgb` crate as dependency to use `ComponentBytes::as_bytes()` for converting to flat byte arrays.
+### 16. No ICC or XMP embedding on encode
 
-4. **No animation metadata exposure:** zenavif doesn't expose whether the AVIF has multiple frames or animation info. Hardcoded `has_animation: false`.
+ravif only supports EXIF (via `with_exif()`). ICC profiles belong in a `colr` box, XMP in a `mime` box. Both are standard AVIF/ISOBMFF features.
 
-5. **No ICC profile extraction:** zenavif doesn't expose ICC profile from the AVIF container. Hardcoded `icc_profile: None`.
+**Fix:** Add `with_icc_profile()` and `with_xmp()` to ravif's `Encoder`.
 
-**Resolution:**
-- Added `rgb` crate (0.8.52) as dependency with "as-bytes" feature for the avif-decode feature
-- Used `ComponentBytes::as_bytes()` to safely convert Vec<Rgb<u8>>/Vec<Rgba<u8>> to Vec<u8>
-- Simplified to use `decode()` without stop token support (TODO: add adapter for Stop trait)
-- Marked 16-bit and grayscale support as unsupported for now
+### 17. `AvifDecoder` only available behind `asm` feature
 
-## ravif (external crate)
+The struct-based `AvifDecoder` API only compiles with the `asm` feature gate. Without it, only `decode()` / `decode_with()` free functions are available. No streaming or incremental parsing in non-asm builds.
 
-**Date:** 2026-02-06
-**Adapter:** src/codecs/avif_enc.rs
-**API Issues:**
+**Fix:** Make `AvifDecoder` available regardless of feature flags, or document this clearly.
 
-None! The ravif API worked smoothly on first try.
+### 18. No probe-only function
 
-**Implementation notes:**
-- Uses builder pattern: `Encoder::new()` → `with_quality()` / `with_speed()` → `encode_rgba/rgb()`
-- Takes `Img<&[RGBA<u8>]>` or `Img<&[RGB<u8>]>` from rgb + imgref crates
-- Used `rgb::bytemuck::cast_slice()` to convert &[u8] to &[RGBA<u8>]/&[RGB<u8>]
-- Quality scale 0-100 matches zencodecs (100 is near-lossless, not truly lossless)
-- Speed parameter 0-10 (0=slowest/best, 10=fastest/worst), defaulted to 4
+To get image dimensions and alpha, the adapter must fully decode the image. No lightweight metadata inspection.
 
-**Resolution:** No issues encountered. Clean API with good builder pattern.
+**Fix:** Add a `probe()` or `read_info()` that parses the ISOBMFF container without decoding pixels.
 
-## Summary
+### What works well
 
-The most friction came from zenjpeg where the API has multiple layers (Config, Request, etc.) but no clear examples for simple use cases. zenwebp was smooth except for minor method name differences. zengif requires type conversions because it uses a structured `Rgba` type instead of flat byte arrays. zenavif needs probe-only function and better metadata exposure. png and ravif (external crates) worked perfectly on first try with clear APIs and good documentation.
+- ravif's builder pattern (`Encoder::new().with_quality().with_speed()`) is clean
+- `DecodedImage` enum variants map naturally to `PixelData`
+- `DecoderConfig::frame_size_limit()` builder method is a good pattern
 
-**Recommendations:**
-- zenjpeg: Add simple usage examples to docs, unify PixelFormat/PixelLayout types
-- zenwebp: Consider aliasing `frame_count()` → `num_frames()` for consistency with other codecs
-- zengif: Consider providing flat byte array convenience methods alongside `Vec<Rgba>` API
-- zenavif: Add probe-only function, expose animation/ICC metadata, improve Stop trait compatibility
-- png: No changes needed - exemplary API design
-- ravif: No changes needed - exemplary API design
+---
+
+## png (external crate)
+
+No issues. Exemplary API:
+
+- `Encoder::with_info()` accepting a pre-built `Info` struct is flexible
+- `set_compression()` / `set_filter()` give full control
+- ICC via `info.icc_profile`, EXIF via `info.exif_metadata`, XMP via `info.utf8_text` iTXt chunks
+- `Decoder::new_with_limits()` for memory limits
+
+---
+
+## Cross-crate: Inconsistent Limits types
+
+Every crate has its own Limits struct with different field names and types:
+
+| Crate | Width type | Pixels field | Memory type |
+|-------|-----------|-------------|-------------|
+| zenjpeg | N/A | `max_pixels: u64` (pub field) | `max_memory: usize` |
+| zenwebp | `max_width: Option<u32>` | `max_total_pixels: Option<u64>` | `max_memory: Option<u64>` |
+| zengif | `max_width: Option<u16>` | `max_total_pixels: Option<u64>` | `max_memory: Option<u64>` |
+| zenavif | N/A | `frame_size_limit(u32)` builder | N/A |
+| png | N/A | N/A | `bytes: usize` |
+
+Every adapter has a `to_X_limits()` conversion function.
+
+**Fix:** Consider a shared limits type in `enough` (already a common dependency), or at minimum use consistent field names and types (`Option<u64>` everywhere).
+
+---
+
+## Priority
+
+| Priority | Issue | Crate | Effort |
+|----------|-------|-------|--------|
+| High | #15 No metadata extraction | zenavif | High |
+| High | #16 No ICC/XMP on encode | ravif | Medium |
+| High | #10+#11 Metadata embedding | zenwebp | Medium |
+| Medium | #8+#9 Probe/has_alpha duplication | zenwebp | Low |
+| Medium | #1 Probe full decode | zenjpeg | Low |
+| Medium | #13 Stop requires Clone | zengif | Low |
+| Medium | #19 Inconsistent Limits | all | Medium |
+| Low | #2 Limits builder methods | zenjpeg | Low |
+| Low | #3 max_memory u64 | zenjpeg | Low |
+| Low | #4 Encoder owned vecs | zenjpeg | Low |
+| Low | #5 Decoder naming | zenjpeg | Low |
+| Low | #6 decode_f32 redundant | zenjpeg | Low |
+| Low | #7 PixelFormat vs PixelLayout | zenjpeg | Low |
+| Low | #14 GIF metadata | zengif | Medium |
+| Low | #17 AvifDecoder feature gate | zenavif | Low |
+| Low | #18 AVIF probe | zenavif | Medium |
