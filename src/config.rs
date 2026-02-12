@@ -49,10 +49,10 @@ pub mod avif_decode {
     pub use zenavif::DecoderConfig;
 }
 
-/// AVIF encode configuration from ravif.
+/// AVIF encode configuration from zenavif.
 #[cfg(feature = "avif-encode")]
 pub mod avif_encode {
-    pub use ravif::{AlphaColorMode, BitDepth, ColorModel, Encoder as RavifEncoder};
+    pub use zenavif::{EncodeAlphaMode, EncodeBitDepth, EncodeColorModel, EncoderConfig};
 }
 
 // --- Unified codec config ---
@@ -115,9 +115,8 @@ pub struct CodecConfig {
     #[cfg(feature = "avif-decode")]
     pub avif_decoder: Option<Box<avif_decode::DecoderConfig>>,
 
-    /// AVIF encoder (ravif) — boxed because it has a lifetime param.
-    /// When set, quality/speed from this encoder override the generic
-    /// quality/effort on EncodeRequest.
+    /// AVIF encode quality override (0-100).
+    /// When set, overrides the generic quality on EncodeRequest.
     #[cfg(feature = "avif-encode")]
     pub avif_quality: Option<f32>,
 

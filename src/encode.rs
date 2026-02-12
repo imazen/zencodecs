@@ -584,11 +584,10 @@ mod tests {
 
     #[test]
     fn metadata_builder() {
-        let meta = ImageMetadata {
-            icc_profile: Some(b"fake_icc"),
-            exif: Some(b"fake_exif"),
-            xmp: Some(b"fake_xmp"),
-        };
+        let meta = ImageMetadata::none()
+            .with_icc(b"fake_icc")
+            .with_exif(b"fake_exif")
+            .with_xmp(b"fake_xmp");
         let _request = EncodeRequest::new(ImageFormat::Jpeg).with_metadata(&meta);
     }
 }

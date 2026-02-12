@@ -84,6 +84,24 @@ pub(crate) fn stop_or_default(stop: Option<&dyn Stop>) -> &dyn Stop {
     stop.unwrap_or(&enough::Unstoppable)
 }
 
+/// Convert zencodecs [`Limits`] to zencodec-types [`ResourceLimits`](zencodec_types::ResourceLimits).
+pub(crate) fn to_resource_limits(limits: &Limits) -> zencodec_types::ResourceLimits {
+    let mut rl = zencodec_types::ResourceLimits::none();
+    if let Some(max_w) = limits.max_width {
+        rl = rl.with_max_width(max_w.min(u32::MAX as u64) as u32);
+    }
+    if let Some(max_h) = limits.max_height {
+        rl = rl.with_max_height(max_h.min(u32::MAX as u64) as u32);
+    }
+    if let Some(max_px) = limits.max_pixels {
+        rl = rl.with_max_pixels(max_px);
+    }
+    if let Some(max_mem) = limits.max_memory_bytes {
+        rl = rl.with_max_memory(max_mem);
+    }
+    rl
+}
+
 /// Re-export `Stop` for cooperative cancellation.
 ///
 /// Codecs periodically call `stop.check()` and return `CodecError::Cancelled`

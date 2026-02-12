@@ -1,11 +1,15 @@
 //! GIF codec adapter using zengif.
+//!
+//! GIF decode uses the native API (for frame counting).
+//! GIF encode uses the trait interface where possible.
 
 extern crate std;
 
 use crate::config::CodecConfig;
 use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData, Stop,
+    CodecError, DecodeOutput, Decoding, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData,
+    Stop,
 };
 
 /// Create a default GIF encoder config with the best available quantizer.
@@ -15,19 +19,9 @@ fn default_encoder_config() -> zengif::EncoderConfig {
 
 /// Probe GIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    let cursor = std::io::Cursor::new(data);
-    let decoder = zengif::Decoder::new(cursor, zengif::Limits::default(), &enough::Unstoppable)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
-
-    let metadata = decoder.metadata();
-
-    Ok(ImageInfo::new(
-        metadata.width as u32,
-        metadata.height as u32,
-        ImageFormat::Gif,
-    )
-    .with_alpha(true)
-    .with_animation(true))
+    zengif::GifDecoding::new()
+        .probe(data)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
 
 /// Convert zencodecs Limits to zengif Limits.
@@ -51,6 +45,8 @@ fn to_gif_limits(limits: Option<&Limits>) -> zengif::Limits {
 }
 
 /// Decode GIF to pixels (first frame only).
+///
+/// Uses native API for frame counting (iterates all frames to determine count).
 pub(crate) fn decode(
     data: &[u8],
     limits: Option<&Limits>,
@@ -119,14 +115,14 @@ pub(crate) fn encode_rgb8(
         .and_then(|c| c.gif_encoder.as_ref())
         .map(|c| c.as_ref().clone())
         .unwrap_or_else(default_encoder_config);
-    let limits = zengif::Limits::default();
+    let gif_limits = zengif::Limits::default();
 
     let gif_data = zengif::encode_gif(
         alloc::vec![frame],
         width,
         height,
         config,
-        limits,
+        gif_limits,
         &enough::Unstoppable,
     )
     .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
@@ -157,14 +153,14 @@ pub(crate) fn encode_rgba8(
         .and_then(|c| c.gif_encoder.as_ref())
         .map(|c| c.as_ref().clone())
         .unwrap_or_else(default_encoder_config);
-    let limits = zengif::Limits::default();
+    let gif_limits = zengif::Limits::default();
 
     let gif_data = zengif::encode_gif(
         alloc::vec![frame],
         width,
         height,
         config,
-        limits,
+        gif_limits,
         &enough::Unstoppable,
     )
     .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;

@@ -1,36 +1,31 @@
-//! JXL decode adapter — delegates to zenjxl.
+//! JXL decode adapter — delegates to zenjxl via trait interface.
 
-use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
+use crate::limits::to_resource_limits;
+use crate::{
+    CodecError, DecodeOutput, Decoding, DecodingJob, ImageFormat, ImageInfo, Limits, Stop,
+};
 
 /// Probe JXL metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    let info = zenjxl::probe(data).map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?;
-    Ok(convert_info(&info))
+    zenjxl::JxlDecoding::new()
+        .probe(data)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
 /// Decode JXL to pixels.
 pub(crate) fn decode(
     data: &[u8],
     limits: Option<&Limits>,
-    _stop: Option<&dyn Stop>,
+    stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    let jxl_limits = limits.map(|lim| zenjxl::JxlLimits {
-        max_pixels: lim.max_pixels,
-        max_memory_bytes: lim.max_memory_bytes,
-    });
-
-    let result = zenjxl::decode(data, jxl_limits.as_ref())
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?;
-
-    Ok(DecodeOutput::new(result.pixels, convert_info(&result.info)))
-}
-
-fn convert_info(info: &zenjxl::JxlInfo) -> ImageInfo {
-    let mut ii = ImageInfo::new(info.width, info.height, ImageFormat::Jxl)
-        .with_alpha(info.has_alpha)
-        .with_animation(info.has_animation);
-    if let Some(ref icc) = info.icc_profile {
-        ii = ii.with_icc_profile(icc.clone());
+    let mut dec = zenjxl::JxlDecoding::new();
+    if let Some(lim) = limits {
+        dec = dec.with_limits(&to_resource_limits(lim));
     }
-    ii
+    let mut job = dec.job();
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.decode(data)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }

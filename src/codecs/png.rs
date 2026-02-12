@@ -1,32 +1,56 @@
-//! PNG codec adapter — delegates to zenpng.
+//! PNG codec adapter — delegates to zenpng via trait interface.
 
 use crate::config::CodecConfig;
+use crate::limits::to_resource_limits;
 use crate::pixel::{ImgRef, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, ImageMetadata, Limits, Stop,
+    CodecError, DecodeOutput, Decoding, DecodingJob, EncodeOutput, Encoding, EncodingJob,
+    ImageFormat, ImageInfo, ImageMetadata, Limits, Stop,
 };
 
 /// Probe PNG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    let info = zenpng::probe(data).map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-    Ok(convert_info(&info))
+    zenpng::PngDecoding::new()
+        .probe(data)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))
 }
 
 /// Decode PNG to pixels.
 pub(crate) fn decode(
     data: &[u8],
     limits: Option<&Limits>,
-    _stop: Option<&dyn Stop>,
+    stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    let png_limits = limits.map(|lim| zenpng::PngLimits {
-        max_pixels: lim.max_pixels,
-        max_memory_bytes: lim.max_memory_bytes,
-    });
+    let mut dec = zenpng::PngDecoding::new();
+    if let Some(lim) = limits {
+        dec = dec.with_limits(&to_resource_limits(lim));
+    }
+    let mut job = dec.job();
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.decode(data)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))
+}
 
-    let result = zenpng::decode(data, png_limits.as_ref())
-        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-
-    Ok(DecodeOutput::new(result.pixels, convert_info(&result.info)))
+/// Build a PngEncoding from codec config.
+fn build_encoding(
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+) -> zenpng::PngEncoding {
+    let mut enc = zenpng::PngEncoding::new();
+    if let Some(cfg) = codec_config {
+        if let Some(compression) = cfg.png_compression {
+            enc = enc.with_compression(compression);
+        }
+        if let Some(filter) = cfg.png_filter {
+            enc = enc.with_filter(filter);
+        }
+    }
+    if let Some(lim) = limits {
+        enc = enc.with_limits(&to_resource_limits(lim));
+    }
+    enc
 }
 
 /// Encode RGB8 pixels to PNG.
@@ -34,13 +58,19 @@ pub(crate) fn encode_rgb8(
     img: ImgRef<Rgb<u8>>,
     metadata: Option<&ImageMetadata<'_>>,
     codec_config: Option<&CodecConfig>,
-    _limits: Option<&Limits>,
-    _stop: Option<&dyn Stop>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let config = build_encode_config(codec_config);
-    let data = zenpng::encode_rgb8(img, metadata, &config)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-    Ok(EncodeOutput::new(data, ImageFormat::Png))
+    let enc = build_encoding(codec_config, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
+    }
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_rgb8(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))
 }
 
 /// Encode RGBA8 pixels to PNG.
@@ -48,41 +78,17 @@ pub(crate) fn encode_rgba8(
     img: ImgRef<Rgba<u8>>,
     metadata: Option<&ImageMetadata<'_>>,
     codec_config: Option<&CodecConfig>,
-    _limits: Option<&Limits>,
-    _stop: Option<&dyn Stop>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let config = build_encode_config(codec_config);
-    let data = zenpng::encode_rgba8(img, metadata, &config)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?;
-    Ok(EncodeOutput::new(data, ImageFormat::Png))
-}
-
-fn build_encode_config(codec_config: Option<&CodecConfig>) -> zenpng::EncodeConfig {
-    let mut config = zenpng::EncodeConfig::default();
-    if let Some(cfg) = codec_config {
-        if let Some(compression) = cfg.png_compression {
-            config.compression = compression;
-        }
-        if let Some(filter) = cfg.png_filter {
-            config.filter = filter;
-        }
+    let enc = build_encoding(codec_config, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
     }
-    config
-}
-
-fn convert_info(info: &zenpng::PngInfo) -> ImageInfo {
-    let mut ii = ImageInfo::new(info.width, info.height, ImageFormat::Png)
-        .with_alpha(info.has_alpha)
-        .with_animation(info.has_animation)
-        .with_frame_count(info.frame_count);
-    if let Some(ref icc) = info.icc_profile {
-        ii = ii.with_icc_profile(icc.clone());
+    if let Some(s) = stop {
+        job = job.with_stop(s);
     }
-    if let Some(ref exif) = info.exif {
-        ii = ii.with_exif(exif.clone());
-    }
-    if let Some(ref xmp) = info.xmp {
-        ii = ii.with_xmp(xmp.clone());
-    }
-    ii
+    job.encode_rgba8(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))
 }

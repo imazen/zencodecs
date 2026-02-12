@@ -1,35 +1,21 @@
 //! JPEG codec adapter using zenjpeg.
+//!
+//! Probe and encode use the trait interface. Decode uses native API to
+//! preserve JPEG extras (DecodedExtras with DCT coefficients etc.).
 
 use crate::config::CodecConfig;
+use crate::limits::to_resource_limits;
 use crate::pixel::{Bgra, ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, EncodeOutput, ImageFormat, ImageInfo, ImageMetadata, Limits,
-    PixelData, Stop,
+    CodecError, DecodeOutput, Decoding, EncodeOutput, Encoding, EncodingJob, ImageFormat,
+    ImageInfo, ImageMetadata, Limits, PixelData, Stop,
 };
 
 /// Probe JPEG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    let decoder = zenjpeg::decoder::DecodeConfig::new();
-    let info = decoder
-        .read_info(data)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
-
-    let mut image_info = ImageInfo::new(
-        info.dimensions.width,
-        info.dimensions.height,
-        ImageFormat::Jpeg,
-    )
-    .with_frame_count(1);
-    if let Some(icc) = info.icc_profile {
-        image_info = image_info.with_icc_profile(icc);
-    }
-    if let Some(exif) = info.exif {
-        image_info = image_info.with_exif(exif);
-    }
-    if let Some(xmp) = info.xmp {
-        image_info = image_info.with_xmp(xmp.into_bytes());
-    }
-    Ok(image_info)
+    zenjpeg::JpegDecoding::new()
+        .probe(data)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
 /// Build a zenjpeg Decoder from codec config and limits.
@@ -55,6 +41,8 @@ fn build_decoder(
 }
 
 /// Decode JPEG to pixels.
+///
+/// Uses native API to preserve JPEG extras (DecodedExtras).
 pub(crate) fn decode(
     data: &[u8],
     codec_config: Option<&CodecConfig>,
@@ -113,47 +101,45 @@ pub(crate) fn decode(
     Ok(output)
 }
 
+/// Build a JpegEncoding from codec config or generic quality.
+fn build_encoding(
+    quality: Option<f32>,
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+) -> zenjpeg::JpegEncoding {
+    let mut enc = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
+        let mut e = zenjpeg::JpegEncoding::new();
+        *e.inner_mut() = cfg.as_ref().clone();
+        e
+    } else {
+        let q = quality.unwrap_or(85.0).clamp(0.0, 100.0);
+        zenjpeg::JpegEncoding::new().with_quality(q)
+    };
+    if let Some(lim) = limits {
+        enc = enc.with_limits(&to_resource_limits(lim));
+    }
+    enc
+}
+
 /// Encode RGB8 pixels to JPEG.
 pub(crate) fn encode_rgb8(
     img: ImgRef<Rgb<u8>>,
     quality: Option<f32>,
     metadata: Option<&ImageMetadata<'_>>,
     codec_config: Option<&CodecConfig>,
-    _limits: Option<&Limits>,
+    limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    // If user provided a full JPEG encoder config, use it
-    let config = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
-        cfg.as_ref().clone()
-    } else {
-        let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0) as u8;
-        zenjpeg::encoder::EncoderConfig::ycbcr(
-            quality,
-            zenjpeg::encoder::ChromaSubsampling::Quarter,
-        )
-    };
-
-    let width = img.width() as u32;
-    let height = img.height() as u32;
-    let (buf, _, _) = img.to_contiguous_buf();
-    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
-
-    let mut request = config.request();
-    request = apply_metadata(request, metadata);
-    if let Some(s) = stop {
-        request = request.stop(s);
+    let enc = build_encoding(quality, codec_config, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
     }
-
-    let jpeg_data = request
-        .encode_bytes(
-            bytes,
-            width,
-            height,
-            zenjpeg::encoder::PixelLayout::Rgb8Srgb,
-        )
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
-
-    Ok(EncodeOutput::new(jpeg_data, ImageFormat::Jpeg))
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_rgb8(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
 /// Encode RGBA8 pixels to JPEG (alpha is discarded).
@@ -162,40 +148,19 @@ pub(crate) fn encode_rgba8(
     quality: Option<f32>,
     metadata: Option<&ImageMetadata<'_>>,
     codec_config: Option<&CodecConfig>,
-    _limits: Option<&Limits>,
+    limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let config = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
-        cfg.as_ref().clone()
-    } else {
-        let quality = quality.unwrap_or(85.0).clamp(0.0, 100.0) as u8;
-        zenjpeg::encoder::EncoderConfig::ycbcr(
-            quality,
-            zenjpeg::encoder::ChromaSubsampling::Quarter,
-        )
-    };
-
-    let width = img.width() as u32;
-    let height = img.height() as u32;
-    let (buf, _, _) = img.to_contiguous_buf();
-    let bytes: &[u8] = bytemuck::cast_slice(buf.as_ref());
-
-    let mut request = config.request();
-    request = apply_metadata(request, metadata);
-    if let Some(s) = stop {
-        request = request.stop(s);
+    let enc = build_encoding(quality, codec_config, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
     }
-
-    let jpeg_data = request
-        .encode_bytes(
-            bytes,
-            width,
-            height,
-            zenjpeg::encoder::PixelLayout::Rgba8Srgb,
-        )
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
-
-    Ok(EncodeOutput::new(jpeg_data, ImageFormat::Jpeg))
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_rgba8(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
 /// Encode BGRA8 pixels to JPEG (native BGRA path, alpha discarded).

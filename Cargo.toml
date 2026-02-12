@@ -25,7 +25,7 @@ zenwebp = { path = "../zenwebp", optional = true }
 zengif = { path = "../zengif", optional = true }
 zenavif = { path = "../zenavif", optional = true }
 zenpng = { path = "../zenpng", optional = true }
-ravif = { version = "0.13", optional = true }
+# ravif is used via zenavif (encode feature)
 zenjxl = { path = "../zenjxl", optional = true, default-features = false }
 
 # Color management (optional)
@@ -46,7 +46,7 @@ gif-quantizr = ["gif", "zengif/quantizr"]
 gif-imagequant = ["gif", "zengif/imagequant"]
 png = ["dep:zenpng"]
 avif-decode = ["dep:zenavif"]
-avif-encode = ["dep:ravif"]
+avif-encode = ["dep:zenavif", "zenavif/encode"]
 jxl-decode = ["dep:zenjxl", "zenjxl/decode"]
 jxl-encode = ["dep:zenjxl", "zenjxl/encode"]
 
