@@ -319,6 +319,26 @@ impl PixelData {
         }
     }
 
+    /// Convert to RGB8 consuming self.
+    ///
+    /// Zero-copy for Rgb8 variant, allocates for others.
+    pub fn into_rgb8(self) -> ImgVec<Rgb<u8>> {
+        match self {
+            PixelData::Rgb8(img) => img,
+            other => other.to_rgb8(),
+        }
+    }
+
+    /// Convert to RGBA8 consuming self.
+    ///
+    /// Zero-copy for Rgba8 variant, allocates for others.
+    pub fn into_rgba8(self) -> ImgVec<Rgba<u8>> {
+        match self {
+            PixelData::Rgba8(img) => img,
+            other => other.to_rgba8(),
+        }
+    }
+
     /// Convert to BGRA8 consuming self.
     ///
     /// Zero-copy for Bgra8 variant, allocates for others.

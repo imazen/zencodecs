@@ -15,6 +15,7 @@ impl FormatSet {
     const AVIF: u8 = 1 << 4;
     const JXL: u8 = 1 << 5;
 
+    #[allow(unused_mut)]
     fn all_compiled() -> Self {
         let mut bits = 0u8;
 
@@ -38,6 +39,7 @@ impl FormatSet {
         FormatSet(bits)
     }
 
+    #[allow(unused_mut)]
     fn all_compiled_decode() -> Self {
         let mut bits = Self::all_compiled().0;
 
@@ -53,17 +55,20 @@ impl FormatSet {
         FormatSet(bits)
     }
 
+    #[allow(unused_mut)]
     fn all_compiled_encode() -> Self {
-        let bits = Self::all_compiled().0;
+        let mut bits = Self::all_compiled().0;
 
         #[cfg(feature = "avif-encode")]
         {
-            FormatSet(bits | Self::AVIF)
+            bits |= Self::AVIF;
         }
-        #[cfg(not(feature = "avif-encode"))]
+        #[cfg(feature = "jxl-encode")]
         {
-            FormatSet(bits)
+            bits |= Self::JXL;
         }
+
+        FormatSet(bits)
     }
 
     fn contains(self, format: ImageFormat) -> bool {
@@ -240,7 +245,9 @@ impl CodecRegistry {
             #[cfg(not(feature = "avif-encode"))]
             ImageFormat::Avif => false,
 
-            // No JXL encode support
+            #[cfg(feature = "jxl-encode")]
+            ImageFormat::Jxl => true,
+            #[cfg(not(feature = "jxl-encode"))]
             ImageFormat::Jxl => false,
         }
     }

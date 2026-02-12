@@ -506,10 +506,10 @@ fn find_box<'a>(data: &'a [u8], box_type: &[u8; 4]) -> Option<(&'a [u8], usize)>
 // ---------------------------------------------------------------------------
 
 fn probe_jxl(data: &[u8]) -> ProbeResult {
-    // Try delegating to jxl-rs if compiled in
+    // Delegate to jxl-rs if compiled in
     #[cfg(feature = "jxl-decode")]
     {
-        return probe_jxl_with_crate(data);
+        probe_jxl_with_crate(data)
     }
 
     // Without jxl-rs, return format-only
