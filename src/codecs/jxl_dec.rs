@@ -8,7 +8,7 @@ use crate::{
 /// Probe JXL metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     zenjxl::JxlDecoding::new()
-        .probe(data)
+        .probe_header(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -20,7 +20,7 @@ pub(crate) fn decode(
 ) -> Result<DecodeOutput, CodecError> {
     let mut dec = zenjxl::JxlDecoding::new();
     if let Some(lim) = limits {
-        dec = dec.with_limits(&to_resource_limits(lim));
+        dec = dec.with_limits(to_resource_limits(lim));
     }
     let mut job = dec.job();
     if let Some(s) = stop {

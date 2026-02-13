@@ -15,7 +15,7 @@ use crate::{
 /// Probe WebP metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     zenwebp::WebpDecoding::new()
-        .probe(data)
+        .probe_header(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
 
@@ -31,7 +31,7 @@ pub(crate) fn decode(
         *dec.inner_mut() = cfg.as_ref().clone();
     }
     if let Some(lim) = limits {
-        dec = dec.with_limits(&to_resource_limits(lim));
+        dec = dec.with_limits(to_resource_limits(lim));
     }
     let mut job = dec.job();
     if let Some(s) = stop {
@@ -54,7 +54,7 @@ pub(crate) fn decode_into_rgba8(
         *dec.inner_mut() = cfg.as_ref().clone();
     }
     if let Some(lim) = limits {
-        dec = dec.with_limits(&to_resource_limits(lim));
+        dec = dec.with_limits(to_resource_limits(lim));
     }
     let mut job = dec.job();
     if let Some(s) = stop {
@@ -89,7 +89,7 @@ fn build_encoding(
         e
     };
     if let Some(lim) = limits {
-        enc = enc.with_limits(&to_resource_limits(lim));
+        enc = enc.with_limits(to_resource_limits(lim));
     }
     enc
 }

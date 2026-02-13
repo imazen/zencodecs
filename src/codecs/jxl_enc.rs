@@ -24,7 +24,7 @@ fn build_encoding(quality: Option<f32>, limits: Option<&Limits>) -> zenjxl::JxlE
     let distance = quality.map_or(1.0, percent_to_distance);
     let mut enc = zenjxl::JxlEncoding::lossy(distance);
     if let Some(lim) = limits {
-        enc = enc.with_limits(&to_resource_limits(lim));
+        enc = enc.with_limits(to_resource_limits(lim));
     }
     enc
 }

@@ -72,7 +72,7 @@ fn build_encoding(
     }
 
     if let Some(lim) = limits {
-        enc = enc.with_limits(&to_resource_limits(lim));
+        enc = enc.with_limits(to_resource_limits(lim));
     }
     enc
 }

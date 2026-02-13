@@ -20,7 +20,7 @@ fn default_encoder_config() -> zengif::EncoderConfig {
 /// Probe GIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     zengif::GifDecoding::new()
-        .probe(data)
+        .probe_header(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
 

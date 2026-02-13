@@ -9,7 +9,7 @@ use crate::{
 /// Probe AVIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     zenavif::AvifDecoding::new()
-        .probe(data)
+        .probe_header(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
 
@@ -26,7 +26,7 @@ pub(crate) fn decode(
         *dec.inner_mut() = cfg.as_ref().clone();
     }
     if let Some(lim) = limits {
-        dec = dec.with_limits(&to_resource_limits(lim));
+        dec = dec.with_limits(to_resource_limits(lim));
     }
     let mut job = dec.job();
     if let Some(s) = stop {

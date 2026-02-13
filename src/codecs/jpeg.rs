@@ -14,7 +14,7 @@ use crate::{
 /// Probe JPEG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
     zenjpeg::JpegDecoding::new()
-        .probe(data)
+        .probe_header(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -172,7 +172,7 @@ fn build_decoding(
     // For trait-based decode_into_*/decode_info, we use the default config.
     let mut dec = zenjpeg::JpegDecoding::new();
     if let Some(lim) = limits {
-        dec = dec.with_limits(&to_resource_limits(lim));
+        dec = dec.with_limits(to_resource_limits(lim));
     }
     dec
 }
@@ -192,7 +192,7 @@ fn build_encoding(
         zenjpeg::JpegEncoding::new().with_quality(q)
     };
     if let Some(lim) = limits {
-        enc = enc.with_limits(&to_resource_limits(lim));
+        enc = enc.with_limits(to_resource_limits(lim));
     }
     enc
 }
