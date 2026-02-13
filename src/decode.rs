@@ -227,6 +227,210 @@ impl<'a> DecodeRequest<'a> {
         }
     }
 
+    /// Decode directly into a caller-provided BGRA8 buffer.
+    ///
+    /// Falls back to decode + swizzle + copy for codecs without native BGRA support.
+    pub fn decode_into_bgra8(
+        self,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Bgra<u8>>,
+    ) -> Result<ImageInfo, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+        let format = match self.format {
+            Some(f) => f,
+            None => ImageFormat::detect(self.data).ok_or(CodecError::UnrecognizedFormat)?,
+        };
+        if !registry.can_decode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        self.decode_into_bgra8_format(format, dst)
+    }
+
+    fn decode_into_bgra8_format(
+        self,
+        format: ImageFormat,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Bgra<u8>>,
+    ) -> Result<ImageInfo, CodecError> {
+        // All codecs: fall back to decode + convert + copy
+        let output = self.decode_format(format)?;
+        let info = output.info().clone();
+        let src = output.into_bgra8();
+        let mut dst = dst;
+        for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+            let n = src_row.len().min(dst_row.len());
+            dst_row[..n].copy_from_slice(&src_row[..n]);
+        }
+        Ok(info)
+    }
+
+    /// Decode directly into a caller-provided BGRX8 buffer (alpha byte set to 255).
+    ///
+    /// Falls back to decode + swizzle + copy for codecs without native BGRX support.
+    pub fn decode_into_bgrx8(
+        self,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Bgra<u8>>,
+    ) -> Result<ImageInfo, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+        let format = match self.format {
+            Some(f) => f,
+            None => ImageFormat::detect(self.data).ok_or(CodecError::UnrecognizedFormat)?,
+        };
+        if !registry.can_decode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        self.decode_into_bgrx8_format(format, dst)
+    }
+
+    fn decode_into_bgrx8_format(
+        self,
+        format: ImageFormat,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Bgra<u8>>,
+    ) -> Result<ImageInfo, CodecError> {
+        // All codecs: fall back to decode + convert to RGB + swizzle + copy
+        let output = self.decode_format(format)?;
+        let info = output.info().clone();
+        let src = output.into_rgb8();
+        let mut dst = dst;
+        for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+            for (s, d) in src_row.iter().zip(dst_row.iter_mut()) {
+                *d = zencodec_types::Bgra {
+                    b: s.b,
+                    g: s.g,
+                    r: s.r,
+                    a: 255,
+                };
+            }
+        }
+        Ok(info)
+    }
+
+    /// Decode directly into a caller-provided linear RGB f32 buffer.
+    ///
+    /// Output is in linear light (not sRGB gamma). Falls back to decode + sRGB
+    /// linearization + copy.
+    pub fn decode_into_rgb_f32(
+        self,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Rgb<f32>>,
+    ) -> Result<ImageInfo, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+        let format = match self.format {
+            Some(f) => f,
+            None => ImageFormat::detect(self.data).ok_or(CodecError::UnrecognizedFormat)?,
+        };
+        if !registry.can_decode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        self.decode_into_rgb_f32_format(format, dst)
+    }
+
+    fn decode_into_rgb_f32_format(
+        self,
+        format: ImageFormat,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Rgb<f32>>,
+    ) -> Result<ImageInfo, CodecError> {
+        use linear_srgb::default::srgb_u8_to_linear;
+        // All codecs: fall back to decode + sRGB linearize + copy
+        let output = self.decode_format(format)?;
+        let info = output.info().clone();
+        let src = output.into_rgb8();
+        let mut dst = dst;
+        for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+            for (s, d) in src_row.iter().zip(dst_row.iter_mut()) {
+                *d = zencodec_types::Rgb {
+                    r: srgb_u8_to_linear(s.r),
+                    g: srgb_u8_to_linear(s.g),
+                    b: srgb_u8_to_linear(s.b),
+                };
+            }
+        }
+        Ok(info)
+    }
+
+    /// Decode directly into a caller-provided linear RGBA f32 buffer.
+    ///
+    /// Output is in linear light (not sRGB gamma). Alpha is linear (not gamma-encoded).
+    /// Falls back to decode + sRGB linearization + copy.
+    pub fn decode_into_rgba_f32(
+        self,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Rgba<f32>>,
+    ) -> Result<ImageInfo, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+        let format = match self.format {
+            Some(f) => f,
+            None => ImageFormat::detect(self.data).ok_or(CodecError::UnrecognizedFormat)?,
+        };
+        if !registry.can_decode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        self.decode_into_rgba_f32_format(format, dst)
+    }
+
+    fn decode_into_rgba_f32_format(
+        self,
+        format: ImageFormat,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Rgba<f32>>,
+    ) -> Result<ImageInfo, CodecError> {
+        use linear_srgb::default::srgb_u8_to_linear;
+        // All codecs: fall back to decode + sRGB linearize + copy
+        let output = self.decode_format(format)?;
+        let info = output.info().clone();
+        let src = output.into_rgba8();
+        let mut dst = dst;
+        for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+            for (s, d) in src_row.iter().zip(dst_row.iter_mut()) {
+                *d = zencodec_types::Rgba {
+                    r: srgb_u8_to_linear(s.r),
+                    g: srgb_u8_to_linear(s.g),
+                    b: srgb_u8_to_linear(s.b),
+                    a: s.a as f32 / 255.0,
+                };
+            }
+        }
+        Ok(info)
+    }
+
+    /// Decode directly into a caller-provided linear grayscale f32 buffer.
+    ///
+    /// Output is in linear light (not sRGB gamma). Falls back to decode + sRGB
+    /// linearization + copy.
+    pub fn decode_into_gray_f32(
+        self,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Gray<f32>>,
+    ) -> Result<ImageInfo, CodecError> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+        let format = match self.format {
+            Some(f) => f,
+            None => ImageFormat::detect(self.data).ok_or(CodecError::UnrecognizedFormat)?,
+        };
+        if !registry.can_decode(format) {
+            return Err(CodecError::DisabledFormat(format));
+        }
+        self.decode_into_gray_f32_format(format, dst)
+    }
+
+    fn decode_into_gray_f32_format(
+        self,
+        format: ImageFormat,
+        dst: imgref::ImgRefMut<'_, zencodec_types::Gray<f32>>,
+    ) -> Result<ImageInfo, CodecError> {
+        use linear_srgb::default::srgb_u8_to_linear;
+        // All codecs: fall back to decode + sRGB linearize + copy
+        let output = self.decode_format(format)?;
+        let info = output.info().clone();
+        let src = output.into_gray8();
+        let mut dst = dst;
+        for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+            for (s, d) in src_row.iter().zip(dst_row.iter_mut()) {
+                *d = zencodec_types::Gray::new(srgb_u8_to_linear(s.value()));
+            }
+        }
+        Ok(info)
+    }
+
     /// Decode the image to pixels.
     pub fn decode(self) -> Result<DecodeOutput, CodecError> {
         let default_registry = CodecRegistry::all();

@@ -6,10 +6,10 @@
 extern crate std;
 
 use crate::config::CodecConfig;
-use crate::pixel::{ImgRef, ImgVec, Rgb, Rgba};
+use crate::pixel::{Gray, ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, Decoding, EncodeOutput, ImageFormat, ImageInfo, Limits, PixelData,
-    Stop,
+    CodecError, DecodeOutput, Decoding, EncodeOutput, Encoding, EncodingJob, ImageFormat,
+    ImageInfo, Limits, PixelData, Stop,
 };
 
 /// Create a default GIF encoder config with the best available quantizer.
@@ -166,4 +166,77 @@ pub(crate) fn encode_rgba8(
     .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
 
     Ok(EncodeOutput::new(gif_data, ImageFormat::Gif))
+}
+
+/// Build a GifEncoding from codec config.
+fn build_gif_encoding(codec_config: Option<&CodecConfig>) -> zengif::GifEncoding {
+    let mut enc = zengif::GifEncoding::new();
+    if let Some(cfg) = codec_config.and_then(|c| c.gif_encoder.as_ref()) {
+        *enc.inner_mut() = cfg.as_ref().clone();
+    }
+    enc
+}
+
+/// Encode Gray8 pixels to GIF (single frame).
+pub(crate) fn encode_gray8(
+    img: ImgRef<Gray<u8>>,
+    codec_config: Option<&CodecConfig>,
+    _limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_gif_encoding(codec_config);
+    let mut job = enc.job();
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_gray8(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
+}
+
+/// Encode linear RGB f32 pixels to GIF (single frame).
+pub(crate) fn encode_rgb_f32(
+    img: ImgRef<Rgb<f32>>,
+    codec_config: Option<&CodecConfig>,
+    _limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_gif_encoding(codec_config);
+    let mut job = enc.job();
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_rgb_f32(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
+}
+
+/// Encode linear RGBA f32 pixels to GIF (single frame).
+pub(crate) fn encode_rgba_f32(
+    img: ImgRef<Rgba<f32>>,
+    codec_config: Option<&CodecConfig>,
+    _limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_gif_encoding(codec_config);
+    let mut job = enc.job();
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_rgba_f32(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
+}
+
+/// Encode linear grayscale f32 pixels to GIF (single frame).
+pub(crate) fn encode_gray_f32(
+    img: ImgRef<Gray<f32>>,
+    codec_config: Option<&CodecConfig>,
+    _limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_gif_encoding(codec_config);
+    let mut job = enc.job();
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_gray_f32(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }

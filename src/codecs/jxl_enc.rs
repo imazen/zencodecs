@@ -71,6 +71,90 @@ pub(crate) fn encode_rgba8(
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
+/// Encode Gray8 pixels to JXL.
+pub(crate) fn encode_gray8(
+    img: ImgRef<crate::pixel::Gray<u8>>,
+    quality: Option<f32>,
+    metadata: Option<&ImageMetadata<'_>>,
+    _codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_encoding(quality, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
+    }
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_gray8(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
+}
+
+/// Encode linear RGB f32 pixels to JXL.
+pub(crate) fn encode_rgb_f32(
+    img: ImgRef<Rgb<f32>>,
+    quality: Option<f32>,
+    metadata: Option<&ImageMetadata<'_>>,
+    _codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_encoding(quality, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
+    }
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_rgb_f32(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
+}
+
+/// Encode linear RGBA f32 pixels to JXL.
+pub(crate) fn encode_rgba_f32(
+    img: ImgRef<Rgba<f32>>,
+    quality: Option<f32>,
+    metadata: Option<&ImageMetadata<'_>>,
+    _codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_encoding(quality, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
+    }
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_rgba_f32(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
+}
+
+/// Encode linear grayscale f32 pixels to JXL.
+pub(crate) fn encode_gray_f32(
+    img: ImgRef<crate::pixel::Gray<f32>>,
+    quality: Option<f32>,
+    metadata: Option<&ImageMetadata<'_>>,
+    _codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_encoding(quality, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
+    }
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_gray_f32(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
+}
+
 /// Encode BGRA8 pixels to JXL (native BGRA path).
 pub(crate) fn encode_bgra8(
     img: ImgRef<Bgra<u8>>,

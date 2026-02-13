@@ -323,6 +323,90 @@ pub(crate) fn encode_bgrx8(
     Ok(EncodeOutput::new(jpeg_data, ImageFormat::Jpeg))
 }
 
+/// Encode Gray8 pixels to JPEG.
+pub(crate) fn encode_gray8(
+    img: ImgRef<crate::pixel::Gray<u8>>,
+    quality: Option<f32>,
+    metadata: Option<&ImageMetadata<'_>>,
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_encoding(quality, codec_config, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
+    }
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_gray8(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
+}
+
+/// Encode linear RGB f32 pixels to JPEG.
+pub(crate) fn encode_rgb_f32(
+    img: ImgRef<Rgb<f32>>,
+    quality: Option<f32>,
+    metadata: Option<&ImageMetadata<'_>>,
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_encoding(quality, codec_config, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
+    }
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_rgb_f32(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
+}
+
+/// Encode linear RGBA f32 pixels to JPEG (alpha discarded).
+pub(crate) fn encode_rgba_f32(
+    img: ImgRef<Rgba<f32>>,
+    quality: Option<f32>,
+    metadata: Option<&ImageMetadata<'_>>,
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_encoding(quality, codec_config, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
+    }
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_rgba_f32(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
+}
+
+/// Encode linear grayscale f32 pixels to JPEG.
+pub(crate) fn encode_gray_f32(
+    img: ImgRef<crate::pixel::Gray<f32>>,
+    quality: Option<f32>,
+    metadata: Option<&ImageMetadata<'_>>,
+    codec_config: Option<&CodecConfig>,
+    limits: Option<&Limits>,
+    stop: Option<&dyn Stop>,
+) -> Result<EncodeOutput, CodecError> {
+    let enc = build_encoding(quality, codec_config, limits);
+    let mut job = enc.job();
+    if let Some(meta) = metadata {
+        job = job.with_metadata(meta);
+    }
+    if let Some(s) = stop {
+        job = job.with_stop(s);
+    }
+    job.encode_gray_f32(img)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
+}
+
 /// Apply zencodecs ImageMetadata to a zenjpeg EncodeRequest.
 fn apply_metadata<'a>(
     mut request: zenjpeg::encoder::EncodeRequest<'a>,
