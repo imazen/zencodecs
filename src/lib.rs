@@ -91,6 +91,8 @@ mod encode;
 mod error;
 mod info;
 mod limits;
+#[cfg(feature = "pipeline")]
+pub mod pipeline;
 pub mod pixel;
 mod probe;
 mod registry;

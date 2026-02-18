@@ -29,6 +29,9 @@ zenpng = { path = "../zenpng", optional = true }
 # ravif is used via zenavif (encode feature)
 zenjxl = { path = "../zenjxl", optional = true, default-features = false }
 
+# Pipeline (optional, feature-gated)
+zenresize = { path = "../zenresize", optional = true, default-features = false, features = ["std", "layout", "imgref"] }
+
 # Color management (optional)
 # moxcms = { version = "0.8", optional = true, default-features = false }  # Disabled for now
 
@@ -50,6 +53,9 @@ avif-decode = ["dep:zenavif"]
 avif-encode = ["dep:zenavif", "zenavif/encode"]
 jxl-decode = ["dep:zenjxl", "zenjxl/decode"]
 jxl-encode = ["dep:zenjxl", "zenjxl/encode"]
+
+# Pipeline
+pipeline = ["dep:zenresize"]
 
 # Color management
 moxcms = []  # Disabled for now
