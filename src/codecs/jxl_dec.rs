@@ -2,12 +2,13 @@
 
 use crate::limits::to_resource_limits;
 use crate::{
-    CodecError, DecodeOutput, Decoding, DecodingJob, ImageFormat, ImageInfo, Limits, Stop,
+    CodecError, DecodeJob, DecodeOutput, DecoderConfig, ImageFormat, ImageInfo, Limits, Stop,
 };
+use zencodec_types::Decoder;
 
 /// Probe JXL metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    zenjxl::JxlDecoding::new()
+    zenjxl::JxlDecoderConfig::new()
         .probe_header(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
@@ -18,7 +19,8 @@ pub(crate) fn decode(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    let mut dec = zenjxl::JxlDecoding::new();
+    // JxlDecoderConfig has inherent with_limits
+    let mut dec = zenjxl::JxlDecoderConfig::new();
     if let Some(lim) = limits {
         dec = dec.with_limits(to_resource_limits(lim));
     }
@@ -26,6 +28,7 @@ pub(crate) fn decode(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decode(data)
+    job.decoder()
+        .decode(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }

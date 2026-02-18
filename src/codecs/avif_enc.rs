@@ -4,8 +4,9 @@ use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::pixel::{ImgRef, Rgb, Rgba};
 use crate::{
-    CodecError, EncodeOutput, Encoding, EncodingJob, ImageFormat, ImageMetadata, Limits, Stop,
+    CodecError, EncodeJob, EncodeOutput, EncoderConfig, ImageFormat, ImageMetadata, Limits, Stop,
 };
+use zencodec_types::{Encoder, PixelSlice};
 
 /// Encode RGB8 pixels to AVIF.
 pub(crate) fn encode_rgb8(
@@ -16,15 +17,19 @@ pub(crate) fn encode_rgb8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgb8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
 
@@ -37,15 +42,19 @@ pub(crate) fn encode_rgba8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgba8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
 
@@ -58,15 +67,19 @@ pub(crate) fn encode_gray8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_gray8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
 
@@ -79,15 +92,19 @@ pub(crate) fn encode_rgb_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgb_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
 
@@ -100,15 +117,19 @@ pub(crate) fn encode_rgba_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgba_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
 
@@ -121,24 +142,27 @@ pub(crate) fn encode_gray_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_gray_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
 
-/// Build an AvifEncoding from quality/codec_config/limits.
+/// Build an AvifEncoderConfig from quality/codec_config.
 fn build_encoding(
     quality: Option<f32>,
     codec_config: Option<&CodecConfig>,
-    limits: Option<&Limits>,
-) -> zenavif::AvifEncoding {
+) -> zenavif::AvifEncoderConfig {
     let q = codec_config
         .and_then(|c| c.avif_quality)
         .or(quality)
@@ -147,16 +171,13 @@ fn build_encoding(
 
     let speed = codec_config.and_then(|c| c.avif_speed).unwrap_or(4);
 
-    let mut enc = zenavif::AvifEncoding::new()
+    let mut enc = zenavif::AvifEncoderConfig::new()
         .with_quality(q)
-        .with_effort(speed as u32);
+        .with_effort_u32(speed as u32);
 
     if let Some(alpha_q) = codec_config.and_then(|c| c.avif_alpha_quality) {
         enc = enc.with_alpha_quality(alpha_q);
     }
 
-    if let Some(lim) = limits {
-        enc = enc.with_limits(to_resource_limits(lim));
-    }
     enc
 }

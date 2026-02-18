@@ -7,13 +7,14 @@ use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::pixel::{Bgra, ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, Decoding, DecodingJob, EncodeOutput, Encoding, EncodingJob,
+    CodecError, DecodeJob, DecodeOutput, DecoderConfig, EncodeJob, EncodeOutput, EncoderConfig,
     ImageFormat, ImageInfo, ImageMetadata, Limits, PixelData, Stop,
 };
+use zencodec_types::{Decoder, Encoder, PixelSlice, PixelSliceMut};
 
 /// Probe JPEG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    zenjpeg::JpegDecoding::new()
+    zenjpeg::JpegDecoderConfig::new()
         .probe_header(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
@@ -104,10 +105,11 @@ pub(crate) fn decode(
 /// Compute actual output dimensions for JPEG (applies DctScale, auto_orient).
 pub(crate) fn decode_info(
     data: &[u8],
-    codec_config: Option<&CodecConfig>,
+    _codec_config: Option<&CodecConfig>,
 ) -> Result<ImageInfo, CodecError> {
-    let dec = build_decoding(codec_config, None);
-    dec.decode_info(data)
+    // Use probe_full which returns complete metadata
+    zenjpeg::JpegDecoderConfig::new()
+        .probe_full(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -115,16 +117,20 @@ pub(crate) fn decode_info(
 pub(crate) fn decode_into_rgb8(
     data: &[u8],
     dst: imgref::ImgRefMut<'_, Rgb<u8>>,
-    codec_config: Option<&CodecConfig>,
+    _codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<ImageInfo, CodecError> {
-    let dec = build_decoding(codec_config, limits);
+    let dec = zenjpeg::JpegDecoderConfig::new();
     let mut job = dec.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decode_into_rgb8(data, dst)
+    job.decoder()
+        .decode_into(data, PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -132,16 +138,20 @@ pub(crate) fn decode_into_rgb8(
 pub(crate) fn decode_into_rgba8(
     data: &[u8],
     dst: imgref::ImgRefMut<'_, Rgba<u8>>,
-    codec_config: Option<&CodecConfig>,
+    _codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<ImageInfo, CodecError> {
-    let dec = build_decoding(codec_config, limits);
+    let dec = zenjpeg::JpegDecoderConfig::new();
     let mut job = dec.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decode_into_rgba8(data, dst)
+    job.decoder()
+        .decode_into(data, PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -149,52 +159,36 @@ pub(crate) fn decode_into_rgba8(
 pub(crate) fn decode_into_gray8(
     data: &[u8],
     dst: imgref::ImgRefMut<'_, crate::pixel::Gray<u8>>,
-    codec_config: Option<&CodecConfig>,
+    _codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<ImageInfo, CodecError> {
-    let dec = build_decoding(codec_config, limits);
+    let dec = zenjpeg::JpegDecoderConfig::new();
     let mut job = dec.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decode_into_gray8(data, dst)
+    job.decoder()
+        .decode_into(data, PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
-/// Build a JpegDecoding from codec config and limits.
-fn build_decoding(
-    _codec_config: Option<&CodecConfig>,
-    limits: Option<&Limits>,
-) -> zenjpeg::JpegDecoding {
-    // Note: JpegDecoding doesn't expose inner_mut() for codec-specific config.
-    // The codec_config.jpeg_decoder is used by the native decode() path above.
-    // For trait-based decode_into_*/decode_info, we use the default config.
-    let mut dec = zenjpeg::JpegDecoding::new();
-    if let Some(lim) = limits {
-        dec = dec.with_limits(to_resource_limits(lim));
-    }
-    dec
-}
-
-/// Build a JpegEncoding from codec config or generic quality.
+/// Build a JpegEncoderConfig from codec config or generic quality.
 fn build_encoding(
     quality: Option<f32>,
     codec_config: Option<&CodecConfig>,
-    limits: Option<&Limits>,
-) -> zenjpeg::JpegEncoding {
-    let mut enc = if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
-        let mut e = zenjpeg::JpegEncoding::new();
+) -> zenjpeg::JpegEncoderConfig {
+    if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
+        let mut e = zenjpeg::JpegEncoderConfig::new();
         *e.inner_mut() = cfg.as_ref().clone();
         e
     } else {
         let q = quality.unwrap_or(85.0).clamp(0.0, 100.0);
-        zenjpeg::JpegEncoding::new().with_quality(q)
-    };
-    if let Some(lim) = limits {
-        enc = enc.with_limits(to_resource_limits(lim));
+        zenjpeg::JpegEncoderConfig::new().with_calibrated_quality(q)
     }
-    enc
 }
 
 /// Encode RGB8 pixels to JPEG.
@@ -206,15 +200,19 @@ pub(crate) fn encode_rgb8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgb8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -227,15 +225,19 @@ pub(crate) fn encode_rgba8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgba8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -332,15 +334,19 @@ pub(crate) fn encode_gray8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_gray8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -353,15 +359,19 @@ pub(crate) fn encode_rgb_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgb_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -374,15 +384,19 @@ pub(crate) fn encode_rgba_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgba_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -395,15 +409,19 @@ pub(crate) fn encode_gray_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config, limits);
+    let enc = build_encoding(quality, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_gray_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 

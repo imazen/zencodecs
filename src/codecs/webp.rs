@@ -8,13 +8,14 @@ use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::pixel::{Bgra, ImgRef, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, Decoding, DecodingJob, EncodeOutput, Encoding, EncodingJob,
+    CodecError, DecodeJob, DecodeOutput, DecoderConfig, EncodeJob, EncodeOutput, EncoderConfig,
     ImageFormat, ImageInfo, ImageMetadata, Limits, Stop,
 };
+use zencodec_types::{Decoder, Encoder, PixelSlice, PixelSliceMut};
 
 /// Probe WebP metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    zenwebp::WebpDecoding::new()
+    zenwebp::WebpDecoderConfig::new()
         .probe_header(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
@@ -26,10 +27,11 @@ pub(crate) fn decode(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    let mut dec = zenwebp::WebpDecoding::new();
+    let mut dec = zenwebp::WebpDecoderConfig::new();
     if let Some(cfg) = codec_config.and_then(|c| c.webp_decoder.as_ref()) {
         *dec.inner_mut() = cfg.as_ref().clone();
     }
+    // WebpDecoderConfig has inherent with_limits
     if let Some(lim) = limits {
         dec = dec.with_limits(to_resource_limits(lim));
     }
@@ -37,7 +39,8 @@ pub(crate) fn decode(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decode(data)
+    job.decoder()
+        .decode(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
 
@@ -49,10 +52,11 @@ pub(crate) fn decode_into_rgba8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<ImageInfo, CodecError> {
-    let mut dec = zenwebp::WebpDecoding::new();
+    let mut dec = zenwebp::WebpDecoderConfig::new();
     if let Some(cfg) = codec_config.and_then(|c| c.webp_decoder.as_ref()) {
         *dec.inner_mut() = cfg.as_ref().clone();
     }
+    // WebpDecoderConfig has inherent with_limits
     if let Some(lim) = limits {
         dec = dec.with_limits(to_resource_limits(lim));
     }
@@ -60,26 +64,26 @@ pub(crate) fn decode_into_rgba8(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decode_into_rgba8(data, dst)
+    job.decoder()
+        .decode_into(data, PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
 
-/// Build a WebpEncoding from quality/lossless/codec_config.
+/// Build a WebpEncoderConfig from quality/lossless/codec_config.
 fn build_encoding(
     quality: Option<f32>,
     lossless: bool,
     codec_config: Option<&CodecConfig>,
-    limits: Option<&Limits>,
-) -> zenwebp::WebpEncoding {
-    let mut enc = if lossless {
-        let mut e = zenwebp::WebpEncoding::lossless();
+) -> zenwebp::WebpEncoderConfig {
+    if lossless {
+        let mut e = zenwebp::WebpEncoderConfig::lossless();
         if let Some(cfg) = codec_config.and_then(|c| c.webp_lossless.as_ref()) {
             *e.inner_mut() =
                 zenwebp::encoder::config::EncoderConfig::Lossless(cfg.as_ref().clone());
         }
         e
     } else {
-        let mut e = zenwebp::WebpEncoding::lossy();
+        let mut e = zenwebp::WebpEncoderConfig::lossy();
         if let Some(cfg) = codec_config.and_then(|c| c.webp_lossy.as_ref()) {
             *e.inner_mut() = zenwebp::encoder::config::EncoderConfig::Lossy(cfg.as_ref().clone());
         } else {
@@ -87,11 +91,7 @@ fn build_encoding(
             e = e.with_quality(q);
         }
         e
-    };
-    if let Some(lim) = limits {
-        enc = enc.with_limits(to_resource_limits(lim));
     }
-    enc
 }
 
 /// Encode RGB8 pixels to WebP.
@@ -104,15 +104,19 @@ pub(crate) fn encode_rgb8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config, limits);
+    let enc = build_encoding(quality, lossless, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgb8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
 
@@ -126,15 +130,19 @@ pub(crate) fn encode_rgba8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config, limits);
+    let enc = build_encoding(quality, lossless, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgba8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
 
@@ -148,15 +156,19 @@ pub(crate) fn encode_gray8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config, limits);
+    let enc = build_encoding(quality, lossless, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_gray8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
 
@@ -170,15 +182,19 @@ pub(crate) fn encode_rgb_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config, limits);
+    let enc = build_encoding(quality, lossless, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgb_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
 
@@ -192,15 +208,19 @@ pub(crate) fn encode_rgba_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config, limits);
+    let enc = build_encoding(quality, lossless, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgba_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
 
@@ -214,15 +234,19 @@ pub(crate) fn encode_gray_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config, limits);
+    let enc = build_encoding(quality, lossless, codec_config);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_gray_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
 }
 

@@ -113,22 +113,22 @@ pub use zencodec_types::ImageFormat;
 pub use zencodec_types::ImageMetadata;
 
 // zencodec-types trait re-exports
-pub use zencodec_types::{Decoding, DecodingJob, Encoding, EncodingJob};
+pub use zencodec_types::{DecodeJob, DecoderConfig, EncodeJob, EncoderConfig};
 
 #[cfg(feature = "png")]
-pub use zenpng::{PngDecodeJob, PngDecoding, PngEncodeJob, PngEncoding};
+pub use zenpng::{PngDecodeJob, PngDecoderConfig, PngEncodeJob, PngEncoderConfig};
 
 #[cfg(feature = "webp")]
-pub use zenwebp::{WebpDecodeJob, WebpDecoding, WebpEncodeJob, WebpEncoding};
+pub use zenwebp::{WebpDecodeJob, WebpDecoderConfig, WebpEncodeJob, WebpEncoderConfig};
 
 #[cfg(feature = "gif")]
-pub use zengif::{GifDecodeJob, GifDecoding, GifEncodeJob, GifEncoding};
+pub use zengif::{GifDecodeJob, GifDecoderConfig, GifEncodeJob, GifEncoderConfig};
 
 #[cfg(feature = "jpeg")]
-pub use zenjpeg::{JpegDecodeJob, JpegDecoding, JpegEncodeJob, JpegEncoding};
+pub use zenjpeg::{JpegDecodeJob, JpegDecoderConfig, JpegEncodeJob, JpegEncoderConfig};
 
 #[cfg(feature = "jxl-decode")]
-pub use zenjxl::{JxlDecodeJob, JxlDecoding};
+pub use zenjxl::{JxlDecodeJob, JxlDecoderConfig};
 
 #[cfg(feature = "jxl-encode")]
-pub use zenjxl::{JxlEncodeJob, JxlEncoding};
+pub use zenjxl::{JxlEncodeJob, JxlEncoderConfig};

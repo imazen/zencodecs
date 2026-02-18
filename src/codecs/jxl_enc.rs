@@ -4,8 +4,9 @@ use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::pixel::{Bgra, ImgRef, Rgb, Rgba};
 use crate::{
-    CodecError, EncodeOutput, Encoding, EncodingJob, ImageFormat, ImageMetadata, Limits, Stop,
+    CodecError, EncodeJob, EncodeOutput, EncoderConfig, ImageFormat, ImageMetadata, Limits, Stop,
 };
+use zencodec_types::{Encoder, PixelSlice};
 
 /// Map 0-100 quality percentage to butteraugli distance.
 fn percent_to_distance(quality: f32) -> f32 {
@@ -19,14 +20,10 @@ fn percent_to_distance(quality: f32) -> f32 {
     }
 }
 
-/// Build a JxlEncoding from quality and limits.
-fn build_encoding(quality: Option<f32>, limits: Option<&Limits>) -> zenjxl::JxlEncoding {
+/// Build a JxlEncoderConfig from quality.
+fn build_encoding(quality: Option<f32>) -> zenjxl::JxlEncoderConfig {
     let distance = quality.map_or(1.0, percent_to_distance);
-    let mut enc = zenjxl::JxlEncoding::lossy(distance);
-    if let Some(lim) = limits {
-        enc = enc.with_limits(to_resource_limits(lim));
-    }
-    enc
+    zenjxl::JxlEncoderConfig::lossy(distance)
 }
 
 /// Encode RGB8 pixels to JXL.
@@ -38,15 +35,19 @@ pub(crate) fn encode_rgb8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, limits);
+    let enc = build_encoding(quality);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgb8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -59,15 +60,19 @@ pub(crate) fn encode_rgba8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, limits);
+    let enc = build_encoding(quality);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgba8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -80,15 +85,19 @@ pub(crate) fn encode_gray8(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, limits);
+    let enc = build_encoding(quality);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_gray8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -101,15 +110,19 @@ pub(crate) fn encode_rgb_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, limits);
+    let enc = build_encoding(quality);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgb_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -122,15 +135,19 @@ pub(crate) fn encode_rgba_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, limits);
+    let enc = build_encoding(quality);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgba_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -143,15 +160,19 @@ pub(crate) fn encode_gray_f32(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, limits);
+    let enc = build_encoding(quality);
     let mut job = enc.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(meta) = metadata {
         job = job.with_metadata(meta);
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_gray_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 

@@ -327,7 +327,7 @@ impl<'a> Pipeline<'a> {
                 LayoutConstraint::FitCrop(w, h) => pipeline.fit_crop(*w, *h),
                 LayoutConstraint::FitPad(w, h, color) => pipeline.constrain(
                     zenresize::Constraint::new(zenresize::ConstraintMode::FitPad, *w, *h)
-                        .canvas_color(color.clone()),
+                        .canvas_color(*color),
                 ),
             };
 

@@ -21,7 +21,7 @@ zencodec-types = { path = "../zencodec-types" }
 linear-srgb = { version = "0.4", default-features = false }
 
 # Codecs (all optional, feature-gated)
-zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder"] }
+zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder", "zencodec"] }
 zenwebp = { path = "../zenwebp", optional = true }
 zengif = { path = "../zengif", optional = true }
 zenavif = { path = "../zenavif", optional = true }

@@ -8,9 +8,10 @@ extern crate std;
 use crate::config::CodecConfig;
 use crate::pixel::{Gray, ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, Decoding, EncodeOutput, Encoding, EncodingJob, ImageFormat,
+    CodecError, DecodeOutput, DecoderConfig, EncodeJob, EncodeOutput, EncoderConfig, ImageFormat,
     ImageInfo, Limits, PixelData, Stop,
 };
+use zencodec_types::{Encoder, PixelSlice};
 
 /// Create a default GIF encoder config with the best available quantizer.
 fn default_encoder_config() -> zengif::EncoderConfig {
@@ -19,7 +20,7 @@ fn default_encoder_config() -> zengif::EncoderConfig {
 
 /// Probe GIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    zengif::GifDecoding::new()
+    zengif::GifDecoderConfig::new()
         .probe_header(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
@@ -168,9 +169,9 @@ pub(crate) fn encode_rgba8(
     Ok(EncodeOutput::new(gif_data, ImageFormat::Gif))
 }
 
-/// Build a GifEncoding from codec config.
-fn build_gif_encoding(codec_config: Option<&CodecConfig>) -> zengif::GifEncoding {
-    let mut enc = zengif::GifEncoding::new();
+/// Build a GifEncoderConfig from codec config.
+fn build_gif_encoding(codec_config: Option<&CodecConfig>) -> zengif::GifEncoderConfig {
+    let mut enc = zengif::GifEncoderConfig::new();
     if let Some(cfg) = codec_config.and_then(|c| c.gif_encoder.as_ref()) {
         *enc.inner_mut() = cfg.as_ref().clone();
     }
@@ -189,7 +190,8 @@ pub(crate) fn encode_gray8(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_gray8(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
 
@@ -205,7 +207,8 @@ pub(crate) fn encode_rgb_f32(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgb_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
 
@@ -221,7 +224,8 @@ pub(crate) fn encode_rgba_f32(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_rgba_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
 
@@ -237,6 +241,7 @@ pub(crate) fn encode_gray_f32(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.encode_gray_f32(img)
+    job.encoder()
+        .encode(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }

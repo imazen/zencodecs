@@ -3,12 +3,13 @@
 use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::{
-    CodecError, DecodeOutput, Decoding, DecodingJob, ImageFormat, ImageInfo, Limits, Stop,
+    CodecError, DecodeJob, DecodeOutput, DecoderConfig, ImageFormat, ImageInfo, Limits, Stop,
 };
+use zencodec_types::Decoder;
 
 /// Probe AVIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    zenavif::AvifDecoding::new()
+    zenavif::AvifDecoderConfig::new()
         .probe_header(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
@@ -20,11 +21,12 @@ pub(crate) fn decode(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    let mut dec = zenavif::AvifDecoding::new();
+    let mut dec = zenavif::AvifDecoderConfig::new();
     // Apply codec config if provided
     if let Some(cfg) = codec_config.and_then(|c| c.avif_decoder.as_ref()) {
         *dec.inner_mut() = cfg.as_ref().clone();
     }
+    // AvifDecoderConfig has inherent with_limits
     if let Some(lim) = limits {
         dec = dec.with_limits(to_resource_limits(lim));
     }
@@ -32,6 +34,7 @@ pub(crate) fn decode(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decode(data)
+    job.decoder()
+        .decode(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
