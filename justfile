@@ -32,3 +32,10 @@ test-armv7:
     cross test --no-default-features --features png --target armv7-unknown-linux-gnueabihf
 
 test-cross: test-i686 test-armv7
+
+# zcimg CLI
+zcimg-build:
+    cargo build --release --manifest-path zcimg/Cargo.toml
+
+zcimg-run *ARGS:
+    cargo run --release --manifest-path zcimg/Cargo.toml -- {{ARGS}}

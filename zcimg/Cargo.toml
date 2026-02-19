@@ -1,0 +1,22 @@
+[package]
+name = "zcimg"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "AGPL-3.0-or-later"
+description = "Multi-format image processor: transcode, resize, inspect"
+
+[[bin]]
+name = "zcimg"
+path = "src/main.rs"
+
+[dependencies]
+zencodecs = { path = "..", features = ["all", "std"] }
+zencodec-types = { path = "../../zencodec-types" }
+clap = { version = "4", features = ["derive", "env", "wrap_help"] }
+rayon = "1.10"
+indicatif = "0.17"
+anyhow = "1"
+glob = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
