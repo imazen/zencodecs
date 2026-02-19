@@ -30,10 +30,14 @@ zenpng = { path = "../zenpng", optional = true }
 zenjxl = { path = "../zenjxl", optional = true, default-features = false }
 
 # Pipeline (optional, feature-gated)
-zenresize = { path = "../zenresize", optional = true, default-features = false, features = ["std", "layout", "imgref"] }
+# Temporarily commented out due to archmage 0.7 vs 0.8 version conflict in zenresize
+# zenresize = { path = "../zenresize", optional = true, default-features = false, features = ["std", "layout"] }
 
 # Color management (optional)
 # moxcms = { version = "0.8", optional = true, default-features = false }  # Disabled for now
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("pipeline"))'] }
 
 [dev-dependencies]
 png = "0.18"
@@ -54,8 +58,8 @@ avif-encode = ["dep:zenavif", "zenavif/encode"]
 jxl-decode = ["dep:zenjxl", "zenjxl/decode"]
 jxl-encode = ["dep:zenjxl", "zenjxl/encode"]
 
-# Pipeline
-pipeline = ["dep:zenresize"]
+# Pipeline (disabled: zenresize has archmage version conflict)
+# pipeline = ["dep:zenresize"]
 
 # Color management
 moxcms = []  # Disabled for now

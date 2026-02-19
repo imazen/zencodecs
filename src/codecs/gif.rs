@@ -15,7 +15,10 @@ use zencodec_types::{Encoder, PixelSlice};
 
 /// Create a default GIF encoder config with the best available quantizer.
 fn default_encoder_config() -> zengif::EncoderConfig {
-    zengif::EncoderConfig::new().quantizer(zengif::Quantizer::auto())
+    let config = zengif::EncoderConfig::new();
+    #[cfg(any(feature = "gif-quantizr", feature = "gif-imagequant"))]
+    let config = config.quantizer(zengif::Quantizer::auto());
+    config
 }
 
 /// Probe GIF metadata without decoding pixels.
