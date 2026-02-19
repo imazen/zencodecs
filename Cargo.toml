@@ -18,7 +18,7 @@ rgb = { version = "0.8", default-features = false, features = ["as-bytes"] }
 imgref = "1.12"
 bytemuck = { version = "1.25", default-features = false }
 zencodec-types = { path = "../zencodec-types" }
-linear-srgb = { version = "0.4", default-features = false }
+linear-srgb = { version = "0.5.5", default-features = false }
 
 # Codecs (all optional, feature-gated)
 zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder", "zencodec"] }
@@ -30,14 +30,10 @@ zenpng = { path = "../zenpng", optional = true }
 zenjxl = { path = "../zenjxl", optional = true, default-features = false }
 
 # Pipeline (optional, feature-gated)
-# Temporarily commented out due to archmage 0.7 vs 0.8 version conflict in zenresize
-# zenresize = { path = "../zenresize", optional = true, default-features = false, features = ["std", "layout"] }
+zenresize = { path = "../zenresize", optional = true, default-features = false, features = ["std", "layout"] }
 
 # Color management (optional)
 # moxcms = { version = "0.8", optional = true, default-features = false }  # Disabled for now
-
-[lints.rust]
-unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("pipeline"))'] }
 
 [dev-dependencies]
 png = "0.18"
@@ -58,8 +54,8 @@ avif-encode = ["dep:zenavif", "zenavif/encode"]
 jxl-decode = ["dep:zenjxl", "zenjxl/decode"]
 jxl-encode = ["dep:zenjxl", "zenjxl/encode"]
 
-# Pipeline (disabled: zenresize has archmage version conflict)
-# pipeline = ["dep:zenresize"]
+# Pipeline
+pipeline = ["dep:zenresize"]
 
 # Color management
 moxcms = []  # Disabled for now
