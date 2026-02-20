@@ -189,6 +189,14 @@ fn print_info(info: &ImageInfoDisplay) {
                     icc.color_space, icc.pcs, icc.profile_class
                 );
                 println!("      Version: {}", icc.version);
+                if let Some(ref trc_desc) = icc.trc_description {
+                    println!("      TRC: {}", trc_desc);
+                }
+                if let Some(ref formula) = icc.trc_formula {
+                    for line in formula.lines() {
+                        println!("        {}", line);
+                    }
+                }
             } else {
                 println!("    ICC profile: {} bytes", size);
             }
@@ -227,6 +235,12 @@ fn print_info(info: &ImageInfoDisplay) {
         if let Some(ref cicp) = info.cicp {
             if let Some(ref parsed) = info.parsed_cicp {
                 println!("    CICP:        {}", parsed.summary);
+                if let Some(ref formula) = parsed.transfer_formula {
+                    println!("      Transfer function:");
+                    for line in formula.lines() {
+                        println!("        {}", line);
+                    }
+                }
             } else {
                 println!(
                     "    CICP:        {}/{}/{} ({})",
