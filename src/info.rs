@@ -103,6 +103,13 @@ fn decode_info_format(
                 {
                     return Ok(info);
                 }
+                // Capped probe failed — retry with full data and warn
+                let mut info = crate::codecs::jpeg::decode_info(data, codec_config)?;
+                info.warnings.push(alloc::format!(
+                    "metadata located beyond {}KB fast-probe cap; required full scan",
+                    PROBE_CAP / 1024
+                ));
+                return Ok(info);
             }
             crate::codecs::jpeg::decode_info(data, codec_config)
         }
@@ -139,6 +146,13 @@ fn probe_format_full(data: &[u8], format: ImageFormat) -> Result<ImageInfo, Code
         if let Ok(info) = probe_codec(&data[..PROBE_CAP], format) {
             return Ok(info);
         }
+        // Capped probe failed — retry with full data and warn
+        let mut info = probe_codec(data, format)?;
+        info.warnings.push(alloc::format!(
+            "metadata located beyond {}KB fast-probe cap; required full scan",
+            PROBE_CAP / 1024
+        ));
+        return Ok(info);
     }
     probe_codec(data, format)
 }
