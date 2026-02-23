@@ -66,7 +66,10 @@ fn stop_decode_jpeg() {
     let result = DecodeRequest::new(&data)
         .with_stop(&AlreadyStopped)
         .decode();
-    assert!(result.is_err(), "JPEG decode should fail with AlreadyStopped");
+    assert!(
+        result.is_err(),
+        "JPEG decode should fail with AlreadyStopped"
+    );
     assert!(
         is_cancelled(&result.unwrap_err()),
         "JPEG decode error should indicate cancellation"
@@ -79,7 +82,10 @@ fn stop_decode_webp() {
     let result = DecodeRequest::new(&data)
         .with_stop(&AlreadyStopped)
         .decode();
-    assert!(result.is_err(), "WebP decode should fail with AlreadyStopped");
+    assert!(
+        result.is_err(),
+        "WebP decode should fail with AlreadyStopped"
+    );
     assert!(
         is_cancelled(&result.unwrap_err()),
         "WebP decode error should indicate cancellation"
@@ -92,7 +98,10 @@ fn stop_decode_gif() {
     let result = DecodeRequest::new(&data)
         .with_stop(&AlreadyStopped)
         .decode();
-    assert!(result.is_err(), "GIF decode should fail with AlreadyStopped");
+    assert!(
+        result.is_err(),
+        "GIF decode should fail with AlreadyStopped"
+    );
     assert!(
         is_cancelled(&result.unwrap_err()),
         "GIF decode error should indicate cancellation"
@@ -121,7 +130,10 @@ fn stop_decode_png() {
     let result = DecodeRequest::new(&data)
         .with_stop(&AlreadyStopped)
         .decode();
-    assert!(result.is_err(), "PNG decode should fail with AlreadyStopped");
+    assert!(
+        result.is_err(),
+        "PNG decode should fail with AlreadyStopped"
+    );
     assert!(
         is_cancelled(&result.unwrap_err()),
         "PNG decode error should indicate cancellation"

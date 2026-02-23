@@ -98,8 +98,7 @@ fn decode_info_format(
         #[cfg(feature = "jpeg")]
         ImageFormat::Jpeg => {
             if data.len() > PROBE_CAP {
-                if let Ok(info) =
-                    crate::codecs::jpeg::decode_info(&data[..PROBE_CAP], codec_config)
+                if let Ok(info) = crate::codecs::jpeg::decode_info(&data[..PROBE_CAP], codec_config)
                 {
                     return Ok(info);
                 }

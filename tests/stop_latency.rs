@@ -9,8 +9,8 @@
 
 mod common;
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -88,7 +88,9 @@ fn measure_stop_latency(
     if was_cancelled {
         if let Some(cancel_instant) = stop.cancel_instant() {
             let latency = return_time.duration_since(cancel_instant);
-            eprintln!("{name}: CANCELLED total={total:?}, stop_latency={latency:?} (flag_set→return)");
+            eprintln!(
+                "{name}: CANCELLED total={total:?}, stop_latency={latency:?} (flag_set→return)"
+            );
             if latency > Duration::from_millis(200) {
                 eprintln!("  WARNING: stop latency > 200ms");
             }

@@ -97,11 +97,7 @@ pub(crate) fn decode(
 }
 
 /// Pre-flight memory check for GIF encoding (4 bytes/pixel for RGBA).
-fn check_gif_memory_limit(
-    w: u32,
-    h: u32,
-    limits: Option<&Limits>,
-) -> Result<(), CodecError> {
+fn check_gif_memory_limit(w: u32, h: u32, limits: Option<&Limits>) -> Result<(), CodecError> {
     if let Some(lim) = limits {
         if let Some(max_mem) = lim.max_memory_bytes {
             let estimated = w as u64 * h as u64 * 4;
@@ -143,15 +139,8 @@ pub(crate) fn encode_rgb8(
     let gif_limits = to_gif_limits(limits);
     let stop = crate::limits::stop_or_default(stop);
 
-    let gif_data = zengif::encode_gif(
-        alloc::vec![frame],
-        width,
-        height,
-        config,
-        gif_limits,
-        stop,
-    )
-    .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
+    let gif_data = zengif::encode_gif(alloc::vec![frame], width, height, config, gif_limits, stop)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
 
     Ok(EncodeOutput::new(gif_data, ImageFormat::Gif))
 }
@@ -184,15 +173,8 @@ pub(crate) fn encode_rgba8(
     let gif_limits = to_gif_limits(limits);
     let stop = crate::limits::stop_or_default(stop);
 
-    let gif_data = zengif::encode_gif(
-        alloc::vec![frame],
-        width,
-        height,
-        config,
-        gif_limits,
-        stop,
-    )
-    .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
+    let gif_data = zengif::encode_gif(alloc::vec![frame], width, height, config, gif_limits, stop)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
 
     Ok(EncodeOutput::new(gif_data, ImageFormat::Gif))
 }

@@ -16,11 +16,11 @@ pub mod jpeg {
         MpfImageType, OutputTarget, PreserveConfig, PreservedMpfImage, PreservedSegment,
         SegmentType, Strictness,
     };
-    pub use zenjpeg::lossless::LosslessTransform;
     pub use zenjpeg::encoder::{
         ChromaSubsampling, ColorMode, EncodeRequest as JpegEncodeRequest, EncoderConfig, Exif,
         ExifFields, HuffmanStrategy, Orientation, PixelLayout as JpegPixelLayout, Quality,
     };
+    pub use zenjpeg::lossless::LosslessTransform;
 }
 
 /// WebP configuration types from zenwebp.

@@ -26,9 +26,13 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
 
 /// Convert zenjpeg's `JpegInfo` to zencodec-types `ImageInfo`.
 fn jpeg_info_to_image_info(info: &zenjpeg::decoder::JpegInfo) -> ImageInfo {
-    let mut ii = ImageInfo::new(info.dimensions.width, info.dimensions.height, ImageFormat::Jpeg)
-        .with_bit_depth(info.precision)
-        .with_channel_count(info.num_components);
+    let mut ii = ImageInfo::new(
+        info.dimensions.width,
+        info.dimensions.height,
+        ImageFormat::Jpeg,
+    )
+    .with_bit_depth(info.precision)
+    .with_channel_count(info.num_components);
     if let Some(ref icc) = info.icc_profile {
         ii = ii.with_icc_profile(icc.clone());
     }

@@ -310,59 +310,59 @@ impl<'a> Pipeline<'a> {
         let is_grayscale = decoded.pixels().is_grayscale();
 
         // 5. Compute layout if needed
-        let (output_width, output_height, layout_plan) = if let Some(ref constraint) = self.constraint
-        {
-            let source_w = decoded.width();
-            let source_h = decoded.height();
+        let (output_width, output_height, layout_plan) =
+            if let Some(ref constraint) = self.constraint {
+                let source_w = decoded.width();
+                let source_h = decoded.height();
 
-            let mut pipeline = zenresize::Pipeline::new(source_w, source_h);
+                let mut pipeline = zenresize::Pipeline::new(source_w, source_h);
 
-            if self.auto_orient && !orientation.is_identity() {
+                if self.auto_orient && !orientation.is_identity() {
+                    pipeline = pipeline.auto_orient(orientation.exif_value() as u8);
+                }
+
+                pipeline = match constraint {
+                    LayoutConstraint::Fit(w, h) => pipeline.fit(*w, *h),
+                    LayoutConstraint::Within(w, h) => pipeline.within(*w, *h),
+                    LayoutConstraint::FitCrop(w, h) => pipeline.fit_crop(*w, *h),
+                    LayoutConstraint::FitPad(w, h, color) => pipeline.constrain(
+                        zenresize::Constraint::new(zenresize::ConstraintMode::FitPad, *w, *h)
+                            .canvas_color(*color),
+                    ),
+                };
+
+                let (ideal, decoder_request) = pipeline
+                    .plan()
+                    .map_err(|e| CodecError::InvalidInput(alloc::format!("layout error: {e}")))?;
+
+                // Full decode (no decoder-level crop/resize)
+                let offer = zenresize::DecoderOffer::full_decode(source_w, source_h);
+                let plan = ideal.finalize(&decoder_request, &offer);
+
+                let out_w = plan.canvas.width;
+                let out_h = plan.canvas.height;
+                (out_w, out_h, Some(plan))
+            } else if self.auto_orient && !orientation.is_identity() {
+                // No resize but need orientation
+                let source_w = decoded.width();
+                let source_h = decoded.height();
+
+                let mut pipeline = zenresize::Pipeline::new(source_w, source_h);
                 pipeline = pipeline.auto_orient(orientation.exif_value() as u8);
-            }
 
-            pipeline = match constraint {
-                LayoutConstraint::Fit(w, h) => pipeline.fit(*w, *h),
-                LayoutConstraint::Within(w, h) => pipeline.within(*w, *h),
-                LayoutConstraint::FitCrop(w, h) => pipeline.fit_crop(*w, *h),
-                LayoutConstraint::FitPad(w, h, color) => pipeline.constrain(
-                    zenresize::Constraint::new(zenresize::ConstraintMode::FitPad, *w, *h)
-                        .canvas_color(*color),
-                ),
+                let (ideal, decoder_request) = pipeline
+                    .plan()
+                    .map_err(|e| CodecError::InvalidInput(alloc::format!("layout error: {e}")))?;
+
+                let offer = zenresize::DecoderOffer::full_decode(source_w, source_h);
+                let plan = ideal.finalize(&decoder_request, &offer);
+
+                let out_w = plan.canvas.width;
+                let out_h = plan.canvas.height;
+                (out_w, out_h, Some(plan))
+            } else {
+                (decoded.width(), decoded.height(), None)
             };
-
-            let (ideal, decoder_request) = pipeline
-                .plan()
-                .map_err(|e| CodecError::InvalidInput(alloc::format!("layout error: {e}")))?;
-
-            // Full decode (no decoder-level crop/resize)
-            let offer = zenresize::DecoderOffer::full_decode(source_w, source_h);
-            let plan = ideal.finalize(&decoder_request, &offer);
-
-            let out_w = plan.canvas.width;
-            let out_h = plan.canvas.height;
-            (out_w, out_h, Some(plan))
-        } else if self.auto_orient && !orientation.is_identity() {
-            // No resize but need orientation
-            let source_w = decoded.width();
-            let source_h = decoded.height();
-
-            let mut pipeline = zenresize::Pipeline::new(source_w, source_h);
-            pipeline = pipeline.auto_orient(orientation.exif_value() as u8);
-
-            let (ideal, decoder_request) = pipeline
-                .plan()
-                .map_err(|e| CodecError::InvalidInput(alloc::format!("layout error: {e}")))?;
-
-            let offer = zenresize::DecoderOffer::full_decode(source_w, source_h);
-            let plan = ideal.finalize(&decoder_request, &offer);
-
-            let out_w = plan.canvas.width;
-            let out_h = plan.canvas.height;
-            (out_w, out_h, Some(plan))
-        } else {
-            (decoded.width(), decoded.height(), None)
-        };
 
         // 6. Extract owned metadata before consuming decoded
         let owned_meta = self.extract_metadata(&decoded);
@@ -383,8 +383,7 @@ impl<'a> Pipeline<'a> {
                     self.filter,
                 );
                 // Zero-copy: reinterpret Vec<u8> as Vec<Gray<u8>> (same layout)
-                let gray_pixels: Vec<rgb::Gray<u8>> =
-                    bytemuck::allocation::cast_vec(result);
+                let gray_pixels: Vec<rgb::Gray<u8>> = bytemuck::allocation::cast_vec(result);
                 imgref::ImgVec::new(gray_pixels, output_width as usize, output_height as usize)
             } else {
                 decoded.into_gray8()
@@ -392,11 +391,7 @@ impl<'a> Pipeline<'a> {
 
             // Encode
             let metadata = owned_meta.as_metadata();
-            let encode_output = self.encode_gray8(
-                resized.as_ref(),
-                target_format,
-                &metadata,
-            )?;
+            let encode_output = self.encode_gray8(resized.as_ref(), target_format, &metadata)?;
 
             Ok(PipelineOutput {
                 bytes: encode_output.into_vec(),
@@ -421,8 +416,7 @@ impl<'a> Pipeline<'a> {
                     self.filter,
                 );
                 // Zero-copy: reinterpret Vec<u8> as Vec<Rgba<u8>> (same layout)
-                let rgba_pixels: Vec<rgb::Rgba<u8>> =
-                    bytemuck::allocation::cast_vec(result);
+                let rgba_pixels: Vec<rgb::Rgba<u8>> = bytemuck::allocation::cast_vec(result);
                 imgref::ImgVec::new(rgba_pixels, output_width as usize, output_height as usize)
             } else {
                 decoded.into_rgba8()
@@ -430,11 +424,7 @@ impl<'a> Pipeline<'a> {
 
             // Encode
             let metadata = owned_meta.as_metadata();
-            let encode_output = self.encode_rgba8(
-                resized.as_ref(),
-                target_format,
-                &metadata,
-            )?;
+            let encode_output = self.encode_rgba8(resized.as_ref(), target_format, &metadata)?;
 
             Ok(PipelineOutput {
                 bytes: encode_output.into_vec(),
@@ -459,8 +449,7 @@ impl<'a> Pipeline<'a> {
                     self.filter,
                 );
                 // Zero-copy: reinterpret Vec<u8> as Vec<Rgb<u8>> (same layout)
-                let rgb_pixels: Vec<rgb::Rgb<u8>> =
-                    bytemuck::allocation::cast_vec(result);
+                let rgb_pixels: Vec<rgb::Rgb<u8>> = bytemuck::allocation::cast_vec(result);
                 imgref::ImgVec::new(rgb_pixels, output_width as usize, output_height as usize)
             } else {
                 decoded.into_rgb8()
@@ -468,11 +457,7 @@ impl<'a> Pipeline<'a> {
 
             // Encode
             let metadata = owned_meta.as_metadata();
-            let encode_output = self.encode_rgb8(
-                resized.as_ref(),
-                target_format,
-                &metadata,
-            )?;
+            let encode_output = self.encode_rgb8(resized.as_ref(), target_format, &metadata)?;
 
             Ok(PipelineOutput {
                 bytes: encode_output.into_vec(),
@@ -597,7 +582,10 @@ mod tests {
 
         assert_eq!(pipeline.input_format, Some(ImageFormat::Jpeg));
         assert_eq!(pipeline.output_format, Some(ImageFormat::WebP));
-        assert!(matches!(pipeline.constraint, Some(LayoutConstraint::Fit(800, 600))));
+        assert!(matches!(
+            pipeline.constraint,
+            Some(LayoutConstraint::Fit(800, 600))
+        ));
         assert!(!pipeline.auto_orient);
         assert!(matches!(pipeline.quality, QualityPreset::HighQuality));
         assert_eq!(pipeline.metadata_policy, MetadataPolicy::Strip);
