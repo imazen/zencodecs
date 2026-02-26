@@ -10,7 +10,10 @@ use crate::{
     CodecError, DecodeJob, DecodeOutput, DecoderConfig, EncodeJob, EncodeOutput, EncoderConfig,
     ImageFormat, ImageInfo, Limits, MetadataView, PixelData, Stop,
 };
-use zencodec_types::{Decoder, Encoder, PixelSlice, PixelSliceMut};
+use zencodec_types::{
+    Decode, EncodeGray8, EncodeGrayF32, EncodeRgb8, EncodeRgbF32, EncodeRgba8, EncodeRgbaF32,
+    PixelSlice, PixelSliceMut,
+};
 
 /// Probe JPEG metadata without decoding pixels.
 ///
@@ -169,6 +172,7 @@ pub(crate) fn decode_into_rgb8(
         job = job.with_stop(s);
     }
     job.decoder()
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
         .decode_into(data, PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
@@ -190,6 +194,7 @@ pub(crate) fn decode_into_rgba8(
         job = job.with_stop(s);
     }
     job.decoder()
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
         .decode_into(data, PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
@@ -211,6 +216,7 @@ pub(crate) fn decode_into_gray8(
         job = job.with_stop(s);
     }
     job.decoder()
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
         .decode_into(data, PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
@@ -251,7 +257,8 @@ pub(crate) fn encode_rgb8(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
+        .encode_rgb8(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -276,7 +283,8 @@ pub(crate) fn encode_rgba8(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
+        .encode_rgba8(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -385,7 +393,8 @@ pub(crate) fn encode_gray8(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
+        .encode_gray8(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -410,7 +419,8 @@ pub(crate) fn encode_rgb_f32(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
+        .encode_rgb_f32(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -435,7 +445,8 @@ pub(crate) fn encode_rgba_f32(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
+        .encode_rgba_f32(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
@@ -460,7 +471,8 @@ pub(crate) fn encode_gray_f32(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
+        .encode_gray_f32(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 

@@ -5,7 +5,7 @@ use crate::limits::to_resource_limits;
 use crate::{
     CodecError, DecodeJob, DecodeOutput, DecoderConfig, ImageFormat, ImageInfo, Limits, Stop,
 };
-use zencodec_types::Decoder;
+use zencodec_types::Decode;
 
 /// Probe AVIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -35,6 +35,7 @@ pub(crate) fn decode(
         job = job.with_stop(s);
     }
     job.decoder()
-        .decode(data)
+        .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))?
+        .decode(data, &[])
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }

@@ -6,7 +6,9 @@ use crate::pixel::{Bgra, ImgRef, Rgb, Rgba};
 use crate::{
     CodecError, EncodeJob, EncodeOutput, EncoderConfig, ImageFormat, Limits, MetadataView, Stop,
 };
-use zencodec_types::{Encoder, PixelSlice};
+use zencodec_types::{
+    EncodeGray8, EncodeGrayF32, EncodeRgb8, EncodeRgbF32, EncodeRgba8, EncodeRgbaF32, PixelSlice,
+};
 
 /// Map 0-100 quality percentage to butteraugli distance.
 fn percent_to_distance(quality: f32) -> f32 {
@@ -47,7 +49,8 @@ pub(crate) fn encode_rgb8(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?
+        .encode_rgb8(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -72,7 +75,8 @@ pub(crate) fn encode_rgba8(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?
+        .encode_rgba8(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -97,7 +101,8 @@ pub(crate) fn encode_gray8(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?
+        .encode_gray8(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -122,7 +127,8 @@ pub(crate) fn encode_rgb_f32(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?
+        .encode_rgb_f32(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -147,7 +153,8 @@ pub(crate) fn encode_rgba_f32(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?
+        .encode_rgba_f32(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -172,7 +179,8 @@ pub(crate) fn encode_gray_f32(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?
+        .encode_gray_f32(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 

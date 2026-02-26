@@ -34,10 +34,11 @@ pub enum CodecError {
     /// Color management error.
     #[cfg(feature = "moxcms")]
     ColorManagement(String),
-    /// Underlying codec error.
+    /// Underlying codec error with caller location.
     Codec {
         format: ImageFormat,
         source: Box<dyn core::error::Error + Send + Sync>,
+        caller: &'static core::panic::Location<'static>,
     },
 }
 
@@ -67,8 +68,12 @@ impl fmt::Display for CodecError {
             }
             #[cfg(feature = "moxcms")]
             CodecError::ColorManagement(msg) => write!(f, "color management error: {}", msg),
-            CodecError::Codec { format, source } => {
-                write!(f, "codec error ({:?}): {}", format, source)
+            CodecError::Codec {
+                format,
+                source,
+                caller,
+            } => {
+                write!(f, "codec error ({:?}) at {}: {}", format, caller, source)
             }
         }
     }
@@ -85,7 +90,8 @@ impl core::error::Error for CodecError {
 
 // Conversion helpers for codec-specific errors
 impl CodecError {
-    /// Wrap a codec-specific error.
+    /// Wrap a codec-specific error, capturing the caller's location.
+    #[track_caller]
     pub fn from_codec<E>(format: ImageFormat, error: E) -> Self
     where
         E: core::error::Error + Send + Sync + 'static,
@@ -93,6 +99,7 @@ impl CodecError {
         CodecError::Codec {
             format,
             source: Box::new(error),
+            caller: core::panic::Location::caller(),
         }
     }
 }

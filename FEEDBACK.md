@@ -6,3 +6,4 @@
 
 ## 2026-02-08: Implement HDR/color capabilities in ravif
 User requested implementing the plan to expose HDR and wide gamut capabilities through ravif's builder API.
+- 2026-02-25: User requested research on rgb, palette, and image crate pixel/color type abstractions for Pixel trait design.

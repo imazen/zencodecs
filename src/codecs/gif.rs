@@ -11,7 +11,7 @@ use crate::{
     CodecError, DecodeOutput, DecoderConfig, EncodeJob, EncodeOutput, EncoderConfig, ImageFormat,
     ImageInfo, Limits, PixelData, Stop,
 };
-use zencodec_types::{Encoder, PixelSlice};
+use zencodec_types::{EncodeGray8, EncodeGrayF32, EncodeRgbF32, EncodeRgbaF32, PixelSlice};
 
 /// Create a default GIF encoder config with the best available quantizer.
 fn default_encoder_config() -> zengif::EncoderConfig {
@@ -204,7 +204,8 @@ pub(crate) fn encode_gray8(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?
+        .encode_gray8(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
 
@@ -224,7 +225,8 @@ pub(crate) fn encode_rgb_f32(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?
+        .encode_rgb_f32(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
 
@@ -244,7 +246,8 @@ pub(crate) fn encode_rgba_f32(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?
+        .encode_rgba_f32(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
 
@@ -264,6 +267,7 @@ pub(crate) fn encode_gray_f32(
         job = job.with_stop(s);
     }
     job.encoder()
-        .encode(PixelSlice::from(img))
+        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?
+        .encode_gray_f32(PixelSlice::from(img))
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
