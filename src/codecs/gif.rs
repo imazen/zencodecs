@@ -87,7 +87,7 @@ pub(crate) fn decode(
         frame_count += 1;
     }
 
-    Ok(DecodeOutput::new(
+    Ok(DecodeOutput::from_pixel_data(
         PixelData::Rgba8(img),
         ImageInfo::new(width as u32, height as u32, ImageFormat::Gif)
             .with_alpha(true)

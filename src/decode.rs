@@ -112,7 +112,7 @@ impl<'a> DecodeRequest<'a> {
                 let info = output.info().clone();
                 let src = output.into_rgb8();
                 let mut dst = dst;
-                for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+                for (src_row, dst_row) in src.as_imgref().rows().zip(dst.rows_mut()) {
                     let n = src_row.len().min(dst_row.len());
                     dst_row[..n].copy_from_slice(&src_row[..n]);
                 }
@@ -169,7 +169,7 @@ impl<'a> DecodeRequest<'a> {
                 let info = output.info().clone();
                 let src = output.into_rgba8();
                 let mut dst = dst;
-                for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+                for (src_row, dst_row) in src.as_imgref().rows().zip(dst.rows_mut()) {
                     let n = src_row.len().min(dst_row.len());
                     dst_row[..n].copy_from_slice(&src_row[..n]);
                 }
@@ -218,7 +218,7 @@ impl<'a> DecodeRequest<'a> {
                 let info = output.info().clone();
                 let src = output.into_gray8();
                 let mut dst = dst;
-                for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+                for (src_row, dst_row) in src.as_imgref().rows().zip(dst.rows_mut()) {
                     let n = src_row.len().min(dst_row.len());
                     dst_row[..n].copy_from_slice(&src_row[..n]);
                 }
@@ -256,7 +256,7 @@ impl<'a> DecodeRequest<'a> {
         let info = output.info().clone();
         let src = output.into_bgra8();
         let mut dst = dst;
-        for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+        for (src_row, dst_row) in src.as_imgref().rows().zip(dst.rows_mut()) {
             let n = src_row.len().min(dst_row.len());
             dst_row[..n].copy_from_slice(&src_row[..n]);
         }
@@ -292,7 +292,7 @@ impl<'a> DecodeRequest<'a> {
         let info = output.info().clone();
         let src = output.into_rgb8();
         let mut dst = dst;
-        for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+        for (src_row, dst_row) in src.as_imgref().rows().zip(dst.rows_mut()) {
             for (s, d) in src_row.iter().zip(dst_row.iter_mut()) {
                 *d = zencodec_types::Bgra {
                     b: s.b,
@@ -336,7 +336,7 @@ impl<'a> DecodeRequest<'a> {
         let info = output.info().clone();
         let src = output.into_rgb8();
         let mut dst = dst;
-        for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+        for (src_row, dst_row) in src.as_imgref().rows().zip(dst.rows_mut()) {
             for (s, d) in src_row.iter().zip(dst_row.iter_mut()) {
                 *d = zencodec_types::Rgb {
                     r: srgb_u8_to_linear(s.r),
@@ -379,7 +379,7 @@ impl<'a> DecodeRequest<'a> {
         let info = output.info().clone();
         let src = output.into_rgba8();
         let mut dst = dst;
-        for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+        for (src_row, dst_row) in src.as_imgref().rows().zip(dst.rows_mut()) {
             for (s, d) in src_row.iter().zip(dst_row.iter_mut()) {
                 *d = zencodec_types::Rgba {
                     r: srgb_u8_to_linear(s.r),
@@ -423,7 +423,7 @@ impl<'a> DecodeRequest<'a> {
         let info = output.info().clone();
         let src = output.into_gray8();
         let mut dst = dst;
-        for (src_row, dst_row) in src.as_ref().rows().zip(dst.rows_mut()) {
+        for (src_row, dst_row) in src.as_imgref().rows().zip(dst.rows_mut()) {
             for (s, d) in src_row.iter().zip(dst_row.iter_mut()) {
                 *d = zencodec_types::Gray::new(srgb_u8_to_linear(s.value()));
             }

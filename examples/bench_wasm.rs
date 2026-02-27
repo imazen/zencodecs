@@ -46,7 +46,7 @@ fn bench_image(path: &str) {
     println!("  {w}x{h} ({mpx:.1} MP) {:?}", decoded.format());
 
     let rgb = decoded.into_pixels().to_rgb8();
-    let img = rgb.as_ref();
+    let img = rgb.as_imgref();
 
     // Encode to each format
     for (name, format) in [

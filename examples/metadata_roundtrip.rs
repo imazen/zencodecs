@@ -46,7 +46,7 @@ fn main() {
 
     // Convert to RGB8 for encoding
     let rgb8 = decoded.pixels().to_rgb8();
-    let img = rgb8.as_ref();
+    let img = rgb8.as_imgref();
 
     // Re-encode to each format that supports metadata
     let formats = [

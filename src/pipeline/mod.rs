@@ -371,7 +371,7 @@ impl<'a> Pipeline<'a> {
             // Gray path
             let resized = if let Some(ref plan) = layout_plan {
                 let source = decoded.into_gray8();
-                let (buf, w, h) = source.as_ref().to_contiguous_buf();
+                let (buf, w, h) = source.as_imgref().to_contiguous_buf();
                 // Zero-copy: Gray<u8> is repr(C) with a single u8, as_bytes is no-op
                 let bytes: &[u8] = rgb::ComponentBytes::as_bytes(&*buf);
                 let result = zenresize::execute_layout(
@@ -384,14 +384,20 @@ impl<'a> Pipeline<'a> {
                 );
                 // Zero-copy: reinterpret Vec<u8> as Vec<Gray<u8>> (same layout)
                 let gray_pixels: Vec<rgb::Gray<u8>> = bytemuck::allocation::cast_vec(result);
-                imgref::ImgVec::new(gray_pixels, output_width as usize, output_height as usize)
+                zencodec_types::PixelBuffer::from_pixels(
+                    gray_pixels,
+                    output_width,
+                    output_height,
+                )
+                .expect("resize output size mismatch")
             } else {
                 decoded.into_gray8()
             };
 
             // Encode
             let metadata = owned_meta.as_metadata();
-            let encode_output = self.encode_gray8(resized.as_ref(), target_format, &metadata)?;
+            let encode_output =
+                self.encode_gray8(resized.as_imgref(), target_format, &metadata)?;
 
             Ok(PipelineOutput {
                 bytes: encode_output.into_vec(),
@@ -404,7 +410,7 @@ impl<'a> Pipeline<'a> {
             // RGBA path
             let resized = if let Some(ref plan) = layout_plan {
                 let source = decoded.into_rgba8();
-                let (buf, w, h) = source.as_ref().to_contiguous_buf();
+                let (buf, w, h) = source.as_imgref().to_contiguous_buf();
                 // Zero-copy: Rgba<u8> is repr(C) [r,g,b,a], as_bytes is no-op
                 let bytes: &[u8] = rgb::ComponentBytes::as_bytes(&*buf);
                 let result = zenresize::execute_layout(
@@ -417,14 +423,20 @@ impl<'a> Pipeline<'a> {
                 );
                 // Zero-copy: reinterpret Vec<u8> as Vec<Rgba<u8>> (same layout)
                 let rgba_pixels: Vec<rgb::Rgba<u8>> = bytemuck::allocation::cast_vec(result);
-                imgref::ImgVec::new(rgba_pixels, output_width as usize, output_height as usize)
+                zencodec_types::PixelBuffer::from_pixels(
+                    rgba_pixels,
+                    output_width,
+                    output_height,
+                )
+                .expect("resize output size mismatch")
             } else {
                 decoded.into_rgba8()
             };
 
             // Encode
             let metadata = owned_meta.as_metadata();
-            let encode_output = self.encode_rgba8(resized.as_ref(), target_format, &metadata)?;
+            let encode_output =
+                self.encode_rgba8(resized.as_imgref(), target_format, &metadata)?;
 
             Ok(PipelineOutput {
                 bytes: encode_output.into_vec(),
@@ -437,7 +449,7 @@ impl<'a> Pipeline<'a> {
             // RGB path
             let resized = if let Some(ref plan) = layout_plan {
                 let source = decoded.into_rgb8();
-                let (buf, w, h) = source.as_ref().to_contiguous_buf();
+                let (buf, w, h) = source.as_imgref().to_contiguous_buf();
                 // Zero-copy: Rgb<u8> is repr(C) [r,g,b], as_bytes is no-op
                 let bytes: &[u8] = rgb::ComponentBytes::as_bytes(&*buf);
                 let result = zenresize::execute_layout(
@@ -450,14 +462,20 @@ impl<'a> Pipeline<'a> {
                 );
                 // Zero-copy: reinterpret Vec<u8> as Vec<Rgb<u8>> (same layout)
                 let rgb_pixels: Vec<rgb::Rgb<u8>> = bytemuck::allocation::cast_vec(result);
-                imgref::ImgVec::new(rgb_pixels, output_width as usize, output_height as usize)
+                zencodec_types::PixelBuffer::from_pixels(
+                    rgb_pixels,
+                    output_width,
+                    output_height,
+                )
+                .expect("resize output size mismatch")
             } else {
                 decoded.into_rgb8()
             };
 
             // Encode
             let metadata = owned_meta.as_metadata();
-            let encode_output = self.encode_rgb8(resized.as_ref(), target_format, &metadata)?;
+            let encode_output =
+                self.encode_rgb8(resized.as_imgref(), target_format, &metadata)?;
 
             Ok(PipelineOutput {
                 bytes: encode_output.into_vec(),

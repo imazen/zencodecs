@@ -232,13 +232,13 @@ fn process_inner(
     // Encode based on pixel type
     let encoded = if has_alpha {
         let pixels = decoded.into_rgba8();
-        encode_req.encode_rgba8(pixels.as_ref())
+        encode_req.encode_rgba8(pixels.as_imgref())
     } else if decoded.pixels().is_grayscale() {
         let pixels = decoded.into_gray8();
-        encode_req.encode_gray8(pixels.as_ref())
+        encode_req.encode_gray8(pixels.as_imgref())
     } else {
         let pixels = decoded.into_rgb8();
-        encode_req.encode_rgb8(pixels.as_ref())
+        encode_req.encode_rgb8(pixels.as_imgref())
     }
     .with_context(|| format!("encoding {} as {:?}", input.display(), target_format))?;
 

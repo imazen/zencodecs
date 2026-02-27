@@ -137,7 +137,7 @@ pub(crate) fn decode(
         ii = ii.with_xmp(xmp);
     }
 
-    let mut output = DecodeOutput::new(PixelData::Rgb8(img), ii);
+    let mut output = DecodeOutput::from_pixel_data(PixelData::Rgb8(img), ii);
     if let Some(extras) = jpeg_extras {
         output = output.with_extras(extras);
     }

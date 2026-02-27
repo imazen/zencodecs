@@ -30,7 +30,7 @@ fn main() {
 
     let meta = decoded.metadata();
     let rgb8 = decoded.pixels().to_rgb8();
-    let img = rgb8.as_ref();
+    let img = rgb8.as_imgref();
 
     // Chain: JPEG → WebP → PNG → JPEG
     let chain = [
@@ -74,7 +74,7 @@ fn main() {
 
         let step_meta = step.metadata();
         let step_rgb8 = step.pixels().to_rgb8();
-        let step_img = step_rgb8.as_ref();
+        let step_img = step_rgb8.as_imgref();
 
         let encoded = EncodeRequest::new(format)
             .with_quality(95.0)

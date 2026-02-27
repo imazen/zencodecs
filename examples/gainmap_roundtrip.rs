@@ -110,7 +110,7 @@ fn main() {
     let config = CodecConfig::default().with_jpeg_encoder(encoder_config);
 
     let rgb8 = decoded.into_pixels().to_rgb8();
-    let img = rgb8.as_ref();
+    let img = rgb8.as_imgref();
 
     let re_encoded = EncodeRequest::new(ImageFormat::Jpeg)
         .with_codec_config(&config)

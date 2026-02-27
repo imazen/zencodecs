@@ -32,7 +32,7 @@ fn main() {
     );
 
     let rgb8 = decoded.pixels().to_rgb8();
-    let img = rgb8.as_ref();
+    let img = rgb8.as_imgref();
 
     for (name, format) in [
         ("JPEG", ImageFormat::Jpeg),
