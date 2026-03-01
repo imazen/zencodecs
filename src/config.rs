@@ -26,17 +26,27 @@ pub mod jpeg {
     #[cfg(feature = "jpeg-ultrahdr")]
     pub mod ultrahdr {
         pub use zenjpeg::ultrahdr::{
-            // Core workflow functions
-            UltraHdrExtras, create_hdr_reconstructor, encode_ultrahdr,
-            encode_ultrahdr_with_tonemapper, encode_with_gainmap,
-            // Gain map types
-            GainMap, GainMapMetadata, GainMapConfig,
-            // Color types
-            UhdrColorGamut, UhdrColorTransfer, UhdrPixelFormat, UhdrRawImage,
             // Tonemapping
-            AdaptiveTonemapper, ToneMapConfig,
+            AdaptiveTonemapper,
+            // Gain map types
+            GainMap,
+            GainMapConfig,
+            GainMapMetadata,
             // Streaming
-            RowDecoder, RowEncoder,
+            RowDecoder,
+            RowEncoder,
+            ToneMapConfig,
+            // Color types
+            UhdrColorGamut,
+            UhdrColorTransfer,
+            UhdrPixelFormat,
+            UhdrRawImage,
+            // Core workflow functions
+            UltraHdrExtras,
+            create_hdr_reconstructor,
+            encode_ultrahdr,
+            encode_ultrahdr_with_tonemapper,
+            encode_with_gainmap,
         };
     }
 }

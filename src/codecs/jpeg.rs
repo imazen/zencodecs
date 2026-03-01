@@ -10,11 +10,11 @@ use crate::{
     CodecError, DecodeJob, DecodeOutput, DecoderConfig, EncodeJob, EncodeOutput, EncoderConfig,
     ImageFormat, ImageInfo, Limits, MetadataView, Stop,
 };
-use zencodec_types::{PixelBuffer, PixelDescriptor};
 use zencodec_types::{
-    EncodeGray8, EncodeGrayF32, EncodeRgb8, EncodeRgbF32, EncodeRgba8, EncodeRgbaF32,
-    PixelSlice, PixelSliceMut,
+    EncodeGray8, EncodeGrayF32, EncodeRgb8, EncodeRgbF32, EncodeRgba8, EncodeRgbaF32, PixelSlice,
+    PixelSliceMut,
 };
+use zencodec_types::{PixelBuffer, PixelDescriptor};
 
 /// Probe JPEG metadata without decoding pixels.
 ///
@@ -572,8 +572,7 @@ pub(crate) fn decode_hdr(
     }
 
     let img = imgref::ImgVec::new(hdr_pixels, width as usize, height as usize);
-    let buf = PixelBuffer::from_imgvec(img)
-        .with_descriptor(PixelDescriptor::RGBAF32_LINEAR);
+    let buf = PixelBuffer::from_imgvec(img).with_descriptor(PixelDescriptor::RGBAF32_LINEAR);
 
     let mut ii = ImageInfo::new(width, height, ImageFormat::Jpeg)
         .with_frame_count(1)
@@ -616,8 +615,8 @@ pub(crate) fn encode_ultrahdr_rgb_f32(
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
     use zenjpeg::ultrahdr::{
-        GainMapConfig, ToneMapConfig, UhdrColorGamut, UhdrColorTransfer,
-        UhdrPixelFormat, UhdrRawImage, encode_ultrahdr,
+        GainMapConfig, ToneMapConfig, UhdrColorGamut, UhdrColorTransfer, UhdrPixelFormat,
+        UhdrRawImage, encode_ultrahdr,
     };
 
     let stop_token = crate::limits::stop_or_default(stop);
@@ -676,8 +675,8 @@ pub(crate) fn encode_ultrahdr_rgba_f32(
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
     use zenjpeg::ultrahdr::{
-        GainMapConfig, ToneMapConfig, UhdrColorGamut, UhdrColorTransfer,
-        UhdrPixelFormat, UhdrRawImage, encode_ultrahdr,
+        GainMapConfig, ToneMapConfig, UhdrColorGamut, UhdrColorTransfer, UhdrPixelFormat,
+        UhdrRawImage, encode_ultrahdr,
     };
 
     let stop_token = crate::limits::stop_or_default(stop);

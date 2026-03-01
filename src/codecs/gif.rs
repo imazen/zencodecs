@@ -8,11 +8,11 @@ extern crate std;
 use crate::config::CodecConfig;
 use crate::pixel::{Gray, ImgRef, ImgVec, Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, EncodeJob, EncodeOutput, EncoderConfig, ImageFormat,
-    ImageInfo, Limits, Stop,
+    CodecError, DecodeOutput, EncodeJob, EncodeOutput, EncoderConfig, ImageFormat, ImageInfo,
+    Limits, Stop,
 };
-use zencodec_types::{PixelBuffer, PixelDescriptor};
 use zencodec_types::{EncodeGray8, EncodeGrayF32, EncodeRgbF32, EncodeRgbaF32, PixelSlice};
+use zencodec_types::{PixelBuffer, PixelDescriptor};
 
 /// Create a default GIF encoder config with the best available quantizer.
 fn default_encoder_config() -> zengif::EncoderConfig {
