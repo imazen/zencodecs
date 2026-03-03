@@ -536,7 +536,7 @@ impl DynEncoder for JpegDynEncoder<'_> {
         let h = height as usize;
 
         match descriptor.pixel_format() {
-            Some(zencodec_types::PixelFormat::Rgb8) => {
+            zencodec_types::PixelFormat::Rgb8 => {
                 let pixels: &[Rgb<u8>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 3);
                 encode_rgb8(
@@ -548,7 +548,7 @@ impl DynEncoder for JpegDynEncoder<'_> {
                     self.stop,
                 )
             }
-            Some(zencodec_types::PixelFormat::Rgba8) => {
+            zencodec_types::PixelFormat::Rgba8 => {
                 let pixels: &[Rgba<u8>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 4);
                 encode_rgba8(
@@ -560,7 +560,7 @@ impl DynEncoder for JpegDynEncoder<'_> {
                     self.stop,
                 )
             }
-            Some(zencodec_types::PixelFormat::Bgra8) => {
+            zencodec_types::PixelFormat::Bgra8 => {
                 let pixels: &[Bgra<u8>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 4);
                 // Check descriptor alpha to distinguish BGRA vs BGRX
@@ -584,7 +584,7 @@ impl DynEncoder for JpegDynEncoder<'_> {
                     )
                 }
             }
-            Some(zencodec_types::PixelFormat::Bgrx8) => {
+            zencodec_types::PixelFormat::Bgrx8 => {
                 let pixels: &[Bgra<u8>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 4);
                 encode_bgrx8(
@@ -596,7 +596,7 @@ impl DynEncoder for JpegDynEncoder<'_> {
                     self.stop,
                 )
             }
-            Some(zencodec_types::PixelFormat::Gray8) => {
+            zencodec_types::PixelFormat::Gray8 => {
                 let pixels: &[crate::pixel::Gray<u8>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride);
                 encode_gray8(
@@ -608,7 +608,7 @@ impl DynEncoder for JpegDynEncoder<'_> {
                     self.stop,
                 )
             }
-            Some(zencodec_types::PixelFormat::RgbF32) => {
+            zencodec_types::PixelFormat::RgbF32 => {
                 let pixels: &[Rgb<f32>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 12);
                 encode_rgb_f32(
@@ -620,7 +620,7 @@ impl DynEncoder for JpegDynEncoder<'_> {
                     self.stop,
                 )
             }
-            Some(zencodec_types::PixelFormat::RgbaF32) => {
+            zencodec_types::PixelFormat::RgbaF32 => {
                 let pixels: &[Rgba<f32>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 16);
                 encode_rgba_f32(
@@ -632,7 +632,7 @@ impl DynEncoder for JpegDynEncoder<'_> {
                     self.stop,
                 )
             }
-            Some(zencodec_types::PixelFormat::GrayF32) => {
+            zencodec_types::PixelFormat::GrayF32 => {
                 let pixels: &[crate::pixel::Gray<f32>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 4);
                 encode_gray_f32(

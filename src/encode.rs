@@ -377,7 +377,7 @@ impl<'a> EncodeRequest<'a> {
         // Use zenpixels to negotiate the cheapest pixel format conversion.
         // Returns Cow::Borrowed (zero-copy) when the input already matches
         // one of the encoder's supported formats.
-        let adapted = zenpixels::adapt::adapt_for_encode(
+        let adapted = zenpixels_convert::adapt::adapt_for_encode(
             data,
             descriptor,
             width,
