@@ -8,7 +8,7 @@ use crate::config::CodecConfig;
 use crate::dispatch::EncodeParams;
 use crate::pixel::{Bgra, Gray, ImgRef, Rgb, Rgba};
 use crate::{CodecError, CodecRegistry, ImageFormat, Limits, MetadataView, Stop};
-use zencodec_types::PixelDescriptor;
+use zenpixels::PixelDescriptor;
 
 pub use zencodec_types::EncodeOutput;
 

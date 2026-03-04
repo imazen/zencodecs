@@ -8,8 +8,9 @@ use crate::{
 };
 use alloc::boxed::Box;
 use zencodec_types::{
-    EncodeGray8, EncodeGrayF32, EncodeRgb8, EncodeRgbF32, EncodeRgba8, EncodeRgbaF32, PixelSlice,
+    EncodeGray8, EncodeGrayF32, EncodeRgb8, EncodeRgbF32, EncodeRgba8, EncodeRgbaF32,
 };
+use zenpixels::PixelSlice;
 
 /// Map 0-100 quality percentage to butteraugli distance.
 fn percent_to_distance(quality: f32) -> f32 {
@@ -206,7 +207,7 @@ pub(crate) fn encode_bgra8(
 // ═══════════════════════════════════════════════════════════════════════
 
 use crate::dispatch::{DynEncoder, EncodeParams};
-use zencodec_types::PixelDescriptor;
+use zenpixels::PixelDescriptor;
 
 static JXL_SUPPORTED: &[PixelDescriptor] = &[
     PixelDescriptor::RGB8_SRGB,
@@ -257,7 +258,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
         let h = height as usize;
 
         match descriptor.pixel_format() {
-            zencodec_types::PixelFormat::Rgb8 => {
+            zenpixels::PixelFormat::Rgb8 => {
                 let pixels: &[Rgb<u8>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 3);
                 encode_rgb8(
@@ -269,7 +270,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                     self.stop,
                 )
             }
-            zencodec_types::PixelFormat::Rgba8 => {
+            zenpixels::PixelFormat::Rgba8 => {
                 let pixels: &[Rgba<u8>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 4);
                 encode_rgba8(
@@ -281,7 +282,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                     self.stop,
                 )
             }
-            zencodec_types::PixelFormat::Bgra8 => {
+            zenpixels::PixelFormat::Bgra8 => {
                 let pixels: &[Bgra<u8>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 4);
                 encode_bgra8(
@@ -293,7 +294,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                     self.stop,
                 )
             }
-            zencodec_types::PixelFormat::Gray8 => {
+            zenpixels::PixelFormat::Gray8 => {
                 let pixels: &[crate::pixel::Gray<u8>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride);
                 encode_gray8(
@@ -305,7 +306,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                     self.stop,
                 )
             }
-            zencodec_types::PixelFormat::RgbF32 => {
+            zenpixels::PixelFormat::RgbF32 => {
                 let pixels: &[Rgb<f32>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 12);
                 encode_rgb_f32(
@@ -317,7 +318,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                     self.stop,
                 )
             }
-            zencodec_types::PixelFormat::RgbaF32 => {
+            zenpixels::PixelFormat::RgbaF32 => {
                 let pixels: &[Rgba<f32>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 16);
                 encode_rgba_f32(
@@ -329,7 +330,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                     self.stop,
                 )
             }
-            zencodec_types::PixelFormat::GrayF32 => {
+            zenpixels::PixelFormat::GrayF32 => {
                 let pixels: &[crate::pixel::Gray<f32>] = bytemuck::cast_slice(data);
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 4);
                 encode_gray_f32(

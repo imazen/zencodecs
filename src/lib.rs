@@ -118,6 +118,9 @@ pub type ImageMetadata<'a> = MetadataView<'a>;
 // zencodec-types trait re-exports
 pub use zencodec_types::{DecodeJob, DecoderConfig, EncodeJob, EncoderConfig};
 
+// Pixel conversion extension trait (provides to_rgb8(), to_rgba8(), etc.)
+pub use zencodec_types::PixelBufferConvertExt;
+
 #[cfg(feature = "png")]
 pub use zenpng::{PngDecodeJob, PngDecoderConfig, PngEncodeJob, PngEncoderConfig};
 

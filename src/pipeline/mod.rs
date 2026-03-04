@@ -27,7 +27,7 @@ mod quality;
 use alloc::vec::Vec;
 
 use zencodec_types::ImageFormat;
-use zenresize::{Filter, PixelFormat, PixelLayout};
+use zenresize::{Filter, PixelDescriptor};
 
 use crate::config::CodecConfig;
 use crate::{CodecError, CodecRegistry, Limits, Stop};
@@ -307,7 +307,7 @@ impl<'a> Pipeline<'a> {
 
         // 4. Determine working pixel format based on source
         let has_alpha = decoded.has_alpha();
-        let is_grayscale = decoded.pixels().is_grayscale();
+        let is_grayscale = decoded.descriptor().is_grayscale();
 
         // 5. Compute layout if needed
         let (output_width, output_height, layout_plan) =
@@ -379,12 +379,12 @@ impl<'a> Pipeline<'a> {
                     w as u32,
                     h as u32,
                     plan,
-                    PixelFormat::Srgb8(PixelLayout::Gray),
+                    PixelDescriptor::GRAY8_SRGB,
                     self.filter,
                 );
                 // Zero-copy: reinterpret Vec<u8> as Vec<Gray<u8>> (same layout)
                 let gray_pixels: Vec<rgb::Gray<u8>> = bytemuck::allocation::cast_vec(result);
-                zencodec_types::PixelBuffer::from_pixels(gray_pixels, output_width, output_height)
+                zenpixels::PixelBuffer::from_pixels(gray_pixels, output_width, output_height)
                     .expect("resize output size mismatch")
             } else {
                 decoded.into_gray8()
@@ -413,12 +413,12 @@ impl<'a> Pipeline<'a> {
                     w as u32,
                     h as u32,
                     plan,
-                    PixelFormat::Srgb8(PixelLayout::Rgba),
+                    PixelDescriptor::RGBA8_SRGB,
                     self.filter,
                 );
                 // Zero-copy: reinterpret Vec<u8> as Vec<Rgba<u8>> (same layout)
                 let rgba_pixels: Vec<rgb::Rgba<u8>> = bytemuck::allocation::cast_vec(result);
-                zencodec_types::PixelBuffer::from_pixels(rgba_pixels, output_width, output_height)
+                zenpixels::PixelBuffer::from_pixels(rgba_pixels, output_width, output_height)
                     .expect("resize output size mismatch")
             } else {
                 decoded.into_rgba8()
@@ -447,12 +447,12 @@ impl<'a> Pipeline<'a> {
                     w as u32,
                     h as u32,
                     plan,
-                    PixelFormat::Srgb8(PixelLayout::Rgb),
+                    PixelDescriptor::RGB8_SRGB,
                     self.filter,
                 );
                 // Zero-copy: reinterpret Vec<u8> as Vec<Rgb<u8>> (same layout)
                 let rgb_pixels: Vec<rgb::Rgb<u8>> = bytemuck::allocation::cast_vec(result);
-                zencodec_types::PixelBuffer::from_pixels(rgb_pixels, output_width, output_height)
+                zenpixels::PixelBuffer::from_pixels(rgb_pixels, output_width, output_height)
                     .expect("resize output size mismatch")
             } else {
                 decoded.into_rgb8()

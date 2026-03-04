@@ -7,7 +7,7 @@
 //!          `wasmtime --dir /path target/.../bench_wasm.wasm -- <image_paths...>`
 
 use std::time::Instant;
-use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat};
+use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat, PixelBufferConvertExt as _};
 
 const ITERS: u32 = 3;
 

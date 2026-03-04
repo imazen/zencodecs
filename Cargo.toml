@@ -18,7 +18,7 @@ rgb = { version = "0.8", default-features = false, features = ["as-bytes"] }
 imgref = "1.12"
 bytemuck = { version = "1.25", default-features = false, features = ["extern_crate_alloc"] }
 zencodec-types = { path = "../zencodec-types" }
-zenpixels = { path = "../zenpixels", default-features = false }
+zenpixels = { path = "../zenpixels", default-features = false, features = ["buffer"] }
 zenpixels-convert = { path = "../zenpixels/convert", features = ["buffer"] }
 linear-srgb = { version = "0.5.5", default-features = false }
 
@@ -27,10 +27,9 @@ zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder",
 zenwebp = { path = "../zenwebp", optional = true, features = ["zencodec"] }
 zengif = { path = "../zengif", optional = true, features = ["zencodec"] }
 zenavif = { path = "../zenavif", optional = true, features = ["zencodec"] }
-# Deferred from cleanup-phase1 (need DecodeRowSink API update):
-# zenpng = { path = "../zenpng", optional = true }
+zenpng = { path = "../zenpng", optional = true, features = ["zencodec"] }
 zenjxl = { path = "../zenjxl", optional = true, default-features = false, features = ["zencodec"] }
-# heic-decoder = { path = "../heic/heic-decoder-rs", optional = true, default-features = false, features = ["zencodec"] }
+heic-decoder = { path = "../heic-decoder-rs", optional = true, default-features = false, features = ["zencodec"] }
 
 # Pipeline (optional, feature-gated)
 zenresize = { path = "../zenresize", optional = true, default-features = false, features = ["std", "layout"] }
@@ -52,13 +51,12 @@ webp = ["dep:zenwebp"]
 gif = ["dep:zengif"]
 gif-quantizr = ["gif", "zengif/quantizr"]
 gif-imagequant = ["gif", "zengif/imagequant"]
-# Deferred from cleanup-phase1:
-# png = ["dep:zenpng"]
+png = ["dep:zenpng"]
 avif-decode = ["dep:zenavif"]
 avif-encode = ["dep:zenavif", "zenavif/encode"]
 jxl-decode = ["dep:zenjxl", "zenjxl/decode"]
 jxl-encode = ["dep:zenjxl", "zenjxl/encode"]
-# heic-decode = ["dep:heic-decoder"]
+heic-decode = ["dep:heic-decoder"]
 
 # Pipeline
 pipeline = ["dep:zenresize"]
@@ -66,8 +64,8 @@ pipeline = ["dep:zenresize"]
 # Color management
 moxcms = []  # Disabled for now
 
-# All codecs (cleanup-phase1: png deferred)
-all = ["jpeg", "jpeg-ultrahdr", "webp", "gif", "gif-quantizr", "avif-decode", "avif-encode", "jxl-decode", "jxl-encode"]
+# All codecs
+all = ["jpeg", "jpeg-ultrahdr", "webp", "gif", "gif-quantizr", "png", "avif-decode", "avif-encode", "jxl-decode", "jxl-encode", "heic-decode"]
 
 [[example]]
 name = "metadata_roundtrip"

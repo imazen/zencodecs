@@ -10,7 +10,8 @@
 use crate::config::CodecConfig;
 use crate::{CodecError, ImageFormat, Limits, MetadataView, Stop};
 use alloc::boxed::Box;
-use zencodec_types::{EncodeOutput, PixelDescriptor};
+use zencodec_types::EncodeOutput;
+use zenpixels::PixelDescriptor;
 
 /// Encoding parameters extracted from [`EncodeRequest`](crate::EncodeRequest).
 pub(crate) struct EncodeParams<'a> {

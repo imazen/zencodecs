@@ -9,7 +9,7 @@
 
 use zencodecs::config::CodecConfig;
 use zencodecs::config::jpeg::{ChromaSubsampling, DecodedExtras, EncoderConfig};
-use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat};
+use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat, PixelBufferConvertExt as _};
 
 fn main() {
     let jpeg_data = include_bytes!("../tests/images/ultrahdr_sample.jpg");

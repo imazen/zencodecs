@@ -34,8 +34,8 @@ pub(crate) fn decode(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decoder()
+    job.decoder(data, &[])
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))?
-        .decode(data, &[])
+        .decode()
         .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
