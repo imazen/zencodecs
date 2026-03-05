@@ -1156,7 +1156,7 @@ mod tests {
             .encode_rgba8(img.as_ref())
             .unwrap();
 
-        verify_probe_truncation(encoded.bytes(), ImageFormat::Gif, w, h);
+        verify_probe_truncation(encoded.data(), ImageFormat::Gif, w, h);
     }
 
     // ---- ImageInfo::probe integration ----
