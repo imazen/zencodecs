@@ -15,12 +15,33 @@ use crate::dispatch::{BuiltEncoder, EncodeParams};
 use zenpixels::PixelDescriptor;
 
 static AVIF_SUPPORTED: &[PixelDescriptor] = &[
+    // SDR
     PixelDescriptor::RGB8_SRGB,
     PixelDescriptor::RGBA8_SRGB,
     PixelDescriptor::GRAY8_SRGB,
     PixelDescriptor::RGBF32_LINEAR,
     PixelDescriptor::RGBAF32_LINEAR,
     PixelDescriptor::GRAYF32_LINEAR,
+    // 16-bit sRGB
+    PixelDescriptor::RGB16_SRGB,
+    PixelDescriptor::RGBA16_SRGB,
+    // 16-bit PQ BT.2020
+    PixelDescriptor::RGB16_SRGB
+        .with_transfer(zenpixels::TransferFunction::Pq)
+        .with_primaries(zenpixels::ColorPrimaries::Bt2020),
+    PixelDescriptor::RGBA16_SRGB
+        .with_transfer(zenpixels::TransferFunction::Pq)
+        .with_primaries(zenpixels::ColorPrimaries::Bt2020),
+    // 16-bit HLG BT.2020
+    PixelDescriptor::RGB16_SRGB
+        .with_transfer(zenpixels::TransferFunction::Hlg)
+        .with_primaries(zenpixels::ColorPrimaries::Bt2020),
+    PixelDescriptor::RGBA16_SRGB
+        .with_transfer(zenpixels::TransferFunction::Hlg)
+        .with_primaries(zenpixels::ColorPrimaries::Bt2020),
+    // 16-bit Display P3 sRGB transfer
+    PixelDescriptor::RGB16_SRGB.with_primaries(zenpixels::ColorPrimaries::DisplayP3),
+    PixelDescriptor::RGBA16_SRGB.with_primaries(zenpixels::ColorPrimaries::DisplayP3),
 ];
 
 pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<'a> {
