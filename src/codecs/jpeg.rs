@@ -130,10 +130,10 @@ pub(crate) fn decode(
     }
     if let Some(xmp) = xmp {
         // Detect UltraHDR gain map from XMP hdrgm namespace
-        if let Ok(xmp_str) = core::str::from_utf8(&xmp) {
-            if xmp_str.contains("hdrgm:Version") || xmp_str.contains("hdrgm:GainMapMax") {
-                ii = ii.with_gain_map(true);
-            }
+        if let Ok(xmp_str) = core::str::from_utf8(&xmp)
+            && (xmp_str.contains("hdrgm:Version") || xmp_str.contains("hdrgm:GainMapMax"))
+        {
+            ii = ii.with_gain_map(true);
         }
         ii = ii.with_xmp(xmp);
     }
@@ -515,10 +515,6 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> JpegDynEncoder<'_> 
 }
 
 impl DynEncoder for JpegDynEncoder<'_> {
-    fn format(&self) -> ImageFormat {
-        ImageFormat::Jpeg
-    }
-
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         JPEG_SUPPORTED
     }

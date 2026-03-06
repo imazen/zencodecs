@@ -238,10 +238,6 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> JxlDynEncoder<'_> {
 }
 
 impl DynEncoder for JxlDynEncoder<'_> {
-    fn format(&self) -> ImageFormat {
-        ImageFormat::Jxl
-    }
-
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         JXL_SUPPORTED
     }

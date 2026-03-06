@@ -145,11 +145,7 @@ fn gradient_gray_f32() -> ImgVec<Gray<f32>> {
 // ---------------------------------------------------------------------------
 
 /// Encode, decode, convert to RGBA8, and verify checksum against stored baseline.
-fn check_roundtrip(
-    encoded: Result<EncodeOutput, CodecError>,
-    codec_name: &str,
-    format_name: &str,
-) {
+fn check_roundtrip(encoded: Result<EncodeOutput, CodecError>, codec_name: &str, format_name: &str) {
     let mgr = manager();
     let encoded =
         encoded.unwrap_or_else(|e| panic!("{codec_name}/{format_name} encode failed: {e}"));
@@ -164,7 +160,15 @@ fn check_roundtrip(
     let rgba_bytes = rgba_buf.copy_to_contiguous_bytes();
 
     let result = mgr
-        .check_pixels(codec_name, "roundtrip", format_name, &rgba_bytes, w, h, None)
+        .check_pixels(
+            codec_name,
+            "roundtrip",
+            format_name,
+            &rgba_bytes,
+            w,
+            h,
+            None,
+        )
         .unwrap_or_else(|e| panic!("{codec_name}/{format_name} check_pixels failed: {e}"));
 
     assert!(
@@ -280,59 +284,153 @@ macro_rules! regress {
 // JPEG — lossy, rgb8/rgba8/gray8/bgra8/rgb_f32
 // ===========================================================================
 
-regress!(regress_jpeg_rgb8,    ImageFormat::Jpeg, "jpeg", rgb8,    "jpeg");
-regress!(regress_jpeg_rgba8,   ImageFormat::Jpeg, "jpeg", rgba8,   "jpeg");
-regress!(regress_jpeg_gray8,   ImageFormat::Jpeg, "jpeg", gray8,   "jpeg");
-regress!(regress_jpeg_bgra8,   ImageFormat::Jpeg, "jpeg", bgra8,   "jpeg");
-regress!(regress_jpeg_rgb_f32, ImageFormat::Jpeg, "jpeg", rgb_f32, "jpeg");
+regress!(regress_jpeg_rgb8, ImageFormat::Jpeg, "jpeg", rgb8, "jpeg");
+regress!(regress_jpeg_rgba8, ImageFormat::Jpeg, "jpeg", rgba8, "jpeg");
+regress!(regress_jpeg_gray8, ImageFormat::Jpeg, "jpeg", gray8, "jpeg");
+regress!(regress_jpeg_bgra8, ImageFormat::Jpeg, "jpeg", bgra8, "jpeg");
+regress!(
+    regress_jpeg_rgb_f32,
+    ImageFormat::Jpeg,
+    "jpeg",
+    rgb_f32,
+    "jpeg"
+);
 
 // ===========================================================================
 // WebP — lossy, rgb8/rgba8/bgra8/gray8/rgb_f32
 // ===========================================================================
 
-regress!(regress_webp_rgb8,    ImageFormat::WebP, "webp", rgb8,    "webp");
-regress!(regress_webp_rgba8,   ImageFormat::WebP, "webp", rgba8,   "webp");
-regress!(regress_webp_bgra8,   ImageFormat::WebP, "webp", bgra8,   "webp");
-regress!(regress_webp_gray8,   ImageFormat::WebP, "webp", gray8,   "webp");
-regress!(regress_webp_rgb_f32, ImageFormat::WebP, "webp", rgb_f32, "webp");
+regress!(regress_webp_rgb8, ImageFormat::WebP, "webp", rgb8, "webp");
+regress!(regress_webp_rgba8, ImageFormat::WebP, "webp", rgba8, "webp");
+regress!(regress_webp_bgra8, ImageFormat::WebP, "webp", bgra8, "webp");
+regress!(regress_webp_gray8, ImageFormat::WebP, "webp", gray8, "webp");
+regress!(
+    regress_webp_rgb_f32,
+    ImageFormat::WebP,
+    "webp",
+    rgb_f32,
+    "webp"
+);
 
 // ===========================================================================
 // GIF — palette-quantized, rgba8/rgb8
 // ===========================================================================
 
 regress!(regress_gif_rgba8, ImageFormat::Gif, "gif", rgba8, "gif");
-regress!(regress_gif_rgb8,  ImageFormat::Gif, "gif", rgb8,  "gif");
+regress!(regress_gif_rgb8, ImageFormat::Gif, "gif", rgb8, "gif");
 
 // ===========================================================================
 // PNG — lossless, rgb8/rgba8/gray8/rgb_f32/rgba_f32/gray_f32
 // ===========================================================================
 
-regress!(regress_png_rgb8,      ImageFormat::Png, "png", rgb8,      "png");
-regress!(regress_png_rgba8,     ImageFormat::Png, "png", rgba8,     "png");
-regress!(regress_png_gray8,     ImageFormat::Png, "png", gray8,     "png");
-regress!(regress_png_rgb_f32,   ImageFormat::Png, "png", rgb_f32,   "png");
-regress!(regress_png_rgba_f32,  ImageFormat::Png, "png", rgba_f32,  "png");
-regress!(regress_png_gray_f32,  ImageFormat::Png, "png", gray_f32,  "png");
+regress!(regress_png_rgb8, ImageFormat::Png, "png", rgb8, "png");
+regress!(regress_png_rgba8, ImageFormat::Png, "png", rgba8, "png");
+regress!(regress_png_gray8, ImageFormat::Png, "png", gray8, "png");
+regress!(regress_png_rgb_f32, ImageFormat::Png, "png", rgb_f32, "png");
+regress!(
+    regress_png_rgba_f32,
+    ImageFormat::Png,
+    "png",
+    rgba_f32,
+    "png"
+);
+regress!(
+    regress_png_gray_f32,
+    ImageFormat::Png,
+    "png",
+    gray_f32,
+    "png"
+);
 
 // ===========================================================================
 // AVIF — lossy (default), rgb8/rgba8/rgb_f32/rgba_f32/gray8/bgra8
 // ===========================================================================
 
-regress!(regress_avif_rgb8,     ImageFormat::Avif, "avif", rgb8,     "avif-encode", "avif-decode");
-regress!(regress_avif_rgba8,    ImageFormat::Avif, "avif", rgba8,    "avif-encode", "avif-decode");
-regress!(regress_avif_rgb_f32,  ImageFormat::Avif, "avif", rgb_f32,  "avif-encode", "avif-decode");
-regress!(regress_avif_rgba_f32, ImageFormat::Avif, "avif", rgba_f32, "avif-encode", "avif-decode");
-regress!(regress_avif_gray8,    ImageFormat::Avif, "avif", gray8,    "avif-encode", "avif-decode");
-regress!(regress_avif_bgra8,    ImageFormat::Avif, "avif", bgra8,    "avif-encode", "avif-decode");
+regress!(
+    regress_avif_rgb8,
+    ImageFormat::Avif,
+    "avif",
+    rgb8,
+    "avif-encode",
+    "avif-decode"
+);
+regress!(
+    regress_avif_rgba8,
+    ImageFormat::Avif,
+    "avif",
+    rgba8,
+    "avif-encode",
+    "avif-decode"
+);
+regress!(
+    regress_avif_rgb_f32,
+    ImageFormat::Avif,
+    "avif",
+    rgb_f32,
+    "avif-encode",
+    "avif-decode"
+);
+regress!(
+    regress_avif_rgba_f32,
+    ImageFormat::Avif,
+    "avif",
+    rgba_f32,
+    "avif-encode",
+    "avif-decode"
+);
+regress!(
+    regress_avif_gray8,
+    ImageFormat::Avif,
+    "avif",
+    gray8,
+    "avif-encode",
+    "avif-decode"
+);
+regress!(
+    regress_avif_bgra8,
+    ImageFormat::Avif,
+    "avif",
+    bgra8,
+    "avif-encode",
+    "avif-decode"
+);
 
 // ===========================================================================
 // JXL — lossy (default), rgb8/rgba8/gray8/bgra8/bgrx8/rgb_f32/rgba_f32/gray_f32
 // ===========================================================================
 
-regress!(regress_jxl_rgb8,      ImageFormat::Jxl, "jxl", rgb8,      "jxl-encode", "jxl-decode");
-regress!(regress_jxl_gray8,     ImageFormat::Jxl, "jxl", gray8,     "jxl-encode", "jxl-decode");
-regress!(regress_jxl_rgb_f32,   ImageFormat::Jxl, "jxl", rgb_f32,   "jxl-encode", "jxl-decode");
-regress!(regress_jxl_gray_f32,  ImageFormat::Jxl, "jxl", gray_f32,  "jxl-encode", "jxl-decode");
+regress!(
+    regress_jxl_rgb8,
+    ImageFormat::Jxl,
+    "jxl",
+    rgb8,
+    "jxl-encode",
+    "jxl-decode"
+);
+regress!(
+    regress_jxl_gray8,
+    ImageFormat::Jxl,
+    "jxl",
+    gray8,
+    "jxl-encode",
+    "jxl-decode"
+);
+regress!(
+    regress_jxl_rgb_f32,
+    ImageFormat::Jxl,
+    "jxl",
+    rgb_f32,
+    "jxl-encode",
+    "jxl-decode"
+);
+regress!(
+    regress_jxl_gray_f32,
+    ImageFormat::Jxl,
+    "jxl",
+    gray_f32,
+    "jxl-encode",
+    "jxl-decode"
+);
 
 // JXL alpha-channel decode bug: zenjxl-decoder panics in frame/render.rs:1432
 // when decoding images that were encoded with alpha-capable pixel formats.

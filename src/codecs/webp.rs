@@ -387,10 +387,6 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> WebpDynEncoder<'_> 
 }
 
 impl DynEncoder for WebpDynEncoder<'_> {
-    fn format(&self) -> ImageFormat {
-        ImageFormat::WebP
-    }
-
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         WEBP_SUPPORTED
     }

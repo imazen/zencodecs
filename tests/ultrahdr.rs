@@ -54,7 +54,7 @@ fn encode_ultrahdr_rgb_f32_produces_jpeg() {
 
     assert_eq!(output.format(), ImageFormat::Jpeg);
     // Should be a valid JPEG (starts with SOI marker)
-    let bytes = output.bytes();
+    let bytes = output.data();
     assert!(bytes.len() > 100, "encoded output too small");
     assert_eq!(&bytes[..2], &[0xFF, 0xD8], "not a valid JPEG");
 }
@@ -70,7 +70,7 @@ fn encode_ultrahdr_rgba_f32_produces_jpeg() {
         .expect("UltraHDR RGBA f32 encode failed");
 
     assert_eq!(output.format(), ImageFormat::Jpeg);
-    let bytes = output.bytes();
+    let bytes = output.data();
     assert!(bytes.len() > 100, "encoded output too small");
     assert_eq!(&bytes[..2], &[0xFF, 0xD8], "not a valid JPEG");
 }
@@ -88,7 +88,7 @@ fn ultrahdr_roundtrip_rgb_f32() {
         .expect("encode failed");
 
     // Decode SDR (standard path — should work even for UltraHDR)
-    let sdr = DecodeRequest::new(encoded.bytes())
+    let sdr = DecodeRequest::new(encoded.data())
         .decode()
         .expect("SDR decode failed");
 
@@ -97,7 +97,7 @@ fn ultrahdr_roundtrip_rgb_f32() {
     assert_eq!(sdr.format(), ImageFormat::Jpeg);
 
     // Decode HDR
-    let hdr = DecodeRequest::new(encoded.bytes())
+    let hdr = DecodeRequest::new(encoded.data())
         .decode_hdr(4.0)
         .expect("HDR decode failed");
 
@@ -119,13 +119,13 @@ fn ultrahdr_roundtrip_rgba_f32() {
         .expect("encode failed");
 
     // Both SDR and HDR decode should work
-    let sdr = DecodeRequest::new(encoded.bytes())
+    let sdr = DecodeRequest::new(encoded.data())
         .decode()
         .expect("SDR decode failed");
     assert_eq!(sdr.width(), w as u32);
     assert_eq!(sdr.height(), h as u32);
 
-    let hdr = DecodeRequest::new(encoded.bytes())
+    let hdr = DecodeRequest::new(encoded.data())
         .decode_hdr(4.0)
         .expect("HDR decode failed");
     assert_eq!(hdr.width(), w as u32);
@@ -153,7 +153,7 @@ fn decode_hdr_rejects_non_ultrahdr_jpeg() {
         .expect("encode failed");
 
     // decode_hdr should fail for non-UltraHDR
-    let result = DecodeRequest::new(encoded.bytes()).decode_hdr(4.0);
+    let result = DecodeRequest::new(encoded.data()).decode_hdr(4.0);
     assert!(result.is_err(), "expected error for non-UltraHDR JPEG");
 }
 
@@ -179,7 +179,7 @@ fn decode_hdr_rejects_non_jpeg() {
             .encode_rgb8(img.as_ref())
             .expect("webp encode failed");
 
-        let result = DecodeRequest::new(webp.bytes()).decode_hdr(4.0);
+        let result = DecodeRequest::new(webp.data()).decode_hdr(4.0);
         assert!(result.is_err(), "expected error for non-JPEG");
     }
 }

@@ -237,10 +237,6 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> PngDynEncoder<'_> {
 }
 
 impl DynEncoder for PngDynEncoder<'_> {
-    fn format(&self) -> ImageFormat {
-        ImageFormat::Png
-    }
-
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         PNG_SUPPORTED
     }

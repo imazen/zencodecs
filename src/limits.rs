@@ -25,16 +25,16 @@ impl Limits {
     ///
     /// Returns `Err` with a description if any limit is exceeded.
     pub fn check_dimensions(&self, width: u64, height: u64) -> Result<(), &'static str> {
-        if let Some(max_width) = self.max_width {
-            if width > max_width {
-                return Err("width exceeds limit");
-            }
+        if let Some(max_width) = self.max_width
+            && width > max_width
+        {
+            return Err("width exceeds limit");
         }
 
-        if let Some(max_height) = self.max_height {
-            if height > max_height {
-                return Err("height exceeds limit");
-            }
+        if let Some(max_height) = self.max_height
+            && height > max_height
+        {
+            return Err("height exceeds limit");
         }
 
         if let Some(max_pixels) = self.max_pixels {
@@ -49,10 +49,10 @@ impl Limits {
 
     /// Check if a memory allocation is within limits.
     pub fn check_memory(&self, bytes: u64) -> Result<(), &'static str> {
-        if let Some(max_memory) = self.max_memory_bytes {
-            if bytes > max_memory {
-                return Err("memory allocation exceeds limit");
-            }
+        if let Some(max_memory) = self.max_memory_bytes
+            && bytes > max_memory
+        {
+            return Err("memory allocation exceeds limit");
         }
         Ok(())
     }

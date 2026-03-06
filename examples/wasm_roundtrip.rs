@@ -6,7 +6,7 @@
 //! Run on wasm:  `cargo build --example wasm_roundtrip --target wasm32-wasip1 --release --features std`
 //!               `wasmtime target/wasm32-wasip1/release/examples/wasm_roundtrip.wasm`
 
-use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat, PixelBufferConvertExt as _};
+use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat};
 
 fn main() {
     // Embed a small test JPEG

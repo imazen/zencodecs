@@ -203,10 +203,6 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> AvifDynEncoder<'_> 
 }
 
 impl DynEncoder for AvifDynEncoder<'_> {
-    fn format(&self) -> ImageFormat {
-        ImageFormat::Avif
-    }
-
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         AVIF_SUPPORTED
     }

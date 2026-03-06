@@ -9,7 +9,7 @@
 
 use zencodecs::config::CodecConfig;
 use zencodecs::config::jpeg::{ChromaSubsampling, DecodedExtras, EncoderConfig};
-use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat, PixelBufferConvertExt as _};
+use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat};
 
 fn main() {
     let jpeg_data = include_bytes!("../tests/images/ultrahdr_sample.jpg");
@@ -109,7 +109,7 @@ fn main() {
 
     let config = CodecConfig::default().with_jpeg_encoder(encoder_config);
 
-    let rgb8 = decoded.into_pixels().to_rgb8();
+    let rgb8 = decoded.into_rgb8();
     let img = rgb8.as_imgref();
 
     let re_encoded = EncodeRequest::new(ImageFormat::Jpeg)
@@ -124,7 +124,7 @@ fn main() {
     );
 
     // Verify segments survived
-    let re_decoded = DecodeRequest::new(re_encoded.bytes())
+    let re_decoded = DecodeRequest::new(re_encoded.data())
         .decode()
         .expect("failed to re-decode");
 

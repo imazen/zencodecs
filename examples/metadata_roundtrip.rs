@@ -5,7 +5,7 @@
 //!
 //! Run: `cargo run --example metadata_roundtrip --features all,std`
 
-use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat, PixelBufferConvertExt as _};
+use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat};
 
 fn main() {
     let jpeg_data = include_bytes!("../tests/images/ultrahdr_sample.jpg");
@@ -64,7 +64,7 @@ fn main() {
             .expect("encode failed");
 
         // Decode the re-encoded image to verify metadata survived
-        let re_decoded = DecodeRequest::new(encoded.bytes())
+        let re_decoded = DecodeRequest::new(encoded.data())
             .decode()
             .expect("re-decode failed");
 

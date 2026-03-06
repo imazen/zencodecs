@@ -101,14 +101,14 @@ pub(crate) fn decode(
 
 /// Pre-flight memory check for GIF encoding (4 bytes/pixel for RGBA).
 fn check_gif_memory_limit(w: u32, h: u32, limits: Option<&Limits>) -> Result<(), CodecError> {
-    if let Some(lim) = limits {
-        if let Some(max_mem) = lim.max_memory_bytes {
-            let estimated = w as u64 * h as u64 * 4;
-            if estimated > max_mem {
-                return Err(CodecError::LimitExceeded(alloc::format!(
-                    "memory {estimated} bytes exceeds limit {max_mem}"
-                )));
-            }
+    if let Some(lim) = limits
+        && let Some(max_mem) = lim.max_memory_bytes
+    {
+        let estimated = w as u64 * h as u64 * 4;
+        if estimated > max_mem {
+            return Err(CodecError::LimitExceeded(alloc::format!(
+                "memory {estimated} bytes exceeds limit {max_mem}"
+            )));
         }
     }
     Ok(())
@@ -305,10 +305,6 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> GifDynEncoder<'_> {
 }
 
 impl DynEncoder for GifDynEncoder<'_> {
-    fn format(&self) -> ImageFormat {
-        ImageFormat::Gif
-    }
-
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         GIF_SUPPORTED
     }
