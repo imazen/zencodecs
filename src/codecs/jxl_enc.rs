@@ -12,24 +12,19 @@ use zencodec_types::{
 };
 use zenpixels::PixelSlice;
 
-/// Map 0-100 quality percentage to butteraugli distance.
-fn percent_to_distance(quality: f32) -> f32 {
-    let q = quality.clamp(0.0, 99.9) as u32;
-    if q >= 90 {
-        (100 - q) as f32 / 10.0
-    } else if q >= 70 {
-        1.0 + (90 - q) as f32 / 20.0
-    } else {
-        2.0 + (70 - q) as f32 / 10.0
-    }
-}
-
 /// Build a JxlEncoderConfig from quality and effort.
+///
+/// Uses `EncoderConfig` trait methods — quality→distance mapping
+/// is handled by zenjxl's `with_generic_quality()`.
 fn build_encoding(quality: Option<f32>, effort: Option<u32>) -> zenjxl::JxlEncoderConfig {
-    let distance = quality.map_or(1.0, percent_to_distance);
-    let mut enc = zenjxl::JxlEncoderConfig::lossy(distance);
-    if let Some(effort) = effort {
-        enc = enc.with_effort(effort.clamp(1, 10));
+    use zencodec_types::EncoderConfig;
+
+    let mut enc = zenjxl::JxlEncoderConfig::default();
+    if let Some(q) = quality {
+        enc = enc.with_generic_quality(q);
+    }
+    if let Some(e) = effort {
+        enc = enc.with_generic_effort(e as i32);
     }
     enc
 }
@@ -206,11 +201,15 @@ pub(crate) fn encode_bgra8(
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let distance = quality.map_or(1.0, percent_to_distance);
-    let mut config = zenjxl::LossyConfig::new(distance);
-    if let Some(effort) = effort {
-        config = config.with_effort(effort.clamp(1, 10) as u8);
-    }
+    // Build config via trait, then extract the lossy config for native BGRA path
+    let enc = build_encoding(quality, effort);
+    let config = enc.lossy_config().cloned().unwrap_or_else(|| {
+        let mut c = zenjxl::LossyConfig::new(1.0);
+        if let Some(e) = effort {
+            c = c.with_effort(e.clamp(1, 10) as u8);
+        }
+        c
+    });
     let data = zenjxl::encode_bgra8(img, &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?;
     Ok(EncodeOutput::new(data, ImageFormat::Jxl))

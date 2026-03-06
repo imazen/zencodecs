@@ -84,37 +84,41 @@ pub(crate) fn decode_into_rgba8(
 }
 
 /// Build a WebpEncoderConfig from quality/lossless/codec_config.
+///
+/// Uses `EncoderConfig` trait methods for generic params, with
+/// codec_config taking priority for format-specific overrides.
 fn build_encoding(
     quality: Option<f32>,
     effort: Option<u32>,
     lossless: bool,
     codec_config: Option<&CodecConfig>,
 ) -> zenwebp::WebpEncoderConfig {
+    use zencodec_types::EncoderConfig;
+
     if lossless {
-        let mut e = zenwebp::WebpEncoderConfig::lossless();
         if let Some(cfg) = codec_config.and_then(|c| c.webp_lossless.as_ref()) {
+            let mut e = zenwebp::WebpEncoderConfig::lossless();
             *e.inner_mut() =
                 zenwebp::encoder::config::EncoderConfig::Lossless(cfg.as_ref().clone());
-        } else if let Some(effort) = effort {
-            // Map effort 0-10 to WebP method 0-6
-            let method = (effort * 6 / 10).min(6) as u8;
-            *e.inner_mut() = zenwebp::encoder::config::EncoderConfig::Lossless(
-                zenwebp::LosslessConfig::new().with_method(method),
-            );
+            e
+        } else {
+            let mut e = zenwebp::WebpEncoderConfig::lossless();
+            if let Some(effort) = effort {
+                e = e.with_generic_effort(effort as i32);
+            }
+            e
         }
+    } else if let Some(cfg) = codec_config.and_then(|c| c.webp_lossy.as_ref()) {
+        let mut e = zenwebp::WebpEncoderConfig::lossy();
+        *e.inner_mut() = zenwebp::encoder::config::EncoderConfig::Lossy(cfg.as_ref().clone());
         e
     } else {
         let mut e = zenwebp::WebpEncoderConfig::lossy();
-        if let Some(cfg) = codec_config.and_then(|c| c.webp_lossy.as_ref()) {
-            *e.inner_mut() = zenwebp::encoder::config::EncoderConfig::Lossy(cfg.as_ref().clone());
-        } else {
-            let q = quality.unwrap_or(85.0).clamp(0.0, 100.0);
-            let mut lossy = zenwebp::LossyConfig::new().with_quality(q);
-            if let Some(effort) = effort {
-                // Map effort 0-10 to WebP method 0-6
-                lossy.method = (effort * 6 / 10).min(6) as u8;
-            }
-            *e.inner_mut() = zenwebp::encoder::config::EncoderConfig::Lossy(lossy);
+        if let Some(q) = quality {
+            e = e.with_generic_quality(q);
+        }
+        if let Some(effort) = effort {
+            e = e.with_generic_effort(effort as i32);
         }
         e
     }

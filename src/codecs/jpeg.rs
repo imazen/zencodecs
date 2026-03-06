@@ -224,17 +224,25 @@ pub(crate) fn decode_into_gray8(
 }
 
 /// Build a JpegEncoderConfig from codec config or generic quality.
+///
+/// Uses `EncoderConfig` trait methods for generic params, with
+/// codec_config taking priority for format-specific overrides.
 fn build_encoding(
     quality: Option<f32>,
     codec_config: Option<&CodecConfig>,
 ) -> zenjpeg::JpegEncoderConfig {
+    use zencodec_types::EncoderConfig;
+
     if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
         let mut e = zenjpeg::JpegEncoderConfig::new();
         *e.inner_mut() = cfg.as_ref().clone();
         e
     } else {
-        let q = quality.unwrap_or(85.0).clamp(0.0, 100.0);
-        zenjpeg::JpegEncoderConfig::new().with_calibrated_quality(q)
+        let mut enc = zenjpeg::JpegEncoderConfig::new();
+        if let Some(q) = quality {
+            enc = enc.with_generic_quality(q);
+        }
+        enc
     }
 }
 

@@ -41,10 +41,15 @@ pub(crate) fn decode(
 }
 
 /// Build a PngEncoderConfig from effort/codec_config.
+///
+/// Uses `EncoderConfig` trait methods for generic params, with
+/// codec_config taking priority for format-specific overrides.
 fn build_encoding(
     effort: Option<u32>,
     codec_config: Option<&CodecConfig>,
 ) -> zenpng::PngEncoderConfig {
+    use zencodec_types::EncoderConfig;
+
     let mut enc = zenpng::PngEncoderConfig::new();
     if let Some(cfg) = codec_config {
         if let Some(compression) = cfg.png_compression {
@@ -54,9 +59,7 @@ fn build_encoding(
             enc = enc.with_filter(filter);
         }
     } else if let Some(effort) = effort {
-        // Map effort 0-10 to zenpng Compression::Effort(0-200)
-        let level = (effort * 20).min(200);
-        enc = enc.with_compression(zenpng::Compression::Effort(level));
+        enc = enc.with_generic_effort(effort as i32);
     }
     enc
 }
