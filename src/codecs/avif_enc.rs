@@ -42,6 +42,24 @@ static AVIF_SUPPORTED: &[PixelDescriptor] = &[
     // 16-bit Display P3 sRGB transfer
     PixelDescriptor::RGB16_SRGB.with_primaries(zenpixels::ColorPrimaries::DisplayP3),
     PixelDescriptor::RGBA16_SRGB.with_primaries(zenpixels::ColorPrimaries::DisplayP3),
+    // 16-bit PQ BT.2020 narrow range (broadcast HDR10)
+    PixelDescriptor::RGB16_SRGB
+        .with_transfer(zenpixels::TransferFunction::Pq)
+        .with_primaries(zenpixels::ColorPrimaries::Bt2020)
+        .with_signal_range(zenpixels::SignalRange::Narrow),
+    PixelDescriptor::RGBA16_SRGB
+        .with_transfer(zenpixels::TransferFunction::Pq)
+        .with_primaries(zenpixels::ColorPrimaries::Bt2020)
+        .with_signal_range(zenpixels::SignalRange::Narrow),
+    // 16-bit HLG BT.2020 narrow range (broadcast HLG)
+    PixelDescriptor::RGB16_SRGB
+        .with_transfer(zenpixels::TransferFunction::Hlg)
+        .with_primaries(zenpixels::ColorPrimaries::Bt2020)
+        .with_signal_range(zenpixels::SignalRange::Narrow),
+    PixelDescriptor::RGBA16_SRGB
+        .with_transfer(zenpixels::TransferFunction::Hlg)
+        .with_primaries(zenpixels::ColorPrimaries::Bt2020)
+        .with_signal_range(zenpixels::SignalRange::Narrow),
 ];
 
 pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<'a> {
