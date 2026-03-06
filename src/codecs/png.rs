@@ -40,8 +40,11 @@ pub(crate) fn decode(
         .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))
 }
 
-/// Build a PngEncoderConfig from codec config.
-fn build_encoding(codec_config: Option<&CodecConfig>) -> zenpng::PngEncoderConfig {
+/// Build a PngEncoderConfig from effort/codec_config.
+fn build_encoding(
+    effort: Option<u32>,
+    codec_config: Option<&CodecConfig>,
+) -> zenpng::PngEncoderConfig {
     let mut enc = zenpng::PngEncoderConfig::new();
     if let Some(cfg) = codec_config {
         if let Some(compression) = cfg.png_compression {
@@ -50,6 +53,10 @@ fn build_encoding(codec_config: Option<&CodecConfig>) -> zenpng::PngEncoderConfi
         if let Some(filter) = cfg.png_filter {
             enc = enc.with_filter(filter);
         }
+    } else if let Some(effort) = effort {
+        // Map effort 0-10 to zenpng Compression::Effort(0-200)
+        let level = (effort * 20).min(200);
+        enc = enc.with_compression(zenpng::Compression::Effort(level));
     }
     enc
 }
@@ -57,12 +64,13 @@ fn build_encoding(codec_config: Option<&CodecConfig>) -> zenpng::PngEncoderConfi
 /// Encode RGB8 pixels to PNG.
 pub(crate) fn encode_rgb8(
     img: ImgRef<Rgb<u8>>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(codec_config);
+    let enc = build_encoding(effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -82,12 +90,13 @@ pub(crate) fn encode_rgb8(
 /// Encode RGBA8 pixels to PNG.
 pub(crate) fn encode_rgba8(
     img: ImgRef<Rgba<u8>>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(codec_config);
+    let enc = build_encoding(effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -107,12 +116,13 @@ pub(crate) fn encode_rgba8(
 /// Encode Gray8 pixels to PNG.
 pub(crate) fn encode_gray8(
     img: ImgRef<crate::pixel::Gray<u8>>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(codec_config);
+    let enc = build_encoding(effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -132,12 +142,13 @@ pub(crate) fn encode_gray8(
 /// Encode linear RGB f32 pixels to PNG.
 pub(crate) fn encode_rgb_f32(
     img: ImgRef<Rgb<f32>>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(codec_config);
+    let enc = build_encoding(effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -157,12 +168,13 @@ pub(crate) fn encode_rgb_f32(
 /// Encode linear RGBA f32 pixels to PNG.
 pub(crate) fn encode_rgba_f32(
     img: ImgRef<Rgba<f32>>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(codec_config);
+    let enc = build_encoding(effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -182,12 +194,13 @@ pub(crate) fn encode_rgba_f32(
 /// Encode linear grayscale f32 pixels to PNG.
 pub(crate) fn encode_gray_f32(
     img: ImgRef<crate::pixel::Gray<f32>>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(codec_config);
+    let enc = build_encoding(effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -221,6 +234,7 @@ static PNG_SUPPORTED: &[PixelDescriptor] = &[
 ];
 
 pub(crate) struct PngDynEncoder<'a> {
+    effort: Option<u32>,
     metadata: Option<&'a MetadataView<'a>>,
     codec_config: Option<&'a CodecConfig>,
     limits: Option<&'a Limits>,
@@ -229,6 +243,7 @@ pub(crate) struct PngDynEncoder<'a> {
 
 pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> PngDynEncoder<'_> {
     PngDynEncoder {
+        effort: params.effort,
         metadata: params.metadata,
         codec_config: params.codec_config,
         limits: params.limits,
@@ -237,6 +252,10 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> PngDynEncoder<'_> {
 }
 
 impl DynEncoder for PngDynEncoder<'_> {
+    fn format(&self) -> ImageFormat {
+        ImageFormat::Png
+    }
+
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         PNG_SUPPORTED
     }
@@ -258,6 +277,7 @@ impl DynEncoder for PngDynEncoder<'_> {
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 3);
                 encode_rgb8(
                     img,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -269,6 +289,7 @@ impl DynEncoder for PngDynEncoder<'_> {
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 4);
                 encode_rgba8(
                     img,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -280,6 +301,7 @@ impl DynEncoder for PngDynEncoder<'_> {
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride);
                 encode_gray8(
                     img,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -291,6 +313,7 @@ impl DynEncoder for PngDynEncoder<'_> {
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 12);
                 encode_rgb_f32(
                     img,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -302,6 +325,7 @@ impl DynEncoder for PngDynEncoder<'_> {
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 16);
                 encode_rgba_f32(
                     img,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -313,6 +337,7 @@ impl DynEncoder for PngDynEncoder<'_> {
                 let img = imgref::ImgRef::new_stride(pixels, w, h, stride / 4);
                 encode_gray_f32(
                     img,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,

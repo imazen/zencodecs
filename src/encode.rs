@@ -364,6 +364,7 @@ impl<'a> EncodeRequest<'a> {
 
         let params = EncodeParams {
             quality: self.quality,
+            effort: self.effort,
             lossless: self.lossless,
             metadata: self.metadata,
             codec_config: self.codec_config,

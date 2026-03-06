@@ -305,6 +305,10 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> GifDynEncoder<'_> {
 }
 
 impl DynEncoder for GifDynEncoder<'_> {
+    fn format(&self) -> ImageFormat {
+        ImageFormat::Gif
+    }
+
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         GIF_SUPPORTED
     }

@@ -16,6 +16,7 @@ use zenpixels::PixelDescriptor;
 /// Encoding parameters extracted from [`EncodeRequest`](crate::EncodeRequest).
 pub(crate) struct EncodeParams<'a> {
     pub quality: Option<f32>,
+    pub effort: Option<u32>,
     pub lossless: bool,
     pub metadata: Option<&'a MetadataView<'a>>,
     pub codec_config: Option<&'a CodecConfig>,
@@ -29,6 +30,9 @@ pub(crate) struct EncodeParams<'a> {
 /// has a descriptor matching one of [`supported_descriptors`](DynEncoder::supported_descriptors).
 /// Use [`zenpixels::adapt::adapt_for_encode`] to negotiate and convert beforehand.
 pub(crate) trait DynEncoder {
+    /// Which format this encoder produces.
+    fn format(&self) -> ImageFormat;
+
     /// Pixel formats this encoder accepts natively (in preference order).
     fn supported_descriptors(&self) -> &'static [PixelDescriptor];
 

@@ -24,22 +24,27 @@ fn percent_to_distance(quality: f32) -> f32 {
     }
 }
 
-/// Build a JxlEncoderConfig from quality.
-fn build_encoding(quality: Option<f32>) -> zenjxl::JxlEncoderConfig {
+/// Build a JxlEncoderConfig from quality and effort.
+fn build_encoding(quality: Option<f32>, effort: Option<u32>) -> zenjxl::JxlEncoderConfig {
     let distance = quality.map_or(1.0, percent_to_distance);
-    zenjxl::JxlEncoderConfig::lossy(distance)
+    let mut enc = zenjxl::JxlEncoderConfig::lossy(distance);
+    if let Some(effort) = effort {
+        enc = enc.with_effort(effort.clamp(1, 10));
+    }
+    enc
 }
 
 /// Encode RGB8 pixels to JXL.
 pub(crate) fn encode_rgb8(
     img: ImgRef<Rgb<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     _codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality);
+    let enc = build_encoding(quality, effort);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -60,12 +65,13 @@ pub(crate) fn encode_rgb8(
 pub(crate) fn encode_rgba8(
     img: ImgRef<Rgba<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     _codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality);
+    let enc = build_encoding(quality, effort);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -86,12 +92,13 @@ pub(crate) fn encode_rgba8(
 pub(crate) fn encode_gray8(
     img: ImgRef<crate::pixel::Gray<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     _codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality);
+    let enc = build_encoding(quality, effort);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -112,12 +119,13 @@ pub(crate) fn encode_gray8(
 pub(crate) fn encode_rgb_f32(
     img: ImgRef<Rgb<f32>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     _codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality);
+    let enc = build_encoding(quality, effort);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -138,12 +146,13 @@ pub(crate) fn encode_rgb_f32(
 pub(crate) fn encode_rgba_f32(
     img: ImgRef<Rgba<f32>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     _codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality);
+    let enc = build_encoding(quality, effort);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -164,12 +173,13 @@ pub(crate) fn encode_rgba_f32(
 pub(crate) fn encode_gray_f32(
     img: ImgRef<crate::pixel::Gray<f32>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     _codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality);
+    let enc = build_encoding(quality, effort);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -190,13 +200,17 @@ pub(crate) fn encode_gray_f32(
 pub(crate) fn encode_bgra8(
     img: ImgRef<Bgra<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     _metadata: Option<&MetadataView<'_>>,
     _codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
     _stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
     let distance = quality.map_or(1.0, percent_to_distance);
-    let config = zenjxl::LossyConfig::new(distance);
+    let mut config = zenjxl::LossyConfig::new(distance);
+    if let Some(effort) = effort {
+        config = config.with_effort(effort.clamp(1, 10) as u8);
+    }
     let data = zenjxl::encode_bgra8(img, &config)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?;
     Ok(EncodeOutput::new(data, ImageFormat::Jxl))
@@ -221,6 +235,7 @@ static JXL_SUPPORTED: &[PixelDescriptor] = &[
 
 pub(crate) struct JxlDynEncoder<'a> {
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&'a MetadataView<'a>>,
     codec_config: Option<&'a CodecConfig>,
     limits: Option<&'a Limits>,
@@ -230,6 +245,7 @@ pub(crate) struct JxlDynEncoder<'a> {
 pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> JxlDynEncoder<'_> {
     JxlDynEncoder {
         quality: params.quality,
+        effort: params.effort,
         metadata: params.metadata,
         codec_config: params.codec_config,
         limits: params.limits,
@@ -238,6 +254,10 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> JxlDynEncoder<'_> {
 }
 
 impl DynEncoder for JxlDynEncoder<'_> {
+    fn format(&self) -> ImageFormat {
+        ImageFormat::Jxl
+    }
+
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         JXL_SUPPORTED
     }
@@ -260,6 +280,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                 encode_rgb8(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -272,6 +293,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                 encode_rgba8(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -284,6 +306,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                 encode_bgra8(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -296,6 +319,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                 encode_gray8(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -308,6 +332,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                 encode_rgb_f32(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -320,6 +345,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                 encode_rgba_f32(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -332,6 +358,7 @@ impl DynEncoder for JxlDynEncoder<'_> {
                 encode_gray_f32(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,

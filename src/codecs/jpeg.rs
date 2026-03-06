@@ -515,6 +515,10 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> JpegDynEncoder<'_> 
 }
 
 impl DynEncoder for JpegDynEncoder<'_> {
+    fn format(&self) -> ImageFormat {
+        ImageFormat::Jpeg
+    }
+
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         JPEG_SUPPORTED
     }

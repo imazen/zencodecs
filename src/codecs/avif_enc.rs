@@ -16,12 +16,13 @@ use zenpixels::PixelSlice;
 pub(crate) fn encode_rgb8(
     img: ImgRef<Rgb<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config);
+    let enc = build_encoding(quality, effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -42,12 +43,13 @@ pub(crate) fn encode_rgb8(
 pub(crate) fn encode_rgba8(
     img: ImgRef<Rgba<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config);
+    let enc = build_encoding(quality, effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -68,12 +70,13 @@ pub(crate) fn encode_rgba8(
 pub(crate) fn encode_gray8(
     img: ImgRef<crate::pixel::Gray<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config);
+    let enc = build_encoding(quality, effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -94,12 +97,13 @@ pub(crate) fn encode_gray8(
 pub(crate) fn encode_rgb_f32(
     img: ImgRef<Rgb<f32>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config);
+    let enc = build_encoding(quality, effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -120,12 +124,13 @@ pub(crate) fn encode_rgb_f32(
 pub(crate) fn encode_rgba_f32(
     img: ImgRef<Rgba<f32>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config);
+    let enc = build_encoding(quality, effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -146,12 +151,13 @@ pub(crate) fn encode_rgba_f32(
 pub(crate) fn encode_gray_f32(
     img: ImgRef<crate::pixel::Gray<f32>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, codec_config);
+    let enc = build_encoding(quality, effort, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -186,6 +192,7 @@ static AVIF_SUPPORTED: &[PixelDescriptor] = &[
 
 pub(crate) struct AvifDynEncoder<'a> {
     quality: Option<f32>,
+    effort: Option<u32>,
     metadata: Option<&'a MetadataView<'a>>,
     codec_config: Option<&'a CodecConfig>,
     limits: Option<&'a Limits>,
@@ -195,6 +202,7 @@ pub(crate) struct AvifDynEncoder<'a> {
 pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> AvifDynEncoder<'_> {
     AvifDynEncoder {
         quality: params.quality,
+        effort: params.effort,
         metadata: params.metadata,
         codec_config: params.codec_config,
         limits: params.limits,
@@ -203,6 +211,10 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> AvifDynEncoder<'_> 
 }
 
 impl DynEncoder for AvifDynEncoder<'_> {
+    fn format(&self) -> ImageFormat {
+        ImageFormat::Avif
+    }
+
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         AVIF_SUPPORTED
     }
@@ -225,6 +237,7 @@ impl DynEncoder for AvifDynEncoder<'_> {
                 encode_rgb8(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -237,6 +250,7 @@ impl DynEncoder for AvifDynEncoder<'_> {
                 encode_rgba8(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -249,6 +263,7 @@ impl DynEncoder for AvifDynEncoder<'_> {
                 encode_gray8(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -261,6 +276,7 @@ impl DynEncoder for AvifDynEncoder<'_> {
                 encode_rgb_f32(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -273,6 +289,7 @@ impl DynEncoder for AvifDynEncoder<'_> {
                 encode_rgba_f32(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -285,6 +302,7 @@ impl DynEncoder for AvifDynEncoder<'_> {
                 encode_gray_f32(
                     img,
                     self.quality,
+                    self.effort,
                     self.metadata,
                     self.codec_config,
                     self.limits,
@@ -299,9 +317,10 @@ impl DynEncoder for AvifDynEncoder<'_> {
     }
 }
 
-/// Build an AvifEncoderConfig from quality/codec_config.
+/// Build an AvifEncoderConfig from quality/effort/codec_config.
 fn build_encoding(
     quality: Option<f32>,
+    effort: Option<u32>,
     codec_config: Option<&CodecConfig>,
 ) -> zenavif::AvifEncoderConfig {
     let q = codec_config
@@ -310,11 +329,16 @@ fn build_encoding(
         .unwrap_or(75.0)
         .clamp(0.0, 100.0);
 
-    let speed = codec_config.and_then(|c| c.avif_speed).unwrap_or(4);
+    // codec_config.avif_speed takes priority, then generic effort, then default 4
+    let speed = codec_config
+        .and_then(|c| c.avif_speed)
+        .map(|s| s as u32)
+        .or(effort)
+        .unwrap_or(4);
 
     let mut enc = zenavif::AvifEncoderConfig::new()
         .with_quality(q)
-        .with_effort_u32(speed as u32);
+        .with_effort_u32(speed);
 
     if let Some(alpha_q) = codec_config.and_then(|c| c.avif_alpha_quality) {
         enc = enc.with_alpha_quality(alpha_q);

@@ -86,6 +86,7 @@ pub(crate) fn decode_into_rgba8(
 /// Build a WebpEncoderConfig from quality/lossless/codec_config.
 fn build_encoding(
     quality: Option<f32>,
+    effort: Option<u32>,
     lossless: bool,
     codec_config: Option<&CodecConfig>,
 ) -> zenwebp::WebpEncoderConfig {
@@ -94,6 +95,12 @@ fn build_encoding(
         if let Some(cfg) = codec_config.and_then(|c| c.webp_lossless.as_ref()) {
             *e.inner_mut() =
                 zenwebp::encoder::config::EncoderConfig::Lossless(cfg.as_ref().clone());
+        } else if let Some(effort) = effort {
+            // Map effort 0-10 to WebP method 0-6
+            let method = (effort * 6 / 10).min(6) as u8;
+            *e.inner_mut() = zenwebp::encoder::config::EncoderConfig::Lossless(
+                zenwebp::LosslessConfig::new().with_method(method),
+            );
         }
         e
     } else {
@@ -102,7 +109,12 @@ fn build_encoding(
             *e.inner_mut() = zenwebp::encoder::config::EncoderConfig::Lossy(cfg.as_ref().clone());
         } else {
             let q = quality.unwrap_or(85.0).clamp(0.0, 100.0);
-            e = e.with_quality(q);
+            let mut lossy = zenwebp::LossyConfig::new().with_quality(q);
+            if let Some(effort) = effort {
+                // Map effort 0-10 to WebP method 0-6
+                lossy.method = (effort * 6 / 10).min(6) as u8;
+            }
+            *e.inner_mut() = zenwebp::encoder::config::EncoderConfig::Lossy(lossy);
         }
         e
     }
@@ -112,13 +124,14 @@ fn build_encoding(
 pub(crate) fn encode_rgb8(
     img: ImgRef<Rgb<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     lossless: bool,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config);
+    let enc = build_encoding(quality, effort, lossless, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -139,13 +152,14 @@ pub(crate) fn encode_rgb8(
 pub(crate) fn encode_rgba8(
     img: ImgRef<Rgba<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     lossless: bool,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config);
+    let enc = build_encoding(quality, effort, lossless, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -166,13 +180,14 @@ pub(crate) fn encode_rgba8(
 pub(crate) fn encode_gray8(
     img: ImgRef<crate::pixel::Gray<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     lossless: bool,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config);
+    let enc = build_encoding(quality, effort, lossless, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -193,13 +208,14 @@ pub(crate) fn encode_gray8(
 pub(crate) fn encode_rgb_f32(
     img: ImgRef<Rgb<f32>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     lossless: bool,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config);
+    let enc = build_encoding(quality, effort, lossless, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -220,13 +236,14 @@ pub(crate) fn encode_rgb_f32(
 pub(crate) fn encode_rgba_f32(
     img: ImgRef<Rgba<f32>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     lossless: bool,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config);
+    let enc = build_encoding(quality, effort, lossless, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -247,13 +264,14 @@ pub(crate) fn encode_rgba_f32(
 pub(crate) fn encode_gray_f32(
     img: ImgRef<crate::pixel::Gray<f32>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     lossless: bool,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<EncodeOutput, CodecError> {
-    let enc = build_encoding(quality, lossless, codec_config);
+    let enc = build_encoding(quality, effort, lossless, codec_config);
     let mut job = enc.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
@@ -276,6 +294,7 @@ pub(crate) fn encode_gray_f32(
 pub(crate) fn encode_bgra8(
     img: ImgRef<Bgra<u8>>,
     quality: Option<f32>,
+    effort: Option<u32>,
     lossless: bool,
     metadata: Option<&MetadataView<'_>>,
     codec_config: Option<&CodecConfig>,
@@ -292,7 +311,13 @@ pub(crate) fn encode_bgra8(
         let config = codec_config
             .and_then(|c| c.webp_lossless.as_ref())
             .map(|c| c.as_ref().clone())
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                let mut c = zenwebp::LosslessConfig::new();
+                if let Some(effort) = effort {
+                    c = c.with_method((effort * 6 / 10).min(6) as u8);
+                }
+                c
+            });
         let mut request = zenwebp::EncodeRequest::lossless(
             &config,
             bytes,
@@ -312,7 +337,13 @@ pub(crate) fn encode_bgra8(
         let config = codec_config
             .and_then(|c| c.webp_lossy.as_ref())
             .map(|c| c.as_ref().clone())
-            .unwrap_or_else(|| zenwebp::LossyConfig::new().with_quality(quality));
+            .unwrap_or_else(|| {
+                let mut c = zenwebp::LossyConfig::new().with_quality(quality);
+                if let Some(effort) = effort {
+                    c.method = (effort * 6 / 10).min(6) as u8;
+                }
+                c
+            });
         let mut request = zenwebp::EncodeRequest::lossy(
             &config,
             bytes,
@@ -368,6 +399,7 @@ static WEBP_SUPPORTED: &[PixelDescriptor] = &[
 
 pub(crate) struct WebpDynEncoder<'a> {
     quality: Option<f32>,
+    effort: Option<u32>,
     lossless: bool,
     metadata: Option<&'a MetadataView<'a>>,
     codec_config: Option<&'a CodecConfig>,
@@ -378,6 +410,7 @@ pub(crate) struct WebpDynEncoder<'a> {
 pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> WebpDynEncoder<'_> {
     WebpDynEncoder {
         quality: params.quality,
+        effort: params.effort,
         lossless: params.lossless,
         metadata: params.metadata,
         codec_config: params.codec_config,
@@ -387,6 +420,10 @@ pub(crate) fn build_dyn_encoder(params: EncodeParams<'_>) -> WebpDynEncoder<'_> 
 }
 
 impl DynEncoder for WebpDynEncoder<'_> {
+    fn format(&self) -> ImageFormat {
+        ImageFormat::WebP
+    }
+
     fn supported_descriptors(&self) -> &'static [PixelDescriptor] {
         WEBP_SUPPORTED
     }
@@ -409,6 +446,7 @@ impl DynEncoder for WebpDynEncoder<'_> {
                 encode_rgb8(
                     img,
                     self.quality,
+                    self.effort,
                     self.lossless,
                     self.metadata,
                     self.codec_config,
@@ -422,6 +460,7 @@ impl DynEncoder for WebpDynEncoder<'_> {
                 encode_rgba8(
                     img,
                     self.quality,
+                    self.effort,
                     self.lossless,
                     self.metadata,
                     self.codec_config,
@@ -435,6 +474,7 @@ impl DynEncoder for WebpDynEncoder<'_> {
                 encode_bgra8(
                     img,
                     self.quality,
+                    self.effort,
                     self.lossless,
                     self.metadata,
                     self.codec_config,
@@ -448,6 +488,7 @@ impl DynEncoder for WebpDynEncoder<'_> {
                 encode_gray8(
                     img,
                     self.quality,
+                    self.effort,
                     self.lossless,
                     self.metadata,
                     self.codec_config,
@@ -461,6 +502,7 @@ impl DynEncoder for WebpDynEncoder<'_> {
                 encode_rgb_f32(
                     img,
                     self.quality,
+                    self.effort,
                     self.lossless,
                     self.metadata,
                     self.codec_config,
@@ -474,6 +516,7 @@ impl DynEncoder for WebpDynEncoder<'_> {
                 encode_rgba_f32(
                     img,
                     self.quality,
+                    self.effort,
                     self.lossless,
                     self.metadata,
                     self.codec_config,
@@ -487,6 +530,7 @@ impl DynEncoder for WebpDynEncoder<'_> {
                 encode_gray_f32(
                     img,
                     self.quality,
+                    self.effort,
                     self.lossless,
                     self.metadata,
                     self.codec_config,
