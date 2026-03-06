@@ -7,11 +7,10 @@ use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::pixel::{Rgb, Rgba};
 use crate::{
-    CodecError, DecodeOutput, EncodeJob, EncoderConfig, ImageFormat, ImageInfo, Limits, Stop,
+    CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop,
 };
 #[cfg(feature = "jpeg-ultrahdr")]
 use crate::{EncodeOutput, MetadataView, pixel::ImgRef};
-use alloc::boxed::Box;
 use zencodec_types::{Decode, DecodeJob as _, DecoderConfig as _};
 #[cfg(feature = "jpeg-ultrahdr")]
 use zenpixels::PixelDescriptor;
@@ -208,30 +207,10 @@ fn build_encoding(
 // Trait-based encoder dispatch
 // ═══════════════════════════════════════════════════════════════════════
 
-use crate::dispatch::{BuiltEncoder, EncodeParams};
+use crate::dispatch::{BuiltEncoder, EncodeParams, build_from_config};
 
 pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<'a> {
-    BuiltEncoder {
-        encoder: Box::new(move |pixels| {
-            let enc = build_encoding(params.quality, params.codec_config);
-            let mut job = enc.job();
-            if let Some(lim) = params.limits {
-                job = job.with_limits(to_resource_limits(lim));
-            }
-            if let Some(meta) = params.metadata {
-                job = job.with_metadata(meta);
-            }
-            if let Some(s) = params.stop {
-                job = job.with_stop(s);
-            }
-            use zencodec_types::Encoder as _;
-            job.encoder()
-                .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
-                .encode(pixels)
-                .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
-        }),
-        supported: zenjpeg::JpegEncoderConfig::supported_descriptors(),
-    }
+    build_from_config(|p| build_encoding(p.quality, p.codec_config), params)
 }
 
 /// Decode UltraHDR JPEG to linear f32 RGBA HDR pixels.

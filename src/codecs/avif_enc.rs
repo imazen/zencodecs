@@ -1,38 +1,19 @@
 //! AVIF encode adapter using zenavif via trait interface.
 
-use crate::CodecError;
-use crate::ImageFormat;
 use crate::config::CodecConfig;
-use crate::limits::to_resource_limits;
-use alloc::boxed::Box;
-use zencodec_types::{EncodeJob as _, Encoder as _, EncoderConfig as _};
+use zencodec_types::EncoderConfig as _;
 
 // ═══════════════════════════════════════════════════════════════════════
 // Trait-based encoder dispatch
 // ═══════════════════════════════════════════════════════════════════════
 
-use crate::dispatch::{BuiltEncoder, EncodeParams};
+use crate::dispatch::{BuiltEncoder, EncodeParams, build_from_config};
+
 pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<'a> {
-    BuiltEncoder {
-        encoder: Box::new(move |pixels| {
-            let enc = build_encoding(params.quality, params.effort, params.codec_config);
-            let mut job = enc.job();
-            if let Some(lim) = params.limits {
-                job = job.with_limits(to_resource_limits(lim));
-            }
-            if let Some(meta) = params.metadata {
-                job = job.with_metadata(meta);
-            }
-            if let Some(s) = params.stop {
-                job = job.with_stop(s);
-            }
-            job.encoder()
-                .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))?
-                .encode(pixels)
-                .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
-        }),
-        supported: zenavif::AvifEncoderConfig::supported_descriptors(),
-    }
+    build_from_config(
+        |p| build_encoding(p.quality, p.effort, p.codec_config),
+        params,
+    )
 }
 
 /// Build an AvifEncoderConfig from quality/effort/codec_config.

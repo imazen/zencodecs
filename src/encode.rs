@@ -8,7 +8,7 @@ use crate::config::CodecConfig;
 use crate::dispatch::EncodeParams;
 use crate::pixel::{Bgra, Gray, ImgRef, Rgb, Rgba};
 use crate::{CodecError, CodecRegistry, ImageFormat, Limits, MetadataView, Stop};
-use zenpixels::PixelDescriptor;
+use zenpixels::{AlphaMode, PixelDescriptor};
 
 pub use zencodec_types::EncodeOutput;
 
@@ -232,6 +232,33 @@ impl<'a> EncodeRequest<'a> {
             stride,
             has_alpha,
         )
+    }
+
+    /// Encode sRGB RGBA8 pixels (straight alpha, not premultiplied).
+    ///
+    /// When `ignore_alpha` is true, the alpha channel is treated as padding —
+    /// codecs may use RGB-only paths and skip alpha handling entirely.
+    /// Use this when all alpha values are 255 or when alpha is irrelevant.
+    ///
+    /// When `ignore_alpha` is false, alpha is preserved as straight
+    /// (unassociated) alpha. Codecs that don't support alpha (e.g. JPEG)
+    /// will discard it during pixel format negotiation.
+    ///
+    /// Pixels must be straight (non-premultiplied) alpha. Premultiplied
+    /// input will produce wrong output — unpremultiply first.
+    pub fn encode_srgba8(
+        self,
+        img: ImgRef<Rgba<u8>>,
+        ignore_alpha: bool,
+    ) -> Result<EncodeOutput, CodecError> {
+        let descriptor = if ignore_alpha {
+            PixelDescriptor::RGBA8_SRGB.with_alpha(Some(AlphaMode::Undefined))
+        } else {
+            PixelDescriptor::RGBA8_SRGB
+        };
+        let data: &[u8] = bytemuck::cast_slice(img.buf());
+        let stride = img.stride() * core::mem::size_of::<Rgba<u8>>();
+        self.encode_dispatch(data, descriptor, img.width() as u32, img.height() as u32, stride, !ignore_alpha)
     }
 
     /// Encode BGRA8 pixels (native byte order, zero-copy for codecs that support it).
@@ -493,5 +520,34 @@ mod tests {
             .with_exif(b"fake_exif")
             .with_xmp(b"fake_xmp");
         let _request = EncodeRequest::new(ImageFormat::Jpeg).with_metadata(&meta);
+    }
+
+    #[test]
+    fn encode_srgba8_opaque() {
+        let img = imgref::ImgVec::new(
+            vec![Rgba { r: 128u8, g: 64, b: 32, a: 255 }; 10 * 10],
+            10,
+            10,
+        );
+        let output = EncodeRequest::new(ImageFormat::Jpeg)
+            .with_quality(75.0)
+            .encode_srgba8(img.as_ref(), true)
+            .unwrap();
+        assert!(!output.data().is_empty());
+    }
+
+    #[test]
+    fn encode_srgba8_straight() {
+        let img = imgref::ImgVec::new(
+            vec![Rgba { r: 128u8, g: 64, b: 32, a: 200 }; 10 * 10],
+            10,
+            10,
+        );
+        // WebP supports alpha
+        let output = EncodeRequest::new(ImageFormat::WebP)
+            .with_quality(75.0)
+            .encode_srgba8(img.as_ref(), false)
+            .unwrap();
+        assert!(!output.data().is_empty());
     }
 }

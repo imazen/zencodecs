@@ -31,6 +31,41 @@ pub(crate) struct BuiltEncoder<'a> {
     pub supported: &'static [PixelDescriptor],
 }
 
+/// Build a type-erased encoder from a config-building closure.
+///
+/// The closure receives `EncodeParams` and returns the concrete `EncoderConfig`.
+/// Config construction happens inside the returned closure so the config's
+/// lifetime doesn't escape the function.
+pub(crate) fn build_from_config<'a, C, F>(build_config: F, params: EncodeParams<'a>) -> BuiltEncoder<'a>
+where
+    C: zencodec_types::EncoderConfig + 'a,
+    F: FnOnce(&EncodeParams<'a>) -> C + 'a,
+    for<'b> <C::Job<'b> as zencodec_types::EncodeJob<'b>>::Enc: zencodec_types::Encoder,
+{
+    BuiltEncoder {
+        encoder: Box::new(move |pixels| {
+            use zencodec_types::EncodeJob as _;
+            let config = build_config(&params);
+            let mut job = config.job();
+            if let Some(lim) = params.limits {
+                job = job.with_limits(crate::limits::to_resource_limits(lim));
+            }
+            if let Some(meta) = params.metadata {
+                job = job.with_metadata(meta);
+            }
+            if let Some(s) = params.stop {
+                job = job.with_stop(s);
+            }
+            let format = C::format();
+            job.dyn_encoder()
+                .map_err(|e| CodecError::from_codec_boxed(format, e))?
+                (pixels)
+                .map_err(|e| CodecError::from_codec_boxed(format, e))
+        }),
+        supported: C::supported_descriptors(),
+    }
+}
+
 /// Build a type-erased encoder for the specified format.
 ///
 /// Each codec arm delegates to its `build_trait_encoder` which builds

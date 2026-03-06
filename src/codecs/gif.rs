@@ -2,10 +2,7 @@
 
 use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
-use crate::{
-    CodecError, DecodeOutput, EncodeJob, EncoderConfig, ImageFormat, ImageInfo, Limits, Stop,
-};
-use alloc::boxed::Box;
+use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
 use zencodec_types::{Decode, DecodeJob as _, DecoderConfig as _};
 
 /// Probe GIF metadata without decoding pixels.
@@ -48,25 +45,8 @@ fn build_gif_encoding(codec_config: Option<&CodecConfig>) -> zengif::GifEncoderC
 // Trait-based encoder dispatch
 // ═══════════════════════════════════════════════════════════════════════
 
-use crate::dispatch::{BuiltEncoder, EncodeParams};
+use crate::dispatch::{BuiltEncoder, EncodeParams, build_from_config};
 
 pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<'a> {
-    BuiltEncoder {
-        encoder: Box::new(move |pixels| {
-            let enc = build_gif_encoding(params.codec_config);
-            let mut job = enc.job();
-            if let Some(lim) = params.limits {
-                job = job.with_limits(crate::limits::to_resource_limits(lim));
-            }
-            if let Some(s) = params.stop {
-                job = job.with_stop(s);
-            }
-            use zencodec_types::Encoder as _;
-            job.encoder()
-                .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?
-                .encode(pixels)
-                .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
-        }),
-        supported: zengif::GifEncoderConfig::supported_descriptors(),
-    }
+    build_from_config(|p| build_gif_encoding(p.codec_config), params)
 }

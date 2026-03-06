@@ -3,11 +3,7 @@
 use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
-use alloc::boxed::Box;
-use zencodec_types::{
-    Decode as _, DecodeJob as _, DecoderConfig as _, EncodeJob as _, Encoder as _,
-    EncoderConfig as _,
-};
+use zencodec_types::{Decode as _, DecodeJob as _, DecoderConfig as _, EncoderConfig as _};
 
 /// Probe PNG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -62,26 +58,8 @@ fn build_encoding(
 // Trait-based encoder dispatch
 // ═══════════════════════════════════════════════════════════════════════
 
-use crate::dispatch::{BuiltEncoder, EncodeParams};
+use crate::dispatch::{BuiltEncoder, EncodeParams, build_from_config};
+
 pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<'a> {
-    BuiltEncoder {
-        encoder: Box::new(move |pixels| {
-            let enc = build_encoding(params.effort, params.codec_config);
-            let mut job = enc.job();
-            if let Some(lim) = params.limits {
-                job = job.with_limits(to_resource_limits(lim));
-            }
-            if let Some(meta) = params.metadata {
-                job = job.with_metadata(meta);
-            }
-            if let Some(s) = params.stop {
-                job = job.with_stop(s);
-            }
-            job.encoder()
-                .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))?
-                .encode(pixels)
-                .map_err(|e| CodecError::from_codec(ImageFormat::Png, e))
-        }),
-        supported: zenpng::PngEncoderConfig::supported_descriptors(),
-    }
+    build_from_config(|p| build_encoding(p.effort, p.codec_config), params)
 }
