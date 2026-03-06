@@ -58,6 +58,7 @@ impl Limits {
     }
 }
 
+#[cfg(feature = "jpeg-ultrahdr")]
 impl Limits {
     /// Validate dimensions and estimated memory against limits, returning CodecError on violation.
     pub(crate) fn validate(
@@ -80,6 +81,7 @@ impl Limits {
 }
 
 /// Get a `&dyn Stop` reference, defaulting to `Unstoppable` if `None`.
+#[cfg(feature = "jpeg-ultrahdr")]
 pub(crate) fn stop_or_default(stop: Option<&dyn Stop>) -> &dyn Stop {
     stop.unwrap_or(&enough::Unstoppable)
 }

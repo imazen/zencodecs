@@ -1,19 +1,19 @@
-//! JPEG codec adapter using zenjpeg.
+//! JPEG codec adapter using zenjpeg via trait interface.
 //!
-//! Probe and encode use the trait interface. Decode uses native API to
-//! preserve JPEG extras (DecodedExtras with DCT coefficients etc.).
+//! Probe, encode, and decode use the trait interface.
+//! UltraHDR decode uses the native API (needs mid-decode extras access).
 
 use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
-use crate::pixel::{ImgVec, Rgb, Rgba};
+use crate::pixel::{Rgb, Rgba};
 use crate::{
-    CodecError, DecodeJob, DecodeOutput, DecoderConfig, EncodeJob, EncoderConfig, ImageFormat,
-    ImageInfo, Limits, Stop,
+    CodecError, DecodeOutput, EncodeJob, EncoderConfig, ImageFormat, ImageInfo, Limits, Stop,
 };
 #[cfg(feature = "jpeg-ultrahdr")]
 use crate::{EncodeOutput, MetadataView, pixel::ImgRef};
 use alloc::boxed::Box;
-use zenpixels::{PixelBuffer, PixelDescriptor, PixelSliceMut};
+use zencodec_types::{Decode, DecodeJob as _, DecoderConfig as _};
+use zenpixels::{PixelDescriptor, PixelSliceMut};
 
 /// Probe JPEG metadata without decoding pixels.
 ///
@@ -56,6 +56,7 @@ fn jpeg_info_to_image_info(info: &zenjpeg::decoder::JpegInfo) -> ImageInfo {
 }
 
 /// Build a zenjpeg Decoder from codec config and limits.
+#[cfg(feature = "jpeg-ultrahdr")]
 fn build_decoder(
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
@@ -78,71 +79,36 @@ fn build_decoder(
 }
 
 /// Decode JPEG to pixels.
-///
-/// Uses native API to preserve JPEG extras (DecodedExtras).
 pub(crate) fn decode(
     data: &[u8],
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    let stop = crate::limits::stop_or_default(stop);
-    let decoder = build_decoder(codec_config, limits);
+    // Pre-decode dimension check (zenjpeg trait doesn't enforce max_width/max_height yet)
+    if let Some(lim) = limits
+        && (lim.max_width.is_some() || lim.max_height.is_some())
+    {
+        let info = probe(data)?;
+        lim.check_dimensions(info.width as u64, info.height as u64)
+            .map_err(|msg| CodecError::LimitExceeded(msg.into()))?;
+    }
 
-    let mut result = decoder
-        .decode(data, stop)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
-
-    let width = result.width();
-    let height = result.height();
-
-    // Validate dimensions against zencodecs limits (zenjpeg has its own, but
-    // this catches width/height limits that zenjpeg doesn't check)
+    let mut dec = zenjpeg::JpegDecoderConfig::new();
+    if let Some(cfg) = codec_config.and_then(|c| c.jpeg_decoder.as_ref()) {
+        *dec.inner_mut() = cfg.as_ref().clone();
+    }
+    let mut job = dec.job();
     if let Some(lim) = limits {
-        lim.validate(width, height, 3)?;
+        job = job.with_limits(to_resource_limits(lim));
     }
-
-    let extras = result.extras();
-    let icc_profile = extras
-        .and_then(|e| e.icc_profile())
-        .map(|p: &[u8]| p.to_vec());
-    let exif = extras.and_then(|e| e.exif()).map(|p: &[u8]| p.to_vec());
-    let xmp = extras
-        .and_then(|e| e.xmp())
-        .map(|s: &str| s.as_bytes().to_vec());
-
-    let raw_pixels = result
-        .pixels_u8()
-        .ok_or_else(|| CodecError::InvalidInput("no pixel data in decoded image".into()))?;
-
-    let rgb_pixels: &[Rgb<u8>] = bytemuck::cast_slice(raw_pixels);
-    let img = ImgVec::new(rgb_pixels.to_vec(), width as usize, height as usize);
-
-    let jpeg_extras = result.take_extras();
-
-    let mut ii = ImageInfo::new(width, height, ImageFormat::Jpeg).with_frame_count(1);
-    if let Some(icc) = icc_profile {
-        ii = ii.with_icc_profile(icc);
+    if let Some(s) = stop {
+        job = job.with_stop(s);
     }
-    if let Some(exif) = exif {
-        ii = ii.with_exif(exif);
-    }
-    if let Some(xmp) = xmp {
-        // Detect UltraHDR gain map from XMP hdrgm namespace
-        if let Ok(xmp_str) = core::str::from_utf8(&xmp)
-            && (xmp_str.contains("hdrgm:Version") || xmp_str.contains("hdrgm:GainMapMax"))
-        {
-            ii = ii.with_gain_map(true);
-        }
-        ii = ii.with_xmp(xmp);
-    }
-
-    let buf = PixelBuffer::from_imgvec(img).with_descriptor(PixelDescriptor::RGB8_SRGB);
-    let mut output = DecodeOutput::new(buf.into(), ii);
-    if let Some(extras) = jpeg_extras {
-        output = output.with_extras(extras);
-    }
-    Ok(output)
+    job.decoder(data, &[])
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
+        .decode()
+        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
 }
 
 /// Compute actual output dimensions for JPEG (applies DctScale, auto_orient).
