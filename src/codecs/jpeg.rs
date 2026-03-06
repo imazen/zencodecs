@@ -85,15 +85,6 @@ pub(crate) fn decode(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    // Pre-decode dimension check (zenjpeg trait doesn't enforce max_width/max_height yet)
-    if let Some(lim) = limits
-        && (lim.max_width.is_some() || lim.max_height.is_some())
-    {
-        let info = probe(data)?;
-        lim.check_dimensions(info.width as u64, info.height as u64)
-            .map_err(|msg| CodecError::LimitExceeded(msg.into()))?;
-    }
-
     let mut dec = zenjpeg::JpegDecoderConfig::new();
     if let Some(cfg) = codec_config.and_then(|c| c.jpeg_decoder.as_ref()) {
         *dec.inner_mut() = cfg.as_ref().clone();
