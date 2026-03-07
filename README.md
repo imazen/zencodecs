@@ -100,6 +100,7 @@ let limits = Limits {
     max_height: Some(4096),
     max_pixels: Some(16_000_000),
     max_memory_bytes: Some(256_000_000),
+    ..Default::default()
 };
 
 let decoded = DecodeRequest::new(data)

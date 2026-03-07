@@ -3,7 +3,7 @@
 /// Resource limits for decode/encode operations.
 ///
 /// Used to prevent DoS attacks and resource exhaustion. All limits are optional.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Limits {
     /// Maximum image width in pixels.
     pub max_width: Option<u64>,
@@ -13,6 +13,23 @@ pub struct Limits {
     pub max_pixels: Option<u64>,
     /// Maximum memory allocation in bytes.
     pub max_memory_bytes: Option<u64>,
+    /// Whether the codec may use multiple threads.
+    ///
+    /// Defaults to `true`. Set to `false` to force single-threaded operation
+    /// (useful for deterministic output or constrained environments).
+    pub allow_multithreading: bool,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_width: None,
+            max_height: None,
+            max_pixels: None,
+            max_memory_bytes: None,
+            allow_multithreading: true,
+        }
+    }
 }
 
 impl Limits {
@@ -101,6 +118,7 @@ pub(crate) fn to_resource_limits(limits: &Limits) -> zencodec_types::ResourceLim
     if let Some(max_mem) = limits.max_memory_bytes {
         rl = rl.with_max_memory(max_mem);
     }
+    rl = rl.with_allow_multithreading(limits.allow_multithreading);
     rl
 }
 

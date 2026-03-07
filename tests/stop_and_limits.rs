@@ -543,6 +543,7 @@ fn generous_limits_still_work() {
         max_height: Some(10000),
         max_pixels: Some(100_000_000),
         max_memory_bytes: Some(1_000_000_000),
+        ..Default::default()
     };
     let result = DecodeRequest::new(&data).with_limits(&limits).decode();
     assert!(
