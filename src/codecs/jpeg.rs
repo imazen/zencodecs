@@ -6,9 +6,7 @@
 use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::pixel::{Rgb, Rgba};
-use crate::{
-    CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop,
-};
+use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
 #[cfg(feature = "jpeg-ultrahdr")]
 use crate::{EncodeOutput, MetadataView, pixel::ImgRef};
 use zencodec_types::{Decode, DecodeJob as _, DecoderConfig as _};

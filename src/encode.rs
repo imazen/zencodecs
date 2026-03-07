@@ -552,6 +552,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "webp")]
     fn encode_srgba8_imgref_straight() {
         let img = imgref::ImgVec::new(
             vec![
@@ -576,6 +577,7 @@ mod tests {
 
     /// Zero generics — `&dyn AnyEncoder` is fully codec-agnostic.
     #[test]
+    #[cfg(all(feature = "jpeg", feature = "webp"))]
     fn any_encoder_dyn_dispatch() {
         use crate::AnyEncoder;
         use zencodec_types::EncoderConfig as _;

@@ -13,11 +13,11 @@ pub struct Limits {
     pub max_pixels: Option<u64>,
     /// Maximum memory allocation in bytes.
     pub max_memory_bytes: Option<u64>,
-    /// Whether the codec may use multiple threads.
+    /// Threading policy for codec operations.
     ///
-    /// Defaults to `true`. Set to `false` to force single-threaded operation
-    /// (useful for deterministic output or constrained environments).
-    pub allow_multithreading: bool,
+    /// Defaults to [`ThreadingPolicy::Unlimited`]. Use [`ThreadingPolicy::SingleThread`]
+    /// for deterministic output or constrained environments.
+    pub threading: zencodec_types::ThreadingPolicy,
 }
 
 impl Default for Limits {
@@ -27,7 +27,7 @@ impl Default for Limits {
             max_height: None,
             max_pixels: None,
             max_memory_bytes: None,
-            allow_multithreading: true,
+            threading: zencodec_types::ThreadingPolicy::Unlimited,
         }
     }
 }
@@ -118,7 +118,7 @@ pub(crate) fn to_resource_limits(limits: &Limits) -> zencodec_types::ResourceLim
     if let Some(max_mem) = limits.max_memory_bytes {
         rl = rl.with_max_memory(max_mem);
     }
-    rl = rl.with_allow_multithreading(limits.allow_multithreading);
+    rl = rl.with_threading(limits.threading);
     rl
 }
 
