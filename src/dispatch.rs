@@ -59,7 +59,7 @@ where
             let format = C::format();
             job.dyn_encoder()
                 .map_err(|e| CodecError::from_codec_boxed(format, e))?
-                (pixels)
+                .encode(pixels)
                 .map_err(|e| CodecError::from_codec_boxed(format, e))
         }),
         supported: C::supported_descriptors(),
