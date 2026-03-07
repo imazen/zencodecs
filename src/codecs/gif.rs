@@ -1,9 +1,11 @@
 //! GIF codec adapter using zengif via trait interface.
 
+use alloc::borrow::Cow;
+
 use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
-use zencodec_types::{Decode, DecodeJob as _, DecoderConfig as _};
+use zc::decode::{Decode, DecodeJob as _, DecoderConfig as _};
 
 /// Probe GIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -26,7 +28,7 @@ pub(crate) fn decode(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decoder(data, &[])
+    job.decoder(Cow::Borrowed(data), &[])
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?
         .decode()
         .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))

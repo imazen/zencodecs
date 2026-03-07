@@ -2,11 +2,13 @@
 //!
 //! Probe, decode, and encode all use the trait interface.
 
+use alloc::borrow::Cow;
+
 use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::pixel::Rgba;
 use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
-use zencodec_types::{Decode as _, DecodeJob as _, DecoderConfig as _};
+use zc::decode::{Decode as _, DecodeJob as _, DecoderConfig as _};
 use zenpixels::PixelSliceMut;
 
 /// Probe WebP metadata without decoding pixels.
@@ -39,7 +41,7 @@ pub(crate) fn decode(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decoder(data, &[])
+    job.decoder(Cow::Borrowed(data), &[])
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
         .decode()
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
@@ -69,7 +71,7 @@ pub(crate) fn decode_into_rgba8(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decoder(data, &[])
+    job.decoder(Cow::Borrowed(data), &[])
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))?
         .decode_into(data, PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::WebP, e))
@@ -85,7 +87,7 @@ fn build_encoding(
     lossless: bool,
     codec_config: Option<&CodecConfig>,
 ) -> zenwebp::WebpEncoderConfig {
-    use zencodec_types::EncoderConfig;
+    use zc::encode::EncoderConfig;
 
     if lossless {
         if let Some(cfg) = codec_config.and_then(|c| c.webp_lossless.as_ref()) {

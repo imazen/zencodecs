@@ -3,13 +3,15 @@
 //! Probe, encode, and decode use the trait interface.
 //! UltraHDR decode uses the native API (needs mid-decode extras access).
 
+use alloc::borrow::Cow;
+
 use crate::config::CodecConfig;
 use crate::limits::to_resource_limits;
 use crate::pixel::{Rgb, Rgba};
 use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
 #[cfg(feature = "jpeg-ultrahdr")]
 use crate::{EncodeOutput, MetadataView, pixel::ImgRef};
-use zencodec_types::{Decode, DecodeJob as _, DecoderConfig as _};
+use zc::decode::{Decode, DecodeJob as _, DecoderConfig as _};
 #[cfg(feature = "jpeg-ultrahdr")]
 use zenpixels::PixelDescriptor;
 use zenpixels::PixelSliceMut;
@@ -40,7 +42,7 @@ fn jpeg_info_to_image_info(info: &zenjpeg::decoder::JpegInfo) -> ImageInfo {
     }
     if let Some(ref exif) = info.exif {
         if let Some(orient) = zenjpeg::lossless::parse_exif_orientation(exif) {
-            ii = ii.with_orientation(zencodec_types::Orientation::from_exif(orient as u16));
+            ii = ii.with_orientation(zc::Orientation::from_exif(orient as u16));
         }
         ii = ii.with_exif(exif.clone());
     }
@@ -95,7 +97,7 @@ pub(crate) fn decode(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decoder(data, &[])
+    job.decoder(Cow::Borrowed(data), &[])
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
         .decode()
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
@@ -128,7 +130,7 @@ pub(crate) fn decode_into_rgb8(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decoder(data, &[])
+    job.decoder(Cow::Borrowed(data), &[])
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
         .decode_into(PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
@@ -150,7 +152,7 @@ pub(crate) fn decode_into_rgba8(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decoder(data, &[])
+    job.decoder(Cow::Borrowed(data), &[])
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
         .decode_into(PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
@@ -172,7 +174,7 @@ pub(crate) fn decode_into_gray8(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decoder(data, &[])
+    job.decoder(Cow::Borrowed(data), &[])
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
         .decode_into(PixelSliceMut::from(dst))
         .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
@@ -186,7 +188,7 @@ fn build_encoding(
     quality: Option<f32>,
     codec_config: Option<&CodecConfig>,
 ) -> zenjpeg::JpegEncoderConfig {
-    use zencodec_types::EncoderConfig;
+    use zc::encode::EncoderConfig;
 
     if let Some(cfg) = codec_config.and_then(|c| c.jpeg_encoder.as_ref()) {
         let mut e = zenjpeg::JpegEncoderConfig::new();

@@ -1,10 +1,12 @@
 //! JXL decode adapter — delegates to zenjxl via trait interface.
 
+use alloc::borrow::Cow;
+
 use crate::limits::to_resource_limits;
 use crate::{
     CodecError, DecodeJob, DecodeOutput, DecoderConfig, ImageFormat, ImageInfo, Limits, Stop,
 };
-use zencodec_types::Decode;
+use zc::decode::Decode;
 
 /// Probe JXL metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
@@ -28,7 +30,7 @@ pub(crate) fn decode(
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
-    job.decoder(data, &[])
+    job.decoder(Cow::Borrowed(data), &[])
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?
         .decode()
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
