@@ -246,7 +246,7 @@ impl<'a> EncodeRequest<'a> {
     ///
     /// Pixels must be straight (non-premultiplied) alpha. Premultiplied
     /// input will produce wrong output — unpremultiply first.
-    pub fn encode_srgba8(
+    pub fn encode_srgba8_imgref(
         self,
         img: ImgRef<Rgba<u8>>,
         ignore_alpha: bool,
@@ -523,7 +523,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_srgba8_opaque() {
+    fn encode_srgba8_imgref_opaque() {
         let img = imgref::ImgVec::new(
             vec![Rgba { r: 128u8, g: 64, b: 32, a: 255 }; 10 * 10],
             10,
@@ -531,13 +531,13 @@ mod tests {
         );
         let output = EncodeRequest::new(ImageFormat::Jpeg)
             .with_quality(75.0)
-            .encode_srgba8(img.as_ref(), true)
+            .encode_srgba8_imgref(img.as_ref(), true)
             .unwrap();
         assert!(!output.data().is_empty());
     }
 
     #[test]
-    fn encode_srgba8_straight() {
+    fn encode_srgba8_imgref_straight() {
         let img = imgref::ImgVec::new(
             vec![Rgba { r: 128u8, g: 64, b: 32, a: 200 }; 10 * 10],
             10,
@@ -546,7 +546,7 @@ mod tests {
         // WebP supports alpha
         let output = EncodeRequest::new(ImageFormat::WebP)
             .with_quality(75.0)
-            .encode_srgba8(img.as_ref(), false)
+            .encode_srgba8_imgref(img.as_ref(), false)
             .unwrap();
         assert!(!output.data().is_empty());
     }
