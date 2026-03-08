@@ -10,8 +10,9 @@ use zc::decode::Decode;
 
 /// Probe HEIC metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    heic_decoder::HeicDecoderConfig::new()
-        .probe_header(data)
+    let dec = heic_decoder::HeicDecoderConfig::new();
+    let job = dec.job();
+    job.probe(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Heic, e))
 }
 

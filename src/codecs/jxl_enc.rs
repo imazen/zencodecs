@@ -1,15 +1,14 @@
 //! JXL encode adapter — delegates to zenjxl via trait interface.
 
 use crate::config::CodecConfig;
-use crate::limits::to_resource_limits;
-use crate::{CodecError, ImageFormat};
-use alloc::boxed::Box;
+use crate::dispatch::{BuiltEncoder, EncodeParams, build_from_config};
 
-/// Build a JxlEncoderConfig from quality and effort.
-///
-/// Uses `EncoderConfig` trait methods — quality→distance mapping
-/// is handled by zenjxl's `with_generic_quality()`.
-fn build_encoding(quality: Option<f32>, effort: Option<u32>) -> zenjxl::JxlEncoderConfig {
+/// Build a JxlEncoderConfig from encoding params.
+fn build_encoding(
+    quality: Option<f32>,
+    effort: Option<u32>,
+    _codec_config: Option<&CodecConfig>,
+) -> zenjxl::JxlEncoderConfig {
     use zc::encode::EncoderConfig;
 
     let mut enc = zenjxl::JxlEncoderConfig::default();
@@ -22,31 +21,9 @@ fn build_encoding(quality: Option<f32>, effort: Option<u32>) -> zenjxl::JxlEncod
     enc
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Trait-based encoder dispatch
-// ═══════════════════════════════════════════════════════════════════════
-
-use crate::dispatch::{BuiltEncoder, EncodeParams};
 pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<'a> {
-    BuiltEncoder {
-        encoder: Box::new(move |pixels| {
-            let enc = build_encoding(params.quality, params.effort);
-            let mut job = enc.job();
-            if let Some(lim) = params.limits {
-                job = job.with_limits(to_resource_limits(lim));
-            }
-            if let Some(meta) = params.metadata {
-                job = job.with_metadata(meta);
-            }
-            if let Some(s) = params.stop {
-                job = job.with_stop(s);
-            }
-            use zc::encode::Encoder as _;
-            job.encoder()
-                .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))?
-                .encode(pixels)
-                .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
-        }),
-        supported: zenjxl::JxlEncoderConfig::supported_descriptors(),
-    }
+    build_from_config(
+        |p| build_encoding(p.quality, p.effort, p.codec_config),
+        params,
+    )
 }

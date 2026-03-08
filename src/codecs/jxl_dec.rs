@@ -10,8 +10,9 @@ use zc::decode::Decode;
 
 /// Probe JXL metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
-    zenjxl::JxlDecoderConfig::new()
-        .probe_header(data)
+    let dec = zenjxl::JxlDecoderConfig::new();
+    let job = dec.job();
+    job.probe(data)
         .map_err(|e| CodecError::from_codec(ImageFormat::Jxl, e))
 }
 
@@ -21,12 +22,11 @@ pub(crate) fn decode(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput, CodecError> {
-    // JxlDecoderConfig has inherent with_limits
-    let mut dec = zenjxl::JxlDecoderConfig::new();
-    if let Some(lim) = limits {
-        dec = dec.with_limits(to_resource_limits(lim));
-    }
+    let dec = zenjxl::JxlDecoderConfig::new();
     let mut job = dec.job();
+    if let Some(lim) = limits {
+        job = job.with_limits(to_resource_limits(lim));
+    }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }
