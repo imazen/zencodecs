@@ -68,5 +68,8 @@ fn build_encoding(
 use crate::dispatch::{BuiltEncoder, EncodeParams, build_from_config};
 
 pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<'a> {
-    build_from_config(|p| build_encoding(p.quality, p.effort, p.codec_config), params)
+    build_from_config(
+        |p| build_encoding(p.quality, p.effort, p.codec_config),
+        params,
+    )
 }

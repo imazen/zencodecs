@@ -90,7 +90,9 @@ fn roundtrip_dyn(
     // Encode via DynEncoderConfig → DynEncodeJob → DynEncoder
     let mut job = enc_config.dyn_job();
     job.set_limits(*limits);
-    let encoder = job.into_encoder().unwrap_or_else(|e| panic!("{label} dyn_encoder: {e}"));
+    let encoder = job
+        .into_encoder()
+        .unwrap_or_else(|e| panic!("{label} dyn_encoder: {e}"));
     let pixel_slice = pixels.as_slice();
     let encoded = encoder
         .encode(pixel_slice)
@@ -126,7 +128,9 @@ fn roundtrip_dyn(
         .into_decoder(data_cow, preferred_u8)
         .unwrap_or_else(|e| panic!("{label} dyn_decoder: {e}"));
 
-    let output = dec.decode().unwrap_or_else(|e| panic!("{label} dyn_decode: {e}"));
+    let output = dec
+        .decode()
+        .unwrap_or_else(|e| panic!("{label} dyn_decode: {e}"));
     eprintln!(
         "  decoded: {}x{} descriptor={:?}",
         output.width(),
@@ -136,10 +140,7 @@ fn roundtrip_dyn(
 }
 
 /// Run encode then push_decode via concrete codec types
-fn push_decode_jpeg(
-    enc_bytes: &[u8],
-    limits: &zc::ResourceLimits,
-) {
+fn push_decode_jpeg(enc_bytes: &[u8], limits: &zc::ResourceLimits) {
     #[cfg(feature = "jpeg")]
     {
         let dec = zenjpeg::JpegDecoderConfig::new();
@@ -159,7 +160,9 @@ fn push_decode_jpeg(
         }
     }
     #[cfg(not(feature = "jpeg"))]
-    { let _ = (enc_bytes, limits); }
+    {
+        let _ = (enc_bytes, limits);
+    }
 }
 
 fn main() {
