@@ -28,8 +28,8 @@ impl enough::Stop for AlreadyStopped {
 }
 
 /// Check if a CodecError indicates cancellation (either directly or wrapped).
-fn is_cancelled(err: &CodecError) -> bool {
-    match err {
+fn is_cancelled(err: &whereat::At<CodecError>) -> bool {
+    match err.error() {
         CodecError::Cancelled => true,
         CodecError::Codec { source, .. } => {
             let msg = format!("{source}");
@@ -40,8 +40,8 @@ fn is_cancelled(err: &CodecError) -> bool {
 }
 
 /// Check if an error indicates a limit violation.
-fn is_limit_error(err: &CodecError) -> bool {
-    match err {
+fn is_limit_error(err: &whereat::At<CodecError>) -> bool {
+    match err.error() {
         CodecError::LimitExceeded(_) => true,
         CodecError::Codec { source, .. } => {
             let msg = format!("{source}");

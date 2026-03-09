@@ -6,21 +6,27 @@
 use alloc::borrow::Cow;
 
 use crate::config::CodecConfig;
+use crate::error::Result;
 use crate::limits::to_resource_limits;
 use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
 #[cfg(feature = "jpeg-ultrahdr")]
 use crate::{EncodeOutput, MetadataView, pixel::ImgRef};
+#[cfg(feature = "jpeg-ultrahdr")]
+use rgb::{Rgb, Rgba};
+use whereat::at;
 use zc::decode::{Decode, DecodeJob as _, DecoderConfig as _};
+#[cfg(feature = "jpeg-ultrahdr")]
+use zenpixels::{PixelBuffer, PixelDescriptor};
 
 /// Probe JPEG metadata without decoding pixels.
 ///
 /// Uses `Permissive` strictness so we can extract dimensions and metadata from
 /// structurally damaged files that would fail a full decode.
-pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
+pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
     let info = zenjpeg::decoder::DecodeConfig::new()
         .permissive()
         .read_info(data)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))?;
     Ok(jpeg_info_to_image_info(&info))
 }
 
@@ -81,7 +87,7 @@ pub(crate) fn decode(
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
-) -> Result<DecodeOutput, CodecError> {
+) -> Result<DecodeOutput> {
     let mut dec = zenjpeg::JpegDecoderConfig::new();
     if let Some(cfg) = codec_config.and_then(|c| c.jpeg_decoder.as_ref()) {
         *dec.inner_mut() = cfg.as_ref().clone();
@@ -94,21 +100,18 @@ pub(crate) fn decode(
         job = job.with_stop(s);
     }
     job.decoder(Cow::Borrowed(data), &[])
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))?
         .decode()
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))
 }
 
 /// Compute actual output dimensions for JPEG (applies DctScale, auto_orient).
-pub(crate) fn decode_info(
-    data: &[u8],
-    _codec_config: Option<&CodecConfig>,
-) -> Result<ImageInfo, CodecError> {
+pub(crate) fn decode_info(data: &[u8], _codec_config: Option<&CodecConfig>) -> Result<ImageInfo> {
     // Use probe_full which returns complete metadata
     zenjpeg::JpegDecoderConfig::new()
         .job()
         .probe_full(data)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))
 }
 
 /// Build a JpegEncoderConfig from codec config or generic quality.
@@ -157,7 +160,7 @@ pub(crate) fn decode_hdr(
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
-) -> Result<DecodeOutput, CodecError> {
+) -> Result<DecodeOutput> {
     use linear_srgb::default::srgb_u8_to_linear;
     use zenjpeg::ultrahdr::{UltraHdrExtras, create_hdr_reconstructor};
 
@@ -166,7 +169,7 @@ pub(crate) fn decode_hdr(
 
     let mut result = decoder
         .decode(data, stop_token)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))?;
 
     let width = result.width();
     let height = result.height();
@@ -177,22 +180,24 @@ pub(crate) fn decode_hdr(
 
     let extras = result
         .extras()
-        .ok_or_else(|| CodecError::InvalidInput("no extras in decoded JPEG".into()))?;
+        .ok_or_else(|| at!(CodecError::InvalidInput("no extras in decoded JPEG".into())))?;
 
     if !extras.is_ultrahdr() {
-        return Err(CodecError::InvalidInput(
+        return Err(at!(CodecError::InvalidInput(
             "JPEG does not contain UltraHDR gain map".into(),
-        ));
+        )));
     }
 
     // Create HDR reconstructor from gain map metadata
     let mut reconstructor = create_hdr_reconstructor(width, height, extras, display_boost)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))?;
 
     // Get SDR pixels and convert to linear f32
-    let raw_pixels = result
-        .pixels_u8()
-        .ok_or_else(|| CodecError::InvalidInput("no pixel data in decoded image".into()))?;
+    let raw_pixels = result.pixels_u8().ok_or_else(|| {
+        at!(CodecError::InvalidInput(
+            "no pixel data in decoded image".into()
+        ))
+    })?;
 
     let row_stride = width as usize * 3; // RGB8
 
@@ -222,7 +227,7 @@ pub(crate) fn decode_hdr(
         // Reconstruct HDR (returns linear f32 RGBA)
         let hdr_batch = reconstructor
             .process_rows(&sdr_linear, batch_height)
-            .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+            .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))?;
 
         // Convert f32 slice to Rgba<f32> pixels
         for rgba in hdr_batch.chunks_exact(4) {
@@ -279,7 +284,7 @@ pub(crate) fn encode_ultrahdr_rgb_f32(
     codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
-) -> Result<EncodeOutput, CodecError> {
+) -> Result<EncodeOutput> {
     use zenjpeg::ultrahdr::{
         GainMapConfig, ToneMapConfig, UhdrColorGamut, UhdrColorTransfer, UhdrPixelFormat,
         UhdrRawImage, encode_ultrahdr,
@@ -308,7 +313,7 @@ pub(crate) fn encode_ultrahdr_rgb_f32(
         UhdrColorTransfer::Linear,
         rgba_data,
     )
-    .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+    .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))?;
 
     let enc = build_encoding(quality, codec_config);
     let gm_quality = gainmap_quality.unwrap_or(75.0);
@@ -321,7 +326,7 @@ pub(crate) fn encode_ultrahdr_rgb_f32(
         gm_quality,
         stop_token,
     )
-    .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+    .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))?;
 
     Ok(EncodeOutput::new(jpeg_data, ImageFormat::Jpeg))
 }
@@ -339,7 +344,7 @@ pub(crate) fn encode_ultrahdr_rgba_f32(
     codec_config: Option<&CodecConfig>,
     _limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
-) -> Result<EncodeOutput, CodecError> {
+) -> Result<EncodeOutput> {
     use zenjpeg::ultrahdr::{
         GainMapConfig, ToneMapConfig, UhdrColorGamut, UhdrColorTransfer, UhdrPixelFormat,
         UhdrRawImage, encode_ultrahdr,
@@ -361,7 +366,7 @@ pub(crate) fn encode_ultrahdr_rgba_f32(
         UhdrColorTransfer::Linear,
         rgba_bytes.to_vec(),
     )
-    .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+    .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))?;
 
     let enc = build_encoding(quality, codec_config);
     let gm_quality = gainmap_quality.unwrap_or(75.0);
@@ -374,7 +379,7 @@ pub(crate) fn encode_ultrahdr_rgba_f32(
         gm_quality,
         stop_token,
     )
-    .map_err(|e| CodecError::from_codec(ImageFormat::Jpeg, e))?;
+    .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))?;
 
     Ok(EncodeOutput::new(jpeg_data, ImageFormat::Jpeg))
 }

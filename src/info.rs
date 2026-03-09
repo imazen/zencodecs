@@ -2,7 +2,9 @@
 
 pub use zc::ImageInfo;
 
+use crate::error::Result;
 use crate::{CodecError, CodecRegistry, ImageFormat};
+use whereat::at;
 
 /// Detect image format from magic bytes using the common format registry.
 pub(crate) fn detect_format(data: &[u8]) -> Option<ImageFormat> {
@@ -13,28 +15,25 @@ pub(crate) fn detect_format(data: &[u8]) -> Option<ImageFormat> {
 ///
 /// Uses format auto-detection and dispatches to the appropriate codec's probe.
 /// All compiled-in codecs are attempted.
-pub fn from_bytes(data: &[u8]) -> Result<ImageInfo, CodecError> {
+pub fn from_bytes(data: &[u8]) -> Result<ImageInfo> {
     from_bytes_with_registry(data, &CodecRegistry::all())
 }
 
 /// Probe image metadata with a specific registry.
 ///
 /// Only formats enabled in the registry will be attempted.
-pub fn from_bytes_with_registry(
-    data: &[u8],
-    registry: &CodecRegistry,
-) -> Result<ImageInfo, CodecError> {
-    let format = detect_format(data).ok_or(CodecError::UnrecognizedFormat)?;
+pub fn from_bytes_with_registry(data: &[u8], registry: &CodecRegistry) -> Result<ImageInfo> {
+    let format = detect_format(data).ok_or_else(|| at!(CodecError::UnrecognizedFormat))?;
 
     if !registry.can_decode(format) {
-        return Err(CodecError::DisabledFormat(format));
+        return Err(at!(CodecError::DisabledFormat(format)));
     }
 
     probe_format_full(data, format)
 }
 
 /// Probe with a known format (skips auto-detection).
-pub fn from_bytes_format(data: &[u8], format: ImageFormat) -> Result<ImageInfo, CodecError> {
+pub fn from_bytes_format(data: &[u8], format: ImageFormat) -> Result<ImageInfo> {
     probe_format_full(data, format)
 }
 
@@ -45,7 +44,7 @@ pub fn from_bytes_format(data: &[u8], format: ImageFormat) -> Result<ImageInfo, 
 /// what [`DecodeRequest::decode`](crate::DecodeRequest::decode) will actually produce.
 ///
 /// For codecs without dimension transforms, this is equivalent to `from_bytes`.
-pub fn decode_info(data: &[u8]) -> Result<ImageInfo, CodecError> {
+pub fn decode_info(data: &[u8]) -> Result<ImageInfo> {
     decode_info_with_config(data, None)
 }
 
@@ -53,8 +52,8 @@ pub fn decode_info(data: &[u8]) -> Result<ImageInfo, CodecError> {
 pub fn decode_info_with_config(
     data: &[u8],
     codec_config: Option<&crate::config::CodecConfig>,
-) -> Result<ImageInfo, CodecError> {
-    let format = detect_format(data).ok_or(CodecError::UnrecognizedFormat)?;
+) -> Result<ImageInfo> {
+    let format = detect_format(data).ok_or_else(|| at!(CodecError::UnrecognizedFormat))?;
     decode_info_format(data, format, codec_config)
 }
 
@@ -63,7 +62,7 @@ fn decode_info_format(
     data: &[u8],
     format: ImageFormat,
     codec_config: Option<&crate::config::CodecConfig>,
-) -> Result<ImageInfo, CodecError> {
+) -> Result<ImageInfo> {
     match format {
         // JPEG needs codec support for DctScale dimension transforms
         #[cfg(feature = "jpeg")]
@@ -73,7 +72,7 @@ fn decode_info_format(
                 {
                     return Ok(info);
                 }
-                // Capped probe failed — retry with full data and warn
+                // Capped probe failed -- retry with full data and warn
                 let mut info = crate::codecs::jpeg::decode_info(data, codec_config)?;
                 info.warnings.push(alloc::format!(
                     "metadata located beyond {}KB fast-probe cap; required full scan",
@@ -97,12 +96,12 @@ fn decode_info_format(
 /// ICC profile pushing SOF past the cap), we retry with the full data.
 ///
 /// Per-format header sizes (typical):
-/// - PNG: IHDR at byte 8, iCCP/tEXt before IDAT — usually <10KB
+/// - PNG: IHDR at byte 8, iCCP/tEXt before IDAT -- usually <10KB
 /// - GIF: header is 13 bytes, global color table <1KB
-/// - WebP: VP8X at byte 12, metadata chunks — usually <10KB
-/// - JPEG: all metadata markers before SOS — usually <100KB, rarely >256KB
-/// - AVIF: ftyp+meta boxes — usually <20KB
-/// - JXL: frame header — usually <4KB
+/// - WebP: VP8X at byte 12, metadata chunks -- usually <10KB
+/// - JPEG: all metadata markers before SOS -- usually <100KB, rarely >256KB
+/// - AVIF: ftyp+meta boxes -- usually <20KB
+/// - JXL: frame header -- usually <4KB
 ///
 /// 256KB handles >99.9% of real-world files on the first attempt.
 const PROBE_CAP: usize = 256 * 1024;
@@ -111,12 +110,12 @@ const PROBE_CAP: usize = 256 * 1024;
 ///
 /// Tries with capped input first to avoid scanning pixel data in large files.
 /// Falls back to full data if the capped probe fails.
-fn probe_format_full(data: &[u8], format: ImageFormat) -> Result<ImageInfo, CodecError> {
+fn probe_format_full(data: &[u8], format: ImageFormat) -> Result<ImageInfo> {
     if data.len() > PROBE_CAP {
         if let Ok(info) = probe_codec(&data[..PROBE_CAP], format) {
             return Ok(info);
         }
-        // Capped probe failed — retry with full data and warn
+        // Capped probe failed -- retry with full data and warn
         let mut info = probe_codec(data, format)?;
         info.warnings.push(alloc::format!(
             "metadata located beyond {}KB fast-probe cap; required full scan",
@@ -128,59 +127,59 @@ fn probe_format_full(data: &[u8], format: ImageFormat) -> Result<ImageInfo, Code
 }
 
 /// Dispatch to the format-specific codec probe (requires codec feature).
-fn probe_codec(data: &[u8], format: ImageFormat) -> Result<ImageInfo, CodecError> {
+fn probe_codec(data: &[u8], format: ImageFormat) -> Result<ImageInfo> {
     match format {
         #[cfg(feature = "jpeg")]
         ImageFormat::Jpeg => crate::codecs::jpeg::probe(data),
         #[cfg(not(feature = "jpeg"))]
-        ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Jpeg => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "webp")]
         ImageFormat::WebP => crate::codecs::webp::probe(data),
         #[cfg(not(feature = "webp"))]
-        ImageFormat::WebP => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::WebP => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "gif")]
         ImageFormat::Gif => crate::codecs::gif::probe(data),
         #[cfg(not(feature = "gif"))]
-        ImageFormat::Gif => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Gif => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "png")]
         ImageFormat::Png => crate::codecs::png::probe(data),
         #[cfg(not(feature = "png"))]
-        ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Png => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "avif-decode")]
         ImageFormat::Avif => crate::codecs::avif_dec::probe(data),
         #[cfg(not(feature = "avif-decode"))]
-        ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Avif => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "jxl-decode")]
         ImageFormat::Jxl => crate::codecs::jxl_dec::probe(data),
         #[cfg(not(feature = "jxl-decode"))]
-        ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Jxl => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "heic-decode")]
         ImageFormat::Heic => crate::codecs::heic::probe(data),
         #[cfg(not(feature = "heic-decode"))]
-        ImageFormat::Heic => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "bitmaps")]
         ImageFormat::Pnm => crate::codecs::pnm::probe(data),
         #[cfg(not(feature = "bitmaps"))]
-        ImageFormat::Pnm => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Pnm => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "bitmaps-bmp")]
         ImageFormat::Bmp => crate::codecs::bmp::probe(data),
         #[cfg(not(feature = "bitmaps-bmp"))]
-        ImageFormat::Bmp => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Bmp => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "bitmaps")]
         ImageFormat::Farbfeld => crate::codecs::farbfeld::probe(data),
         #[cfg(not(feature = "bitmaps"))]
-        ImageFormat::Farbfeld => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Farbfeld => Err(at!(CodecError::UnsupportedFormat(format))),
 
-        _ => Err(CodecError::UnsupportedFormat(format)),
+        _ => Err(at!(CodecError::UnsupportedFormat(format))),
     }
 }
 
@@ -192,7 +191,10 @@ mod tests {
     fn unrecognized_format() {
         let data = b"not an image";
         let result = from_bytes(data);
-        assert!(matches!(result, Err(CodecError::UnrecognizedFormat)));
+        assert!(matches!(
+            result.as_ref().map_err(|e| e.error()),
+            Err(CodecError::UnrecognizedFormat)
+        ));
     }
 
     #[test]
@@ -201,6 +203,9 @@ mod tests {
         let registry = CodecRegistry::none();
 
         let result = from_bytes_with_registry(&jpeg_data, &registry);
-        assert!(matches!(result, Err(CodecError::DisabledFormat(_))));
+        assert!(matches!(
+            result.as_ref().map_err(|e| e.error()),
+            Err(CodecError::DisabledFormat(_))
+        ));
     }
 }

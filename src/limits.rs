@@ -149,15 +149,16 @@ impl Limits {
         width: u32,
         height: u32,
         bytes_per_pixel: u32,
-    ) -> Result<(), crate::CodecError> {
+    ) -> crate::error::Result<()> {
+        use whereat::at;
         self.check_dimensions(width as u64, height as u64)
-            .map_err(|msg| crate::CodecError::LimitExceeded(msg.into()))?;
+            .map_err(|msg| at!(crate::CodecError::LimitExceeded(msg.into())))?;
 
         let estimated_bytes = (width as u64)
             .saturating_mul(height as u64)
             .saturating_mul(bytes_per_pixel as u64);
         self.check_memory(estimated_bytes)
-            .map_err(|msg| crate::CodecError::LimitExceeded(msg.into()))?;
+            .map_err(|msg| at!(crate::CodecError::LimitExceeded(msg.into())))?;
 
         Ok(())
     }

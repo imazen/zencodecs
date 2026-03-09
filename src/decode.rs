@@ -3,7 +3,9 @@
 pub use zc::decode::DecodeOutput;
 
 use crate::config::CodecConfig;
+use crate::error::Result;
 use crate::{CodecError, CodecRegistry, ImageFormat, ImageInfo, Limits, Stop};
+use whereat::at;
 
 /// Image decode request builder.
 ///
@@ -15,7 +17,7 @@ use crate::{CodecError, CodecRegistry, ImageFormat, ImageInfo, Limits, Stop};
 /// let data: &[u8] = &[]; // your image bytes
 /// let output = DecodeRequest::new(data).decode()?;
 /// println!("{}x{}", output.width(), output.height());
-/// # Ok::<(), zencodecs::CodecError>(())
+/// # Ok::<(), whereat::At<zencodecs::CodecError>>(())
 /// ```
 pub struct DecodeRequest<'a> {
     data: &'a [u8],
@@ -73,15 +75,16 @@ impl<'a> DecodeRequest<'a> {
     }
 
     /// Resolve format (auto-detect or explicit) and check registry.
-    fn resolve_format(&self) -> Result<ImageFormat, CodecError> {
+    fn resolve_format(&self) -> Result<ImageFormat> {
         let default_registry = CodecRegistry::all();
         let registry = self.registry.unwrap_or(&default_registry);
         let format = match self.format {
             Some(f) => f,
-            None => crate::info::detect_format(self.data).ok_or(CodecError::UnrecognizedFormat)?,
+            None => crate::info::detect_format(self.data)
+                .ok_or_else(|| at!(CodecError::UnrecognizedFormat))?,
         };
         if !registry.can_decode(format) {
-            return Err(CodecError::DisabledFormat(format));
+            return Err(at!(CodecError::DisabledFormat(format)));
         }
         Ok(format)
     }
@@ -91,7 +94,7 @@ impl<'a> DecodeRequest<'a> {
         self,
         dst: imgref::ImgRefMut<'_, P>,
         convert: fn(zenpixels::PixelBuffer) -> zenpixels::PixelBuffer<P>,
-    ) -> Result<ImageInfo, CodecError> {
+    ) -> Result<ImageInfo> {
         let format = self.resolve_format()?;
         let output = self.decode_format(format)?;
         let info = output.info().clone();
@@ -101,46 +104,31 @@ impl<'a> DecodeRequest<'a> {
     }
 
     /// Decode directly into a caller-provided RGB8 buffer.
-    pub fn decode_into_rgb8(
-        self,
-        dst: imgref::ImgRefMut<'_, rgb::Rgb<u8>>,
-    ) -> Result<ImageInfo, CodecError> {
+    pub fn decode_into_rgb8(self, dst: imgref::ImgRefMut<'_, rgb::Rgb<u8>>) -> Result<ImageInfo> {
         use zenpixels_convert::PixelBufferConvertExt as _;
         self.decode_into(dst, |b| b.to_rgb8())
     }
 
     /// Decode directly into a caller-provided RGBA8 buffer.
-    pub fn decode_into_rgba8(
-        self,
-        dst: imgref::ImgRefMut<'_, rgb::Rgba<u8>>,
-    ) -> Result<ImageInfo, CodecError> {
+    pub fn decode_into_rgba8(self, dst: imgref::ImgRefMut<'_, rgb::Rgba<u8>>) -> Result<ImageInfo> {
         use zenpixels_convert::PixelBufferConvertExt as _;
         self.decode_into(dst, |b| b.to_rgba8())
     }
 
     /// Decode directly into a caller-provided Gray8 buffer.
-    pub fn decode_into_gray8(
-        self,
-        dst: imgref::ImgRefMut<'_, rgb::Gray<u8>>,
-    ) -> Result<ImageInfo, CodecError> {
+    pub fn decode_into_gray8(self, dst: imgref::ImgRefMut<'_, rgb::Gray<u8>>) -> Result<ImageInfo> {
         use zenpixels_convert::PixelBufferConvertExt as _;
         self.decode_into(dst, |b| b.to_gray8())
     }
 
     /// Decode directly into a caller-provided BGRA8 buffer.
-    pub fn decode_into_bgra8(
-        self,
-        dst: imgref::ImgRefMut<'_, rgb::Bgra<u8>>,
-    ) -> Result<ImageInfo, CodecError> {
+    pub fn decode_into_bgra8(self, dst: imgref::ImgRefMut<'_, rgb::Bgra<u8>>) -> Result<ImageInfo> {
         use zenpixels_convert::PixelBufferConvertExt as _;
         self.decode_into(dst, |b| b.to_bgra8())
     }
 
     /// Decode directly into a caller-provided BGRX8 buffer (alpha byte set to 255).
-    pub fn decode_into_bgrx8(
-        self,
-        dst: imgref::ImgRefMut<'_, rgb::Bgra<u8>>,
-    ) -> Result<ImageInfo, CodecError> {
+    pub fn decode_into_bgrx8(self, dst: imgref::ImgRefMut<'_, rgb::Bgra<u8>>) -> Result<ImageInfo> {
         let format = self.resolve_format()?;
         use zenpixels_convert::PixelBufferConvertExt as _;
         let output = self.decode_format(format)?;
@@ -164,7 +152,7 @@ impl<'a> DecodeRequest<'a> {
     pub fn decode_into_rgb_f32(
         self,
         dst: imgref::ImgRefMut<'_, rgb::Rgb<f32>>,
-    ) -> Result<ImageInfo, CodecError> {
+    ) -> Result<ImageInfo> {
         use linear_srgb::default::srgb_u8_to_linear;
         use zenpixels_convert::PixelBufferConvertExt as _;
         let format = self.resolve_format()?;
@@ -188,7 +176,7 @@ impl<'a> DecodeRequest<'a> {
     pub fn decode_into_rgba_f32(
         self,
         dst: imgref::ImgRefMut<'_, rgb::Rgba<f32>>,
-    ) -> Result<ImageInfo, CodecError> {
+    ) -> Result<ImageInfo> {
         use linear_srgb::default::srgb_u8_to_linear;
         use zenpixels_convert::PixelBufferConvertExt as _;
         let format = self.resolve_format()?;
@@ -213,7 +201,7 @@ impl<'a> DecodeRequest<'a> {
     pub fn decode_into_gray_f32(
         self,
         dst: imgref::ImgRefMut<'_, rgb::Gray<f32>>,
-    ) -> Result<ImageInfo, CodecError> {
+    ) -> Result<ImageInfo> {
         use linear_srgb::default::srgb_u8_to_linear;
         use zenpixels_convert::PixelBufferConvertExt as _;
         let format = self.resolve_format()?;
@@ -236,13 +224,13 @@ impl<'a> DecodeRequest<'a> {
     ///
     /// `display_boost` controls the HDR headroom: 1.0 = SDR, 4.0 = typical HDR display.
     #[cfg(feature = "jpeg-ultrahdr")]
-    pub fn decode_hdr(self, display_boost: f32) -> Result<DecodeOutput, CodecError> {
+    pub fn decode_hdr(self, display_boost: f32) -> Result<DecodeOutput> {
         let format = self.resolve_format()?;
         if format != ImageFormat::Jpeg {
-            return Err(CodecError::UnsupportedOperation {
+            return Err(at!(CodecError::UnsupportedOperation {
                 format,
                 detail: "UltraHDR decode only supported for JPEG",
-            });
+            }));
         }
         crate::codecs::jpeg::decode_hdr(
             self.data,
@@ -254,37 +242,37 @@ impl<'a> DecodeRequest<'a> {
     }
 
     /// Decode the image to pixels.
-    pub fn decode(self) -> Result<DecodeOutput, CodecError> {
+    pub fn decode(self) -> Result<DecodeOutput> {
         let format = self.resolve_format()?;
         self.decode_format(format)
     }
 
     /// Dispatch to format-specific decoder.
-    fn decode_format(self, format: ImageFormat) -> Result<DecodeOutput, CodecError> {
+    fn decode_format(self, format: ImageFormat) -> Result<DecodeOutput> {
         match format {
             #[cfg(feature = "jpeg")]
             ImageFormat::Jpeg => {
                 crate::codecs::jpeg::decode(self.data, self.codec_config, self.limits, self.stop)
             }
             #[cfg(not(feature = "jpeg"))]
-            ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
+            ImageFormat::Jpeg => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "webp")]
             ImageFormat::WebP => {
                 crate::codecs::webp::decode(self.data, self.codec_config, self.limits, self.stop)
             }
             #[cfg(not(feature = "webp"))]
-            ImageFormat::WebP => Err(CodecError::UnsupportedFormat(format)),
+            ImageFormat::WebP => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "gif")]
             ImageFormat::Gif => crate::codecs::gif::decode(self.data, self.limits, self.stop),
             #[cfg(not(feature = "gif"))]
-            ImageFormat::Gif => Err(CodecError::UnsupportedFormat(format)),
+            ImageFormat::Gif => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "png")]
             ImageFormat::Png => crate::codecs::png::decode(self.data, self.limits, self.stop),
             #[cfg(not(feature = "png"))]
-            ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
+            ImageFormat::Png => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "avif-decode")]
             ImageFormat::Avif => crate::codecs::avif_dec::decode(
@@ -294,36 +282,36 @@ impl<'a> DecodeRequest<'a> {
                 self.stop,
             ),
             #[cfg(not(feature = "avif-decode"))]
-            ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
+            ImageFormat::Avif => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "jxl-decode")]
             ImageFormat::Jxl => crate::codecs::jxl_dec::decode(self.data, self.limits, self.stop),
             #[cfg(not(feature = "jxl-decode"))]
-            ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
+            ImageFormat::Jxl => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "heic-decode")]
             ImageFormat::Heic => crate::codecs::heic::decode(self.data, self.limits, self.stop),
             #[cfg(not(feature = "heic-decode"))]
-            ImageFormat::Heic => Err(CodecError::UnsupportedFormat(format)),
+            ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "bitmaps")]
             ImageFormat::Pnm => crate::codecs::pnm::decode(self.data, self.limits, self.stop),
             #[cfg(not(feature = "bitmaps"))]
-            ImageFormat::Pnm => Err(CodecError::UnsupportedFormat(format)),
+            ImageFormat::Pnm => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "bitmaps-bmp")]
             ImageFormat::Bmp => crate::codecs::bmp::decode(self.data, self.limits, self.stop),
             #[cfg(not(feature = "bitmaps-bmp"))]
-            ImageFormat::Bmp => Err(CodecError::UnsupportedFormat(format)),
+            ImageFormat::Bmp => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "bitmaps")]
             ImageFormat::Farbfeld => {
                 crate::codecs::farbfeld::decode(self.data, self.limits, self.stop)
             }
             #[cfg(not(feature = "bitmaps"))]
-            ImageFormat::Farbfeld => Err(CodecError::UnsupportedFormat(format)),
+            ImageFormat::Farbfeld => Err(at!(CodecError::UnsupportedFormat(format))),
 
-            _ => Err(CodecError::UnsupportedFormat(format)),
+            _ => Err(at!(CodecError::UnsupportedFormat(format))),
         }
     }
 }
@@ -356,6 +344,9 @@ mod tests {
             .with_registry(&registry)
             .decode();
 
-        assert!(matches!(result, Err(CodecError::DisabledFormat(_))));
+        assert!(matches!(
+            result.as_ref().map_err(|e| e.error()),
+            Err(CodecError::DisabledFormat(_))
+        ));
     }
 }

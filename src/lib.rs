@@ -28,7 +28,7 @@
 //! let data: &[u8] = &[]; // your image bytes
 //! let decoded = DecodeRequest::new(data).decode()?;
 //! println!("{}x{} {:?}", decoded.width(), decoded.height(), decoded.pixels());
-//! # Ok::<(), zencodecs::CodecError>(())
+//! # Ok::<(), whereat::At<zencodecs::CodecError>>(())
 //! ```
 //!
 //! ### Encode to Different Format
@@ -42,7 +42,7 @@
 //!     .with_quality(85.0)
 //!     .encode_rgba8(pixels.as_ref())?;
 //! println!("Encoded {} bytes", webp.len());
-//! # Ok::<(), zencodecs::CodecError>(())
+//! # Ok::<(), whereat::At<zencodecs::CodecError>>(())
 //! ```
 //!
 //! ### Probe Image Metadata
@@ -53,7 +53,7 @@
 //! let data: &[u8] = &[]; // your image bytes
 //! let info = from_bytes(data)?;
 //! println!("{}x{} {:?}", info.width, info.height, info.format);
-//! # Ok::<(), zencodecs::CodecError>(())
+//! # Ok::<(), whereat::At<zencodecs::CodecError>>(())
 //! ```
 //!
 //! ### Control Available Codecs
@@ -69,7 +69,7 @@
 //! let decoded = DecodeRequest::new(data)
 //!     .with_registry(&registry)
 //!     .decode()?;
-//! # Ok::<(), zencodecs::CodecError>(())
+//! # Ok::<(), whereat::At<zencodecs::CodecError>>(())
 //! ```
 //!
 //! ## What This Crate Does NOT Do
@@ -83,6 +83,8 @@
 #![forbid(unsafe_code)]
 
 extern crate alloc;
+
+whereat::define_at_crate_info!();
 
 mod codecs;
 pub mod config;
@@ -101,7 +103,7 @@ mod registry;
 pub use decode::{DecodeOutput, DecodeRequest};
 pub use dispatch::AnyEncoder;
 pub use encode::{EncodeOutput, EncodeRequest};
-pub use error::CodecError;
+pub use error::{CodecError, Result};
 pub use info::ImageInfo;
 pub use info::{decode_info, decode_info_with_config};
 pub use info::{from_bytes, from_bytes_format, from_bytes_with_registry};

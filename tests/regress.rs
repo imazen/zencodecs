@@ -10,9 +10,7 @@ use std::path::Path;
 
 use imgref::ImgVec;
 use zencodecs::pixel::{Bgra, Gray, Rgb, Rgba};
-use zencodecs::{
-    CodecError, DecodeRequest, EncodeOutput, EncodeRequest, ImageFormat, PixelBufferConvertExt,
-};
+use zencodecs::{DecodeRequest, EncodeOutput, EncodeRequest, ImageFormat, PixelBufferConvertExt};
 use zensim_regress::checksums::ChecksumManager;
 use zensim_regress::generators;
 
@@ -145,7 +143,11 @@ fn gradient_gray_f32() -> ImgVec<Gray<f32>> {
 // ---------------------------------------------------------------------------
 
 /// Encode, decode, convert to RGBA8, and verify checksum against stored baseline.
-fn check_roundtrip(encoded: Result<EncodeOutput, CodecError>, codec_name: &str, format_name: &str) {
+fn check_roundtrip(
+    encoded: Result<EncodeOutput, whereat::At<zencodecs::CodecError>>,
+    codec_name: &str,
+    format_name: &str,
+) {
     let mgr = manager();
     let encoded =
         encoded.unwrap_or_else(|e| panic!("{codec_name}/{format_name} encode failed: {e}"));

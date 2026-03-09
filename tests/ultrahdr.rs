@@ -194,7 +194,10 @@ fn ultrahdr_encode_disabled_registry() {
         .encode_ultrahdr_rgb_f32(img.as_ref());
 
     assert!(
-        matches!(result, Err(zencodecs::CodecError::DisabledFormat(_))),
+        matches!(
+            result.as_ref().map_err(|e| e.error()),
+            Err(zencodecs::CodecError::DisabledFormat(_))
+        ),
         "expected DisabledFormat error"
     );
 }

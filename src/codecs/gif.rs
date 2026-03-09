@@ -3,15 +3,17 @@
 use alloc::borrow::Cow;
 
 use crate::config::CodecConfig;
+use crate::error::Result;
 use crate::limits::to_resource_limits;
 use crate::{CodecError, DecodeOutput, ImageFormat, ImageInfo, Limits, Stop};
+use whereat::at;
 use zc::decode::{Decode, DecodeJob as _, DecoderConfig as _};
 
 /// Probe GIF metadata without decoding pixels.
-pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
+pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
     zengif::GifDecoderConfig::new()
         .probe_header(data)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Gif, e)))
 }
 
 /// Decode GIF to pixels (first frame only).
@@ -19,7 +21,7 @@ pub(crate) fn decode(
     data: &[u8],
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
-) -> Result<DecodeOutput, CodecError> {
+) -> Result<DecodeOutput> {
     let dec = zengif::GifDecoderConfig::new();
     let mut job = dec.job();
     if let Some(lim) = limits {
@@ -29,9 +31,9 @@ pub(crate) fn decode(
         job = job.with_stop(s);
     }
     job.decoder(Cow::Borrowed(data), &[])
-        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))?
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Gif, e)))?
         .decode()
-        .map_err(|e| CodecError::from_codec(ImageFormat::Gif, e))
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Gif, e)))
 }
 
 /// Build a GifEncoderConfig from codec config.
@@ -43,9 +45,9 @@ fn build_gif_encoding(codec_config: Option<&CodecConfig>) -> zengif::GifEncoderC
     enc
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// ===================================================================
 // Trait-based encoder dispatch
-// ═══════════════════════════════════════════════════════════════════════
+// ===================================================================
 
 use crate::dispatch::{BuiltEncoder, EncodeParams, build_from_config};
 

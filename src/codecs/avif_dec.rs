@@ -3,17 +3,19 @@
 use alloc::borrow::Cow;
 
 use crate::config::CodecConfig;
+use crate::error::Result;
 use crate::limits::to_resource_limits;
 use crate::{
     CodecError, DecodeJob, DecodeOutput, DecoderConfig, ImageFormat, ImageInfo, Limits, Stop,
 };
+use whereat::at;
 use zc::decode::Decode;
 
 /// Probe AVIF metadata without decoding pixels.
-pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo, CodecError> {
+pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
     zenavif::AvifDecoderConfig::new()
         .probe_header(data)
-        .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Avif, e)))
 }
 
 /// Decode AVIF to pixels.
@@ -22,7 +24,7 @@ pub(crate) fn decode(
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
-) -> Result<DecodeOutput, CodecError> {
+) -> Result<DecodeOutput> {
     let mut dec = zenavif::AvifDecoderConfig::new();
     // Apply codec config if provided
     if let Some(cfg) = codec_config.and_then(|c| c.avif_decoder.as_ref()) {
@@ -37,7 +39,7 @@ pub(crate) fn decode(
         job = job.with_stop(s);
     }
     job.decoder(Cow::Borrowed(data), &[])
-        .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))?
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Avif, e)))?
         .decode()
-        .map_err(|e| CodecError::from_codec(ImageFormat::Avif, e))
+        .map_err(|e| at!(CodecError::from_codec(ImageFormat::Avif, e)))
 }

@@ -18,7 +18,7 @@
 //!     .execute()?;
 //!
 //! println!("{}x{} {:?} ({} bytes)", output.width, output.height, output.format, output.bytes.len());
-//! # Ok::<(), zencodecs::CodecError>(())
+//! # Ok::<(), whereat::At<zencodecs::CodecError>>(())
 //! ```
 
 mod convert;
@@ -30,7 +30,9 @@ use zc::ImageFormat;
 use zenresize::{Filter, PixelDescriptor};
 
 use crate::config::CodecConfig;
+use crate::error::Result;
 use crate::{CodecError, CodecRegistry, Limits, Stop};
+use whereat::at;
 
 pub use quality::QualityPreset;
 
@@ -254,12 +256,12 @@ impl<'a> Pipeline<'a> {
     }
 
     /// Execute the pipeline: decode -> resize/orient -> encode.
-    pub fn execute(self) -> Result<PipelineOutput, CodecError> {
+    pub fn execute(self) -> Result<PipelineOutput> {
         self.execute_static()
     }
 
     /// Execute the pipeline for a static (single-frame) image.
-    fn execute_static(self) -> Result<PipelineOutput, CodecError> {
+    fn execute_static(self) -> Result<PipelineOutput> {
         // 1. Decode
         let mut decode_req = crate::DecodeRequest::new(self.input);
         if let Some(fmt) = self.input_format {
@@ -331,9 +333,11 @@ impl<'a> Pipeline<'a> {
                     ),
                 };
 
-                let (ideal, decoder_request) = pipeline
-                    .plan()
-                    .map_err(|e| CodecError::InvalidInput(alloc::format!("layout error: {e}")))?;
+                let (ideal, decoder_request) = pipeline.plan().map_err(|e| {
+                    at!(CodecError::InvalidInput(alloc::format!(
+                        "layout error: {e}"
+                    )))
+                })?;
 
                 // Full decode (no decoder-level crop/resize)
                 let offer = zenresize::DecoderOffer::full_decode(source_w, source_h);
@@ -350,9 +354,11 @@ impl<'a> Pipeline<'a> {
                 let mut pipeline = zenresize::Pipeline::new(source_w, source_h);
                 pipeline = pipeline.auto_orient(orientation.exif_value() as u8);
 
-                let (ideal, decoder_request) = pipeline
-                    .plan()
-                    .map_err(|e| CodecError::InvalidInput(alloc::format!("layout error: {e}")))?;
+                let (ideal, decoder_request) = pipeline.plan().map_err(|e| {
+                    at!(CodecError::InvalidInput(alloc::format!(
+                        "layout error: {e}"
+                    )))
+                })?;
 
                 let offer = zenresize::DecoderOffer::full_decode(source_w, source_h);
                 let plan = ideal.finalize(&decoder_request, &offer);
@@ -550,7 +556,7 @@ impl<'a> Pipeline<'a> {
         img: imgref::ImgRef<rgb::Rgb<u8>>,
         format: ImageFormat,
         metadata: &zc::MetadataView<'_>,
-    ) -> Result<zc::encode::EncodeOutput, CodecError> {
+    ) -> Result<zc::encode::EncodeOutput> {
         self.build_encode_request(format, metadata).encode_rgb8(img)
     }
 
@@ -559,7 +565,7 @@ impl<'a> Pipeline<'a> {
         img: imgref::ImgRef<rgb::Rgba<u8>>,
         format: ImageFormat,
         metadata: &zc::MetadataView<'_>,
-    ) -> Result<zc::encode::EncodeOutput, CodecError> {
+    ) -> Result<zc::encode::EncodeOutput> {
         self.build_encode_request(format, metadata)
             .encode_rgba8(img)
     }
@@ -569,7 +575,7 @@ impl<'a> Pipeline<'a> {
         img: imgref::ImgRef<rgb::Gray<u8>>,
         format: ImageFormat,
         metadata: &zc::MetadataView<'_>,
-    ) -> Result<zc::encode::EncodeOutput, CodecError> {
+    ) -> Result<zc::encode::EncodeOutput> {
         self.build_encode_request(format, metadata)
             .encode_gray8(img)
     }

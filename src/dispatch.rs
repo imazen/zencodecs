@@ -5,8 +5,10 @@
 //! format dispatch internally.
 
 use crate::config::CodecConfig;
+use crate::error::Result;
 use crate::{CodecError, ImageFormat, Limits, MetadataView, Stop};
 use alloc::boxed::Box;
+use whereat::at;
 use zc::encode::EncodeOutput;
 use zenpixels::{PixelDescriptor, PixelSlice};
 
@@ -22,8 +24,7 @@ pub(crate) struct EncodeParams<'a> {
 }
 
 /// Type-erased one-shot encode closure.
-pub(crate) type EncodeFn<'a> =
-    Box<dyn FnOnce(PixelSlice<'_>) -> Result<EncodeOutput, CodecError> + 'a>;
+pub(crate) type EncodeFn<'a> = Box<dyn FnOnce(PixelSlice<'_>) -> Result<EncodeOutput> + 'a>;
 
 /// A built encoder: a closure that encodes pixels + its supported descriptors.
 pub(crate) struct BuiltEncoder<'a> {
@@ -62,16 +63,16 @@ where
             let format = C::format();
             let enc = job
                 .encoder()
-                .map_err(|e| CodecError::from_codec(format, e))?;
+                .map_err(|e| at!(CodecError::from_codec(format, e)))?;
             enc.encode(pixels)
-                .map_err(|e| CodecError::from_codec(format, e))
+                .map_err(|e| at!(CodecError::from_codec(format, e)))
         }),
         supported: C::supported_descriptors(),
     }
 }
 
 // ===========================================================================
-// Object-safe encoder config — zero-generics codec-agnostic encoding
+// Object-safe encoder config -- zero-generics codec-agnostic encoding
 // ===========================================================================
 
 /// Object-safe encoder configuration.
@@ -81,7 +82,7 @@ where
 /// Enables fully codec-agnostic code with no generic parameters:
 ///
 /// ```rust,ignore
-/// fn save(enc: &dyn AnyEncoder, img: ImgRef<Rgba<u8>>) -> Result<Vec<u8>, CodecError> {
+/// fn save(enc: &dyn AnyEncoder, img: ImgRef<Rgba<u8>>) -> Result<Vec<u8>, At<CodecError>> {
 ///     let output = enc.encode_srgba8_imgref(img, true)?;
 ///     Ok(output.into_data())
 /// }
@@ -105,7 +106,7 @@ pub trait AnyEncoder: Send + Sync {
         metadata: Option<&MetadataView<'_>>,
         limits: Option<&Limits>,
         stop: Option<&dyn Stop>,
-    ) -> Result<EncodeOutput, CodecError>;
+    ) -> Result<EncodeOutput>;
 
     /// Encode sRGB RGBA8 pixels from an `ImgRef`.
     ///
@@ -115,7 +116,7 @@ pub trait AnyEncoder: Send + Sync {
         &self,
         img: imgref::ImgRef<'_, rgb::Rgba<u8>>,
         ignore_alpha: bool,
-    ) -> Result<EncodeOutput, CodecError> {
+    ) -> Result<EncodeOutput> {
         let typed: PixelSlice<'_, rgb::Rgba<u8>> = PixelSlice::from(img);
         let pixels: PixelSlice<'_> = if ignore_alpha {
             typed
@@ -149,10 +150,10 @@ where
         metadata: Option<&MetadataView<'_>>,
         limits: Option<&Limits>,
         stop: Option<&dyn Stop>,
-    ) -> Result<EncodeOutput, CodecError> {
+    ) -> Result<EncodeOutput> {
         use zc::encode::{EncodeJob as _, Encoder as _};
 
-        // Negotiate pixel format — convert input to something the encoder supports
+        // Negotiate pixel format -- convert input to something the encoder supports
         let pixel_data = pixels.contiguous_bytes();
         let adapted = zenpixels_convert::adapt::adapt_for_encode(
             &pixel_data,
@@ -162,7 +163,11 @@ where
             pixels.width() as usize * pixels.descriptor().bytes_per_pixel(),
             C::supported_descriptors(),
         )
-        .map_err(|e| CodecError::InvalidInput(alloc::format!("pixel format negotiation: {e}")))?;
+        .map_err(|e| {
+            at!(CodecError::InvalidInput(alloc::format!(
+                "pixel format negotiation: {e}"
+            )))
+        })?;
 
         let adapted_stride = adapted.width as usize * adapted.descriptor.bytes_per_pixel();
         let adapted_pixels = PixelSlice::new(
@@ -172,7 +177,7 @@ where
             adapted_stride,
             adapted.descriptor,
         )
-        .map_err(|e| CodecError::InvalidInput(alloc::format!("pixel slice: {e}")))?;
+        .map_err(|e| at!(CodecError::InvalidInput(alloc::format!("pixel slice: {e}"))))?;
 
         let mut job = self.job();
         if let Some(m) = metadata {
@@ -187,9 +192,9 @@ where
         let format = C::format();
         let enc = job
             .encoder()
-            .map_err(|e| CodecError::from_codec(format, e))?;
+            .map_err(|e| at!(CodecError::from_codec(format, e)))?;
         enc.encode(adapted_pixels)
-            .map_err(|e| CodecError::from_codec(format, e))
+            .map_err(|e| at!(CodecError::from_codec(format, e)))
     }
 }
 
@@ -201,53 +206,53 @@ where
 pub(crate) fn build_encoder<'a>(
     format: ImageFormat,
     params: EncodeParams<'a>,
-) -> Result<BuiltEncoder<'a>, CodecError> {
+) -> Result<BuiltEncoder<'a>> {
     match format {
         #[cfg(feature = "jpeg")]
         ImageFormat::Jpeg => Ok(crate::codecs::jpeg::build_trait_encoder(params)),
         #[cfg(not(feature = "jpeg"))]
-        ImageFormat::Jpeg => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Jpeg => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "webp")]
         ImageFormat::WebP => Ok(crate::codecs::webp::build_trait_encoder(params)),
         #[cfg(not(feature = "webp"))]
-        ImageFormat::WebP => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::WebP => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "gif")]
         ImageFormat::Gif => Ok(crate::codecs::gif::build_trait_encoder(params)),
         #[cfg(not(feature = "gif"))]
-        ImageFormat::Gif => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Gif => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "png")]
         ImageFormat::Png => Ok(crate::codecs::png::build_trait_encoder(params)),
         #[cfg(not(feature = "png"))]
-        ImageFormat::Png => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Png => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "avif-encode")]
         ImageFormat::Avif => Ok(crate::codecs::avif_enc::build_trait_encoder(params)),
         #[cfg(not(feature = "avif-encode"))]
-        ImageFormat::Avif => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Avif => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "jxl-encode")]
         ImageFormat::Jxl => Ok(crate::codecs::jxl_enc::build_trait_encoder(params)),
         #[cfg(not(feature = "jxl-encode"))]
-        ImageFormat::Jxl => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Jxl => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "bitmaps")]
         ImageFormat::Pnm => Ok(crate::codecs::pnm::build_trait_encoder(params)),
         #[cfg(not(feature = "bitmaps"))]
-        ImageFormat::Pnm => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Pnm => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "bitmaps-bmp")]
         ImageFormat::Bmp => Ok(crate::codecs::bmp::build_trait_encoder(params)),
         #[cfg(not(feature = "bitmaps-bmp"))]
-        ImageFormat::Bmp => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Bmp => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "bitmaps")]
         ImageFormat::Farbfeld => Ok(crate::codecs::farbfeld::build_trait_encoder(params)),
         #[cfg(not(feature = "bitmaps"))]
-        ImageFormat::Farbfeld => Err(CodecError::UnsupportedFormat(format)),
+        ImageFormat::Farbfeld => Err(at!(CodecError::UnsupportedFormat(format))),
 
-        _ => Err(CodecError::UnsupportedFormat(format)),
+        _ => Err(at!(CodecError::UnsupportedFormat(format))),
     }
 }

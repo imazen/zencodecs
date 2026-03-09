@@ -6,8 +6,10 @@
 
 use crate::config::CodecConfig;
 use crate::dispatch::EncodeParams;
+use crate::error::Result;
 use crate::pixel::{Bgra, Gray, ImgRef, Rgb, Rgba};
 use crate::{CodecError, CodecRegistry, ImageFormat, Limits, MetadataView, Stop};
+use whereat::at;
 use zenpixels::{AlphaMode, PixelDescriptor};
 
 pub use zc::encode::EncodeOutput;
@@ -24,7 +26,7 @@ pub use zc::encode::EncodeOutput;
 /// let output = EncodeRequest::new(ImageFormat::WebP)
 ///     .with_quality(85.0)
 ///     .encode_rgba8(pixels.as_ref())?;
-/// # Ok::<(), zencodecs::CodecError>(())
+/// # Ok::<(), whereat::At<zencodecs::CodecError>>(())
 /// ```
 pub struct EncodeRequest<'a> {
     format: Option<ImageFormat>,
@@ -151,15 +153,12 @@ impl<'a> EncodeRequest<'a> {
     /// UltraHDR JPEG with embedded gain map. The `quality` setting controls
     /// the SDR base JPEG quality.
     #[cfg(feature = "jpeg-ultrahdr")]
-    pub fn encode_ultrahdr_rgb_f32(
-        self,
-        img: ImgRef<Rgb<f32>>,
-    ) -> Result<EncodeOutput, CodecError> {
+    pub fn encode_ultrahdr_rgb_f32(self, img: ImgRef<Rgb<f32>>) -> Result<EncodeOutput> {
         let default_registry = CodecRegistry::all();
         let registry = self.registry.unwrap_or(&default_registry);
 
         if !registry.can_encode(ImageFormat::Jpeg) {
-            return Err(CodecError::DisabledFormat(ImageFormat::Jpeg));
+            return Err(at!(CodecError::DisabledFormat(ImageFormat::Jpeg)));
         }
 
         crate::codecs::jpeg::encode_ultrahdr_rgb_f32(
@@ -179,15 +178,12 @@ impl<'a> EncodeRequest<'a> {
     /// UltraHDR JPEG with embedded gain map. Alpha is discarded.
     /// The `quality` setting controls the SDR base JPEG quality.
     #[cfg(feature = "jpeg-ultrahdr")]
-    pub fn encode_ultrahdr_rgba_f32(
-        self,
-        img: ImgRef<Rgba<f32>>,
-    ) -> Result<EncodeOutput, CodecError> {
+    pub fn encode_ultrahdr_rgba_f32(self, img: ImgRef<Rgba<f32>>) -> Result<EncodeOutput> {
         let default_registry = CodecRegistry::all();
         let registry = self.registry.unwrap_or(&default_registry);
 
         if !registry.can_encode(ImageFormat::Jpeg) {
-            return Err(CodecError::DisabledFormat(ImageFormat::Jpeg));
+            return Err(at!(CodecError::DisabledFormat(ImageFormat::Jpeg)));
         }
 
         crate::codecs::jpeg::encode_ultrahdr_rgba_f32(
@@ -206,7 +202,7 @@ impl<'a> EncodeRequest<'a> {
     // ═══════════════════════════════════════════════════════════════════
 
     /// Encode RGB8 pixels.
-    pub fn encode_rgb8(self, img: ImgRef<Rgb<u8>>) -> Result<EncodeOutput, CodecError> {
+    pub fn encode_rgb8(self, img: ImgRef<Rgb<u8>>) -> Result<EncodeOutput> {
         let data: &[u8] = bytemuck::cast_slice(img.buf());
         let stride = img.stride() * core::mem::size_of::<Rgb<u8>>();
         self.encode_dispatch(
@@ -220,7 +216,7 @@ impl<'a> EncodeRequest<'a> {
     }
 
     /// Encode RGBA8 pixels.
-    pub fn encode_rgba8(self, img: ImgRef<Rgba<u8>>) -> Result<EncodeOutput, CodecError> {
+    pub fn encode_rgba8(self, img: ImgRef<Rgba<u8>>) -> Result<EncodeOutput> {
         let has_alpha = img.pixels().any(|p| p.a < 255);
         let data: &[u8] = bytemuck::cast_slice(img.buf());
         let stride = img.stride() * core::mem::size_of::<Rgba<u8>>();
@@ -250,7 +246,7 @@ impl<'a> EncodeRequest<'a> {
         self,
         img: ImgRef<Rgba<u8>>,
         ignore_alpha: bool,
-    ) -> Result<EncodeOutput, CodecError> {
+    ) -> Result<EncodeOutput> {
         let descriptor = if ignore_alpha {
             PixelDescriptor::RGBA8_SRGB.with_alpha(Some(AlphaMode::Undefined))
         } else {
@@ -269,7 +265,7 @@ impl<'a> EncodeRequest<'a> {
     }
 
     /// Encode BGRA8 pixels (native byte order, zero-copy for codecs that support it).
-    pub fn encode_bgra8(self, img: ImgRef<Bgra<u8>>) -> Result<EncodeOutput, CodecError> {
+    pub fn encode_bgra8(self, img: ImgRef<Bgra<u8>>) -> Result<EncodeOutput> {
         let has_alpha = img.pixels().any(|p| p.a < 255);
         let data: &[u8] = bytemuck::cast_slice(img.buf());
         let stride = img.stride() * core::mem::size_of::<Bgra<u8>>();
@@ -284,7 +280,7 @@ impl<'a> EncodeRequest<'a> {
     }
 
     /// Encode BGRX8 pixels (opaque BGRA — padding byte is ignored).
-    pub fn encode_bgrx8(self, img: ImgRef<Bgra<u8>>) -> Result<EncodeOutput, CodecError> {
+    pub fn encode_bgrx8(self, img: ImgRef<Bgra<u8>>) -> Result<EncodeOutput> {
         let data: &[u8] = bytemuck::cast_slice(img.buf());
         let stride = img.stride() * core::mem::size_of::<Bgra<u8>>();
         self.encode_dispatch(
@@ -298,7 +294,7 @@ impl<'a> EncodeRequest<'a> {
     }
 
     /// Encode Gray8 pixels.
-    pub fn encode_gray8(self, img: ImgRef<Gray<u8>>) -> Result<EncodeOutput, CodecError> {
+    pub fn encode_gray8(self, img: ImgRef<Gray<u8>>) -> Result<EncodeOutput> {
         let data: &[u8] = bytemuck::cast_slice(img.buf());
         let stride = img.stride() * core::mem::size_of::<Gray<u8>>();
         self.encode_dispatch(
@@ -315,7 +311,7 @@ impl<'a> EncodeRequest<'a> {
     ///
     /// Input is expected in linear light (not sRGB gamma). Codecs that store
     /// sRGB will convert internally.
-    pub fn encode_rgb_f32(self, img: ImgRef<Rgb<f32>>) -> Result<EncodeOutput, CodecError> {
+    pub fn encode_rgb_f32(self, img: ImgRef<Rgb<f32>>) -> Result<EncodeOutput> {
         let data: &[u8] = bytemuck::cast_slice(img.buf());
         let stride = img.stride() * core::mem::size_of::<Rgb<f32>>();
         self.encode_dispatch(
@@ -332,7 +328,7 @@ impl<'a> EncodeRequest<'a> {
     ///
     /// Input is expected in linear light (not sRGB gamma). Codecs that store
     /// sRGB will convert internally.
-    pub fn encode_rgba_f32(self, img: ImgRef<Rgba<f32>>) -> Result<EncodeOutput, CodecError> {
+    pub fn encode_rgba_f32(self, img: ImgRef<Rgba<f32>>) -> Result<EncodeOutput> {
         let has_alpha = img.pixels().any(|p| p.a < 1.0);
         let data: &[u8] = bytemuck::cast_slice(img.buf());
         let stride = img.stride() * core::mem::size_of::<Rgba<f32>>();
@@ -350,7 +346,7 @@ impl<'a> EncodeRequest<'a> {
     ///
     /// Input is expected in linear light (not sRGB gamma). Codecs that store
     /// sRGB will convert internally.
-    pub fn encode_gray_f32(self, img: ImgRef<Gray<f32>>) -> Result<EncodeOutput, CodecError> {
+    pub fn encode_gray_f32(self, img: ImgRef<Gray<f32>>) -> Result<EncodeOutput> {
         let data: &[u8] = bytemuck::cast_slice(img.buf());
         let stride = img.stride() * core::mem::size_of::<Gray<f32>>();
         self.encode_dispatch(
@@ -377,7 +373,7 @@ impl<'a> EncodeRequest<'a> {
         height: u32,
         stride: usize,
         has_alpha: bool,
-    ) -> Result<EncodeOutput, CodecError> {
+    ) -> Result<EncodeOutput> {
         let default_registry = CodecRegistry::all();
         let registry = self.registry.unwrap_or(&default_registry);
 
@@ -387,13 +383,13 @@ impl<'a> EncodeRequest<'a> {
         };
 
         if !registry.can_encode(format) {
-            return Err(CodecError::DisabledFormat(format));
+            return Err(at!(CodecError::DisabledFormat(format)));
         }
         if self.lossless && !format.supports_lossless() {
-            return Err(CodecError::UnsupportedOperation {
+            return Err(at!(CodecError::UnsupportedOperation {
                 format,
                 detail: "lossless encoding not supported",
-            });
+            }));
         }
 
         let params = EncodeParams {
@@ -419,7 +415,11 @@ impl<'a> EncodeRequest<'a> {
             stride,
             built.supported,
         )
-        .map_err(|e| CodecError::InvalidInput(alloc::format!("pixel format negotiation: {e}")))?;
+        .map_err(|e| {
+            at!(CodecError::InvalidInput(alloc::format!(
+                "pixel format negotiation: {e}"
+            )))
+        })?;
 
         // Adapted data is always packed (stride = width * bpp).
         let adapted_stride = adapted.width as usize * adapted.descriptor.bytes_per_pixel();
@@ -431,16 +431,12 @@ impl<'a> EncodeRequest<'a> {
             adapted_stride,
             adapted.descriptor,
         )
-        .map_err(|e| CodecError::InvalidInput(alloc::format!("pixel slice: {e}")))?;
+        .map_err(|e| at!(CodecError::InvalidInput(alloc::format!("pixel slice: {e}"))))?;
 
         (built.encoder)(pixel_slice)
     }
 
-    fn auto_select_format(
-        &self,
-        has_alpha: bool,
-        registry: &CodecRegistry,
-    ) -> Result<ImageFormat, CodecError> {
+    fn auto_select_format(&self, has_alpha: bool, registry: &CodecRegistry) -> Result<ImageFormat> {
         if self.lossless {
             if registry.can_encode(ImageFormat::WebP) {
                 return Ok(ImageFormat::WebP);
@@ -470,7 +466,7 @@ impl<'a> EncodeRequest<'a> {
             }
         }
 
-        Err(CodecError::NoSuitableEncoder)
+        Err(at!(CodecError::NoSuitableEncoder))
     }
 }
 
@@ -509,7 +505,7 @@ mod tests {
             .encode_rgb8(img.as_ref());
 
         assert!(matches!(
-            result,
+            result.as_ref().map_err(|e| e.error()),
             Err(CodecError::UnsupportedOperation { .. })
         ));
     }

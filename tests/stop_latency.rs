@@ -15,7 +15,7 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use common::{encode_rgba_test_data, encode_test_data, rgb8_image, rgba8_image};
-use zencodecs::{CodecError, DecodeRequest, EncodeRequest, ImageFormat};
+use zencodecs::{DecodeRequest, EncodeRequest, ImageFormat};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -73,7 +73,7 @@ impl enough::Stop for DelayedStop {
 fn measure_stop_latency(
     name: &str,
     cancel_delay: Duration,
-    operation: impl FnOnce(&dyn enough::Stop) -> Result<(), CodecError>,
+    operation: impl FnOnce(&dyn enough::Stop) -> Result<(), whereat::At<zencodecs::CodecError>>,
 ) {
     let stop = DelayedStop::new();
     let handle = stop.cancel_after(cancel_delay);
