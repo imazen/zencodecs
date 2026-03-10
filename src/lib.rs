@@ -112,7 +112,7 @@ pub use registry::CodecRegistry;
 pub use zc::ImageFormat;
 pub use zc::MetadataView;
 
-// zencodec-types trait re-exports
+// zencodec trait re-exports
 pub use zc::decode::{DecodeJob, DecoderConfig};
 pub use zc::encode::{EncodeJob, EncoderConfig};
 

@@ -570,7 +570,7 @@ fn cicp_transfer_formula(tc: u8) -> Option<&'static str> {
     }
 }
 
-/// Parse CICP into human-readable form using zencodec-types name helpers.
+/// Parse CICP into human-readable form using zencodec name helpers.
 pub fn parse_cicp(cicp: &Cicp) -> ParsedCicp {
     ParsedCicp {
         color_primaries: cicp.color_primaries,

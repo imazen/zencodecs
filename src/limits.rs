@@ -170,7 +170,7 @@ pub(crate) fn stop_or_default(stop: Option<&dyn Stop>) -> &dyn Stop {
     stop.unwrap_or(&enough::Unstoppable)
 }
 
-/// Convert zencodecs [`Limits`] to zencodec-types [`ResourceLimits`](zc::ResourceLimits).
+/// Convert zencodecs [`Limits`] to zencodec [`ResourceLimits`](zc::ResourceLimits).
 pub(crate) fn to_resource_limits(limits: &Limits) -> zc::ResourceLimits {
     let mut rl = zc::ResourceLimits::none();
     if let Some(max_w) = limits.max_width {

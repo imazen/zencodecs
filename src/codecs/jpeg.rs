@@ -30,7 +30,7 @@ pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
     Ok(jpeg_info_to_image_info(&info))
 }
 
-/// Convert zenjpeg's `JpegInfo` to zencodec-types `ImageInfo`.
+/// Convert zenjpeg's `JpegInfo` to zencodec `ImageInfo`.
 fn jpeg_info_to_image_info(info: &zenjpeg::decoder::JpegInfo) -> ImageInfo {
     let mut ii = ImageInfo::new(
         info.dimensions.width,

@@ -1,4 +1,4 @@
-//! Heaptrack profiling: exercise zencodec-types trait interface for all codecs.
+//! Heaptrack profiling: exercise zencodec trait interface for all codecs.
 //!
 //! Run with:
 //!   cargo build --release --example heaptrack_zencodec_traits --features "jpeg,webp,gif,gif-quantizr,png,avif-decode,avif-encode,std"
@@ -242,5 +242,5 @@ fn main() {
         roundtrip_dyn(&enc, &dec, &rgb_buf, &limits, "AVIF");
     }
 
-    eprintln!("\n=== All zencodec-types trait roundtrips complete ===");
+    eprintln!("\n=== All zencodec trait roundtrips complete ===");
 }
