@@ -241,8 +241,7 @@ pub(crate) fn decode_hdr(
     let img = imgref::ImgVec::new(hdr_pixels, width as usize, height as usize);
     let buf = PixelBuffer::from_imgvec(img).with_descriptor(PixelDescriptor::RGBAF32_LINEAR);
 
-    let mut ii = ImageInfo::new(width, height, ImageFormat::Jpeg)
-        .with_frame_count(1);
+    let mut ii = ImageInfo::new(width, height, ImageFormat::Jpeg);
 
     // Preserve metadata from extras
     let extras = result.extras();
