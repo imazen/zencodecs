@@ -105,6 +105,7 @@ pub mod quality;
 mod registry;
 pub mod select;
 pub mod trace;
+pub mod transcode;
 
 // Re-exports
 pub use codec_id::CodecId;
@@ -122,6 +123,7 @@ pub use quality::{QualityIntent, QualityProfile};
 pub use registry::CodecRegistry;
 pub use select::ImageFacts;
 pub use trace::SelectionTrace;
+pub use transcode::TranscodeSink;
 pub use zencodec::ImageFormat;
 pub use zencodec::Metadata;
 

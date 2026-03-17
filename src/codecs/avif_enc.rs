@@ -20,7 +20,7 @@ pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<
 ///
 /// Uses `EncoderConfig` trait methods for generic params, with
 /// codec_config taking priority for format-specific overrides.
-fn build_encoding(
+pub(crate) fn build_encoding(
     quality: Option<f32>,
     effort: Option<u32>,
     codec_config: Option<&CodecConfig>,

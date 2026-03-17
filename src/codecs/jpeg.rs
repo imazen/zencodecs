@@ -114,7 +114,7 @@ pub(crate) fn decode_info(data: &[u8], _codec_config: Option<&CodecConfig>) -> R
 ///
 /// Uses `EncoderConfig` trait methods for generic params, with
 /// codec_config taking priority for format-specific overrides.
-fn build_encoding(
+pub(crate) fn build_encoding(
     quality: Option<f32>,
     codec_config: Option<&CodecConfig>,
 ) -> zenjpeg::JpegEncoderConfig {
