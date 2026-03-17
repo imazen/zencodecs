@@ -260,6 +260,80 @@ impl<'a> DecodeRequest<'a> {
         self.decode_format(format)
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // Streaming decode
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Push-based decode: the decoder writes rows into the provided sink.
+    ///
+    /// This is the most memory-efficient decode path — the caller provides
+    /// buffers via the sink, and the decoder fills them in order.
+    pub fn push_decode(
+        self,
+        sink: &mut dyn zencodec::decode::DecodeRowSink,
+    ) -> Result<zencodec::decode::OutputInfo> {
+        let format = self.resolve_format()?;
+        crate::dyn_dispatch::dyn_push_decode(format, &self.decode_params(), sink)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Animation decode
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Returns a full-frame decoder for animated images.
+    ///
+    /// For animated formats (GIF, animated WebP, APNG), yields frames
+    /// in sequence with duration information. For single-frame formats,
+    /// yields one frame then `None`.
+    ///
+    /// Note: The input data is copied to an owned buffer because the
+    /// full-frame decoder is `'static` (it owns its data).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use zencodecs::DecodeRequest;
+    ///
+    /// let data: &[u8] = &[]; // GIF bytes
+    /// let mut decoder = DecodeRequest::new(data).full_frame_decoder()?;
+    /// while let Some(frame) = decoder.render_next_frame_owned(None)? {
+    ///     // frame.pixels(), frame.duration_ms(), frame.frame_index()
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn full_frame_decoder(
+        self,
+    ) -> Result<alloc::boxed::Box<dyn zencodec::decode::DynFullFrameDecoder>> {
+        let format = self.resolve_format()?;
+        crate::dyn_dispatch::dyn_full_frame_decoder(format, &self.decode_params())
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Probe
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Probe image metadata without decoding pixels.
+    ///
+    /// Cheaper than `decode()` — only parses headers.
+    pub fn probe(&self) -> Result<ImageInfo> {
+        let format = self.resolve_format()?;
+        crate::info::probe_format(self.data, format)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Internal helpers
+    // ═══════════════════════════════════════════════════════════════════
+
+    fn decode_params(&self) -> crate::dyn_dispatch::DecodeParams<'a> {
+        crate::dyn_dispatch::DecodeParams {
+            data: self.data,
+            codec_config: self.codec_config,
+            limits: self.limits,
+            stop: self.stop,
+            preferred: &[],
+        }
+    }
+
     /// Dispatch to format-specific decoder.
     fn decode_format(self, format: ImageFormat) -> Result<DecodeOutput> {
         match format {

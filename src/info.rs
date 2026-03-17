@@ -37,6 +37,11 @@ pub fn from_bytes_format(data: &[u8], format: ImageFormat) -> Result<ImageInfo> 
     probe_format_full(data, format)
 }
 
+/// Probe format — used by DecodeRequest::probe().
+pub(crate) fn probe_format(data: &[u8], format: ImageFormat) -> Result<ImageInfo> {
+    probe_format_full(data, format)
+}
+
 /// Compute actual decode output dimensions for an image.
 ///
 /// Unlike [`from_bytes`] which returns stored file dimensions, this applies

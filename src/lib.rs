@@ -91,6 +91,7 @@ mod codecs;
 pub mod config;
 mod decode;
 mod dispatch;
+mod dyn_dispatch;
 mod encode;
 mod error;
 mod format_set;
@@ -125,8 +126,11 @@ pub use zencodec::ImageFormat;
 pub use zencodec::Metadata;
 
 // zencodec trait re-exports
-pub use zencodec::decode::{DecodeJob, DecoderConfig};
-pub use zencodec::encode::{EncodeJob, EncoderConfig};
+pub use zencodec::decode::{
+    DecodeJob, DecodeRowSink, DecoderConfig, DynFullFrameDecoder, DynStreamingDecoder, OutputInfo,
+};
+pub use zencodec::encode::{DynFullFrameEncoder, EncodeJob, EncoderConfig};
+pub use zencodec::{FullFrame, OwnedFullFrame};
 
 // Pixel conversion extension traits
 pub use zenpixels_convert::PixelBufferConvertExt;

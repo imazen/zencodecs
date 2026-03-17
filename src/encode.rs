@@ -252,6 +252,66 @@ impl<'a> EncodeRequest<'a> {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // Animation encode
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Create a full-frame animation encoder.
+    ///
+    /// Push frames sequentially, then call `finish()` to get the encoded output.
+    /// Supported formats: GIF, WebP, PNG (APNG).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use zencodecs::{EncodeRequest, ImageFormat};
+    /// use zenpixels::PixelSlice;
+    ///
+    /// let mut encoder = EncodeRequest::new(ImageFormat::Gif)
+    ///     .with_quality(80.0)
+    ///     .full_frame_encoder(320, 240)?;
+    /// // encoder.push_frame(pixels, delay_ms, None)?;
+    /// // let output = encoder.finish(None)?;
+    /// # Ok::<(), whereat::At<zencodecs::CodecError>>(())
+    /// ```
+    pub fn full_frame_encoder(
+        self,
+        width: u32,
+        height: u32,
+    ) -> Result<alloc::boxed::Box<dyn zencodec::encode::DynFullFrameEncoder>> {
+        let default_registry = CodecRegistry::all();
+        let registry = self.registry.unwrap_or(&default_registry);
+
+        let format = match self.format {
+            Some(f) => f,
+            None => return Err(at!(CodecError::InvalidInput(
+                "animation encode requires an explicit format (use new(), not auto())".into(),
+            ))),
+        };
+
+        if !registry.can_encode(format) {
+            return Err(at!(CodecError::DisabledFormat(format)));
+        }
+
+        let resolved_quality = self.resolve_quality();
+
+        crate::dyn_dispatch::dyn_full_frame_encoder(
+            format,
+            crate::dyn_dispatch::AnimEncodeParams {
+                quality: Some(resolved_quality),
+                effort: self.effort,
+                lossless: self.lossless,
+                metadata: self.metadata,
+                codec_config: self.codec_config,
+                limits: self.limits,
+                _stop: self.stop,
+                canvas_width: width,
+                canvas_height: height,
+                loop_count: None,
+            },
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // Typed encode methods — thin wrappers over dispatch
     // ═══════════════════════════════════════════════════════════════════
 
