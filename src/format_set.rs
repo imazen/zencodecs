@@ -189,15 +189,21 @@ mod tests {
 
     #[test]
     fn set_operations() {
-        let a = FormatSet::EMPTY.with(ImageFormat::Jpeg).with(ImageFormat::Png);
-        let b = FormatSet::EMPTY.with(ImageFormat::Png).with(ImageFormat::WebP);
+        let a = FormatSet::EMPTY
+            .with(ImageFormat::Jpeg)
+            .with(ImageFormat::Png);
+        let b = FormatSet::EMPTY
+            .with(ImageFormat::Png)
+            .with(ImageFormat::WebP);
         assert_eq!(a.intersection(&b), FormatSet::EMPTY.with(ImageFormat::Png));
         assert_eq!(a.union(&b).len(), 3);
     }
 
     #[test]
     fn iter_order() {
-        let set = FormatSet::EMPTY.with(ImageFormat::Png).with(ImageFormat::Jpeg);
+        let set = FormatSet::EMPTY
+            .with(ImageFormat::Png)
+            .with(ImageFormat::Jpeg);
         let formats: alloc::vec::Vec<_> = set.iter().collect();
         // Iteration order is bit order (Jpeg=0, Png=3), not insertion order
         assert_eq!(formats, &[ImageFormat::Jpeg, ImageFormat::Png]);

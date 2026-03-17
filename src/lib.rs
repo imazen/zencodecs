@@ -97,10 +97,10 @@ mod error;
 mod format_set;
 mod info;
 mod limits;
-pub mod policy;
 #[cfg(feature = "pipeline")]
 pub mod pipeline;
 pub mod pixel;
+pub mod policy;
 pub mod quality;
 mod registry;
 pub mod select;

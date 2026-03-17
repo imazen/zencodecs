@@ -1,7 +1,7 @@
 //! Runtime codec registry for enabling/disabling formats.
 
-use crate::format_set::FormatSet;
 use crate::ImageFormat;
+use crate::format_set::FormatSet;
 
 /// Check at compile time whether a format has decode support compiled in.
 fn compiled_decode(format: ImageFormat) -> bool {
@@ -169,7 +169,11 @@ impl CodecRegistry {
         }
         matches!(
             format,
-            ImageFormat::Gif | ImageFormat::WebP | ImageFormat::Png | ImageFormat::Avif | ImageFormat::Jxl
+            ImageFormat::Gif
+                | ImageFormat::WebP
+                | ImageFormat::Png
+                | ImageFormat::Avif
+                | ImageFormat::Jxl
         )
     }
 

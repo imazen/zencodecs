@@ -39,20 +39,19 @@ impl ImageFacts {
             has_animation: info.sequence.is_animation(),
             is_lossless_source: matches!(
                 info.format,
-                ImageFormat::Png | ImageFormat::Gif | ImageFormat::Bmp
-                    | ImageFormat::Pnm | ImageFormat::Farbfeld
+                ImageFormat::Png
+                    | ImageFormat::Gif
+                    | ImageFormat::Bmp
+                    | ImageFormat::Pnm
+                    | ImageFormat::Farbfeld
             ),
             pixel_count: info.width as u64 * info.height as u64,
-            is_hdr: info
-                .source_color
-                .cicp
-                .as_ref()
-                .is_some_and(|c| {
-                    matches!(
-                        c.transfer_function_enum(),
-                        zenpixels::TransferFunction::Pq | zenpixels::TransferFunction::Hlg
-                    )
-                }),
+            is_hdr: info.source_color.cicp.as_ref().is_some_and(|c| {
+                matches!(
+                    c.transfer_function_enum(),
+                    zenpixels::TransferFunction::Pq | zenpixels::TransferFunction::Hlg
+                )
+            }),
         }
     }
 }
@@ -136,10 +135,7 @@ pub fn select_format(
 }
 
 /// Available output formats, filtered by registry and policy.
-pub fn available_encode_formats(
-    registry: &CodecRegistry,
-    policy: &CodecPolicy,
-) -> FormatSet {
+pub fn available_encode_formats(registry: &CodecRegistry, policy: &CodecPolicy) -> FormatSet {
     let mut set = FormatSet::EMPTY;
     for format in registry.encodable_formats() {
         if policy.is_format_allowed(format) {
@@ -219,7 +215,9 @@ mod tests {
         let format = select(&facts, &intent);
         // Without JXL encode, should get AVIF (if available) or JPEG
         assert!(
-            format == ImageFormat::Avif || format == ImageFormat::Jpeg || format == ImageFormat::Jxl,
+            format == ImageFormat::Avif
+                || format == ImageFormat::Jpeg
+                || format == ImageFormat::Jxl,
             "got {format:?}"
         );
     }
@@ -260,9 +258,7 @@ mod tests {
         let intent = QualityIntent::from_quality(100.0).with_lossless(true);
         let format = select(&facts, &intent);
         assert!(
-            format == ImageFormat::Jxl
-                || format == ImageFormat::WebP
-                || format == ImageFormat::Png,
+            format == ImageFormat::Jxl || format == ImageFormat::WebP || format == ImageFormat::Png,
             "got {format:?}"
         );
     }

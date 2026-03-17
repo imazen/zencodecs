@@ -67,7 +67,6 @@ impl QualityProfile {
     }
 }
 
-
 /// Generic encoding quality parameters, codec-agnostic.
 ///
 /// Created from a [`QualityProfile`], a raw quality value, or constructed
@@ -120,7 +119,9 @@ impl QualityIntent {
 
     /// JPEG quality (0-100, native scale).
     pub fn jpeg_quality(&self) -> u8 {
-        interpolate(&JPEG_TABLE, self.quality).round().clamp(0.0, 100.0) as u8
+        interpolate(&JPEG_TABLE, self.quality)
+            .round()
+            .clamp(0.0, 100.0) as u8
     }
 
     /// WebP lossy quality (0-100, native scale).
@@ -130,7 +131,9 @@ impl QualityIntent {
 
     /// WebP method/effort (0-6).
     pub fn webp_method(&self) -> u8 {
-        interpolate(&WEBP_METHOD_TABLE, self.quality).round().clamp(0.0, 6.0) as u8
+        interpolate(&WEBP_METHOD_TABLE, self.quality)
+            .round()
+            .clamp(0.0, 6.0) as u8
     }
 
     /// AVIF quality (0-100, native scale).
@@ -140,7 +143,9 @@ impl QualityIntent {
 
     /// AVIF speed (0-10, lower = slower + better).
     pub fn avif_speed(&self) -> u8 {
-        interpolate(&AVIF_SPEED_TABLE, self.quality).round().clamp(0.0, 10.0) as u8
+        interpolate(&AVIF_SPEED_TABLE, self.quality)
+            .round()
+            .clamp(0.0, 10.0) as u8
     }
 
     /// JXL butteraugli distance (0-25, lower = better).
@@ -150,13 +155,19 @@ impl QualityIntent {
 
     /// JXL effort (1-9).
     pub fn jxl_effort(&self) -> u8 {
-        interpolate(&JXL_EFFORT_TABLE, self.quality).round().clamp(1.0, 9.0) as u8
+        interpolate(&JXL_EFFORT_TABLE, self.quality)
+            .round()
+            .clamp(1.0, 9.0) as u8
     }
 
     /// PNG quantization quality range (min, max) for lossy PNG.
     pub fn png_quality_range(&self) -> (u8, u8) {
-        let min = interpolate(&PNG_MIN_TABLE, self.quality).round().clamp(0.0, 100.0) as u8;
-        let max = interpolate(&PNG_MAX_TABLE, self.quality).round().clamp(0.0, 100.0) as u8;
+        let min = interpolate(&PNG_MIN_TABLE, self.quality)
+            .round()
+            .clamp(0.0, 100.0) as u8;
+        let max = interpolate(&PNG_MAX_TABLE, self.quality)
+            .round()
+            .clamp(0.0, 100.0) as u8;
         (min, max.max(min))
     }
 }
@@ -449,7 +460,10 @@ mod tests {
     fn avif_speed_decreases_with_quality() {
         let low = QualityIntent::from_quality(15.0).avif_speed();
         let high = QualityIntent::from_quality(96.0).avif_speed();
-        assert!(low > high, "AVIF speed should decrease (slower) at higher quality");
+        assert!(
+            low > high,
+            "AVIF speed should decrease (slower) at higher quality"
+        );
     }
 
     #[test]

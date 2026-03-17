@@ -24,20 +24,11 @@ use zencodec::decode::{DecodeJob as _, DecoderConfig as _, DynDecoderConfig, Out
 
 /// Wrap a BoxedError from a codec into a CodecError.
 fn wrap_boxed(format: ImageFormat, e: zencodec::decode::BoxedError) -> whereat::At<CodecError> {
-    at!(CodecError::Codec {
-        format,
-        source: e,
-    })
+    at!(CodecError::Codec { format, source: e })
 }
 
-fn wrap_enc_boxed(
-    format: ImageFormat,
-    e: zencodec::encode::BoxedError,
-) -> whereat::At<CodecError> {
-    at!(CodecError::Codec {
-        format,
-        source: e,
-    })
+fn wrap_enc_boxed(format: ImageFormat, e: zencodec::encode::BoxedError) -> whereat::At<CodecError> {
+    at!(CodecError::Codec { format, source: e })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

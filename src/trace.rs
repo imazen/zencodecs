@@ -3,8 +3,8 @@
 //! [`SelectionTrace`] records the steps taken during codec/format selection
 //! for debugging and auditability.
 
-use crate::codec_id::CodecId;
 use crate::ImageFormat;
+use crate::codec_id::CodecId;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -49,10 +49,7 @@ pub enum SelectionStep {
         reason: &'static str,
     },
     /// An encoder was skipped (policy, capability, etc.).
-    EncoderSkipped {
-        id: CodecId,
-        reason: &'static str,
-    },
+    EncoderSkipped { id: CodecId, reason: &'static str },
     /// A decoder was chosen.
     DecoderChosen {
         id: CodecId,
@@ -60,24 +57,13 @@ pub enum SelectionStep {
         reason: &'static str,
     },
     /// A decoder was skipped.
-    DecoderSkipped {
-        id: CodecId,
-        reason: &'static str,
-    },
+    DecoderSkipped { id: CodecId, reason: &'static str },
     /// A decoder was tried and failed.
-    DecoderFailed {
-        id: CodecId,
-        error: String,
-    },
+    DecoderFailed { id: CodecId, error: String },
     /// Fallback from one decoder to another.
-    FallbackAttempt {
-        from: CodecId,
-        to: CodecId,
-    },
+    FallbackAttempt { from: CodecId, to: CodecId },
     /// Informational note.
-    Info {
-        message: &'static str,
-    },
+    Info { message: &'static str },
 }
 
 impl SelectionTrace {
@@ -122,7 +108,9 @@ impl SelectionTrace {
 
     /// Whether any decoder failed during selection (indicating fallback was attempted).
     pub fn had_failures(&self) -> bool {
-        self.steps.iter().any(|s| matches!(s, SelectionStep::DecoderFailed { .. }))
+        self.steps
+            .iter()
+            .any(|s| matches!(s, SelectionStep::DecoderFailed { .. }))
     }
 
     /// Number of steps recorded.
@@ -145,13 +133,21 @@ impl core::fmt::Display for SelectionStep {
             Self::FormatSkipped { format, reason } => {
                 write!(f, "[skip]   {format:?}: {reason}")
             }
-            Self::EncoderChosen { id, priority, reason } => {
+            Self::EncoderChosen {
+                id,
+                priority,
+                reason,
+            } => {
                 write!(f, "[chosen] {id} (priority {priority}): {reason}")
             }
             Self::EncoderSkipped { id, reason } => {
                 write!(f, "[skip]   {id}: {reason}")
             }
-            Self::DecoderChosen { id, priority, reason } => {
+            Self::DecoderChosen {
+                id,
+                priority,
+                reason,
+            } => {
                 write!(f, "[chosen] {id} (priority {priority}): {reason}")
             }
             Self::DecoderSkipped { id, reason } => {

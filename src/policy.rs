@@ -4,9 +4,9 @@
 //! available for a specific operation. It provides killbits, allowlists,
 //! preference ordering, and format restrictions.
 
+use crate::ImageFormat;
 use crate::codec_id::CodecId;
 use crate::format_set::FormatSet;
-use crate::ImageFormat;
 use alloc::vec::Vec;
 
 /// Per-request codec filtering policy.
@@ -166,7 +166,9 @@ impl CodecPolicy {
     /// Position 0 → +1000, position 1 → +900, etc. Not in list → 0.
     fn preference_bonus(&self, id: CodecId, format: ImageFormat) -> i32 {
         for (fmt, order) in &self.preferences {
-            if *fmt == format && let Some(pos) = order.iter().position(|&x| x == id) {
+            if *fmt == format
+                && let Some(pos) = order.iter().position(|&x| x == id)
+            {
                 return (1000 - (pos as i32) * 100).max(0);
             }
         }
@@ -212,9 +214,7 @@ impl CodecPolicy {
 
         // Allowed: intersect
         self.allowed = match (self.allowed, other.allowed) {
-            (Some(a), Some(b)) => {
-                Some(a.into_iter().filter(|id| b.contains(id)).collect())
-            }
+            (Some(a), Some(b)) => Some(a.into_iter().filter(|id| b.contains(id)).collect()),
             (Some(a), None) => Some(a),
             (None, Some(b)) => Some(b),
             (None, None) => None,
@@ -256,16 +256,14 @@ mod tests {
 
     #[test]
     fn killbit_disables_codec() {
-        let policy = CodecPolicy::new()
-            .with_disabled(CodecId::ZenjpegDecode);
+        let policy = CodecPolicy::new().with_disabled(CodecId::ZenjpegDecode);
         assert!(!policy.is_codec_allowed(CodecId::ZenjpegDecode));
         assert!(policy.is_codec_allowed(CodecId::ZenjpegEncode));
     }
 
     #[test]
     fn allowlist_restricts() {
-        let policy = CodecPolicy::new()
-            .with_allowed(&[CodecId::ZenjpegDecode, CodecId::PngDecode]);
+        let policy = CodecPolicy::new().with_allowed(&[CodecId::ZenjpegDecode, CodecId::PngDecode]);
         assert!(policy.is_codec_allowed(CodecId::ZenjpegDecode));
         assert!(policy.is_codec_allowed(CodecId::PngDecode));
         assert!(!policy.is_codec_allowed(CodecId::ZenwebpDecode));
@@ -282,24 +280,18 @@ mod tests {
 
     #[test]
     fn preference_bonus() {
-        let policy = CodecPolicy::new()
-            .with_preference(ImageFormat::Jpeg, &[
-                CodecId::ZenjpegDecode,
-            ]);
-        let priority = policy.effective_priority(
-            CodecId::ZenjpegDecode, 100, ImageFormat::Jpeg,
-        );
+        let policy =
+            CodecPolicy::new().with_preference(ImageFormat::Jpeg, &[CodecId::ZenjpegDecode]);
+        let priority = policy.effective_priority(CodecId::ZenjpegDecode, 100, ImageFormat::Jpeg);
         assert_eq!(priority, 1100); // 100 base + 1000 bonus
     }
 
     #[test]
     fn preference_no_bonus_for_other_format() {
-        let policy = CodecPolicy::new()
-            .with_preference(ImageFormat::Jpeg, &[CodecId::ZenjpegDecode]);
+        let policy =
+            CodecPolicy::new().with_preference(ImageFormat::Jpeg, &[CodecId::ZenjpegDecode]);
         // PNG codec gets no JPEG preference bonus
-        let priority = policy.effective_priority(
-            CodecId::PngDecode, 100, ImageFormat::Png,
-        );
+        let priority = policy.effective_priority(CodecId::PngDecode, 100, ImageFormat::Png);
         assert_eq!(priority, 100);
     }
 
@@ -324,10 +316,8 @@ mod tests {
 
     #[test]
     fn merge_allowed_intersect() {
-        let a = CodecPolicy::new()
-            .with_allowed(&[CodecId::ZenjpegDecode, CodecId::PngDecode]);
-        let b = CodecPolicy::new()
-            .with_allowed(&[CodecId::PngDecode, CodecId::ZenwebpDecode]);
+        let a = CodecPolicy::new().with_allowed(&[CodecId::ZenjpegDecode, CodecId::PngDecode]);
+        let b = CodecPolicy::new().with_allowed(&[CodecId::PngDecode, CodecId::ZenwebpDecode]);
         let merged = a.merge(b);
         assert!(!merged.is_codec_allowed(CodecId::ZenjpegDecode));
         assert!(merged.is_codec_allowed(CodecId::PngDecode));
@@ -347,10 +337,8 @@ mod tests {
 
     #[test]
     fn merge_formats_intersect() {
-        let a = CodecPolicy::new()
-            .with_allowed_formats(FormatSet::modern_web());
-        let b = CodecPolicy::new()
-            .with_allowed_formats(FormatSet::web_safe());
+        let a = CodecPolicy::new().with_allowed_formats(FormatSet::modern_web());
+        let b = CodecPolicy::new().with_allowed_formats(FormatSet::web_safe());
         let merged = a.merge(b);
         assert!(merged.is_format_allowed(ImageFormat::Jpeg));
         assert!(!merged.is_format_allowed(ImageFormat::WebP));
@@ -358,10 +346,8 @@ mod tests {
 
     #[test]
     fn merge_preferences_override() {
-        let a = CodecPolicy::new()
-            .with_preference(ImageFormat::Jpeg, &[CodecId::ZenjpegDecode]);
-        let b = CodecPolicy::new()
-            .with_preference(ImageFormat::Jpeg, &[]);
+        let a = CodecPolicy::new().with_preference(ImageFormat::Jpeg, &[CodecId::ZenjpegDecode]);
+        let b = CodecPolicy::new().with_preference(ImageFormat::Jpeg, &[]);
         let merged = a.merge(b);
         // b's empty preference overrides a's
         assert_eq!(

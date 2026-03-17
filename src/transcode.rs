@@ -77,14 +77,8 @@ impl TranscodeSink {
     /// Create a `PixelSlice` for encoding.
     pub fn as_pixel_slice(&self) -> Result<zenpixels::PixelSlice<'_>, alloc::string::String> {
         let stride = self.width as usize * self.descriptor.bytes_per_pixel();
-        zenpixels::PixelSlice::new(
-            &self.buf,
-            self.width,
-            self.height,
-            stride,
-            self.descriptor,
-        )
-        .map_err(|e| alloc::format!("{e}"))
+        zenpixels::PixelSlice::new(&self.buf, self.width, self.height, stride, self.descriptor)
+            .map_err(|e| alloc::format!("{e}"))
     }
 
     /// Consume the sink and return the raw pixel buffer.

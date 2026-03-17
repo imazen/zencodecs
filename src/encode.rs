@@ -283,9 +283,11 @@ impl<'a> EncodeRequest<'a> {
 
         let format = match self.format {
             Some(f) => f,
-            None => return Err(at!(CodecError::InvalidInput(
-                "animation encode requires an explicit format (use new(), not auto())".into(),
-            ))),
+            None => {
+                return Err(at!(CodecError::InvalidInput(
+                    "animation encode requires an explicit format (use new(), not auto())".into(),
+                )));
+            }
         };
 
         if !registry.can_encode(format) {
@@ -545,8 +547,7 @@ impl<'a> EncodeRequest<'a> {
                     ..Default::default()
                 });
                 let intent = self.quality_intent();
-                crate::select::select_format(&facts, &intent, registry, policy)?
-                    .format
+                crate::select::select_format(&facts, &intent, registry, policy)?.format
             }
         };
 
