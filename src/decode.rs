@@ -297,7 +297,10 @@ impl<'a> DecodeRequest<'a> {
 
         let gainmap = match format {
             ImageFormat::Jpeg => extract_jpeg_gainmap(&output),
-            // AVIF/JXL gain map extraction not yet implemented
+            #[cfg(feature = "avif-decode")]
+            ImageFormat::Avif => extract_avif_gainmap(&output),
+            #[cfg(feature = "jxl-decode")]
+            ImageFormat::Jxl => extract_jxl_gainmap(&output),
             _ => None,
         };
 
@@ -485,6 +488,115 @@ fn extract_jpeg_gainmap(output: &DecodeOutput) -> Option<crate::gainmap::Decoded
         metadata,
         base_is_hdr: false, // JPEG UltraHDR: base=SDR, gain map maps SDR→HDR
         source_format: ImageFormat::Jpeg,
+    })
+}
+
+/// Extract a gain map from an AVIF DecodeOutput's extras, if present.
+///
+/// The gain map image is returned as raw AV1 bytes — the caller must
+/// decode them separately to get pixels. For now we store the raw bytes
+/// in `GainMapImage` with channels=0 to signal "not yet decoded."
+#[cfg(all(feature = "avif-decode", feature = "jpeg-ultrahdr"))]
+fn extract_avif_gainmap(output: &DecodeOutput) -> Option<crate::gainmap::DecodedGainMap> {
+    use crate::gainmap::{DecodedGainMap, GainMapImage};
+
+    let avif_gm = output.extras::<zenavif::AvifGainMap>()?;
+
+    // Convert zenavif-parse's rational GainMapMetadata to ultrahdr-core's f32 GainMapMetadata
+    let meta = &avif_gm.metadata;
+    let convert_channel =
+        |ch: &zenavif::GainMapChannel| -> (f32, f32, f32, f32, f32) {
+            let safe_div = |n: i64, d: u64| -> f32 {
+                if d == 0 { 0.0 } else { n as f32 / d as f32 }
+            };
+            let safe_div_u = |n: u64, d: u64| -> f32 {
+                if d == 0 { 0.0 } else { n as f32 / d as f32 }
+            };
+            (
+                safe_div(ch.gain_map_min_n as i64, ch.gain_map_min_d as u64), // min_content_boost
+                safe_div(ch.gain_map_max_n as i64, ch.gain_map_max_d as u64), // max_content_boost
+                safe_div_u(ch.gamma_n as u64, ch.gamma_d as u64),             // gamma
+                safe_div(ch.base_offset_n as i64, ch.base_offset_d as u64),   // offset_sdr
+                safe_div(
+                    ch.alternate_offset_n as i64,
+                    ch.alternate_offset_d as u64,
+                ), // offset_hdr
+            )
+        };
+
+    let ch0 = convert_channel(&meta.channels[0]);
+    let ch1 = if meta.is_multichannel {
+        convert_channel(&meta.channels[1])
+    } else {
+        ch0
+    };
+    let ch2 = if meta.is_multichannel {
+        convert_channel(&meta.channels[2])
+    } else {
+        ch0
+    };
+
+    let base_headroom = if meta.base_hdr_headroom_d == 0 {
+        0.0
+    } else {
+        meta.base_hdr_headroom_n as f32 / meta.base_hdr_headroom_d as f32
+    };
+    let alt_headroom = if meta.alternate_hdr_headroom_d == 0 {
+        0.0
+    } else {
+        meta.alternate_hdr_headroom_n as f32 / meta.alternate_hdr_headroom_d as f32
+    };
+
+    let uhdr_metadata = crate::gainmap::GainMapMetadata {
+        min_content_boost: [ch0.0, ch1.0, ch2.0],
+        max_content_boost: [ch0.1, ch1.1, ch2.1],
+        gamma: [ch0.2, ch1.2, ch2.2],
+        offset_sdr: [ch0.3, ch1.3, ch2.3],
+        offset_hdr: [ch0.4, ch1.4, ch2.4],
+        hdr_capacity_min: base_headroom,
+        hdr_capacity_max: alt_headroom,
+        use_base_color_space: meta.use_base_colour_space,
+    };
+
+    // The gain map data is raw AV1 — store as-is.
+    // Channels=0 signals "encoded, not yet decoded to pixels."
+    Some(DecodedGainMap {
+        gain_map: GainMapImage {
+            data: avif_gm.gain_map_data.clone(),
+            width: 0,  // Unknown until AV1 is decoded
+            height: 0, // Unknown until AV1 is decoded
+            channels: 0, // Signals raw encoded data
+        },
+        metadata: uhdr_metadata,
+        base_is_hdr: false, // AVIF: base=SDR, gain map maps SDR→HDR
+        source_format: ImageFormat::Avif,
+    })
+}
+
+/// Extract a gain map from a JXL DecodeOutput's extras, if present.
+#[cfg(all(feature = "jxl-decode", feature = "jpeg-ultrahdr"))]
+fn extract_jxl_gainmap(output: &DecodeOutput) -> Option<crate::gainmap::DecodedGainMap> {
+    use crate::gainmap::{DecodedGainMap, GainMapImage};
+
+    let bundle = output.extras::<zenjxl::GainMapBundle>()?;
+
+    // The jhgm bundle contains ISO 21496-1 binary metadata.
+    // TODO: Wire ultrahdr_core::metadata::iso21496::parse_iso21496() when
+    // the dependency chain includes it. For now, use default metadata.
+    let _ = &bundle.metadata; // metadata bytes available but parser not yet wired
+    let metadata = crate::gainmap::GainMapMetadata::default();
+
+    // The gain map codestream is a bare JXL — store as-is.
+    Some(DecodedGainMap {
+        gain_map: GainMapImage {
+            data: bundle.gain_map_codestream.clone(),
+            width: 0,
+            height: 0,
+            channels: 0, // Signals raw encoded data
+        },
+        metadata,
+        base_is_hdr: true, // JXL: base=HDR, gain map maps HDR→SDR
+        source_format: ImageFormat::Jxl,
     })
 }
 
