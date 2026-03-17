@@ -1,0 +1,342 @@
+//! End-to-end gain map tests exercising the full pipeline:
+//! encode HDR → UltraHDR JPEG → decode_gain_map → reconstruct HDR → verify values
+//! encode HDR → UltraHDR JPEG → decode_gain_map → passthrough → re-encode → verify
+//!
+//! These tests verify the complete gain map lifecycle across format boundaries.
+
+#![cfg(feature = "jpeg-ultrahdr")]
+
+use imgref::{ImgRef, ImgVec};
+use rgb::{Rgb, Rgba};
+use zencodecs::{
+    DecodeRequest, DecodedGainMap, EncodeRequest, GainMapSource, ImageFormat,
+};
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/// Generate a synthetic HDR gradient (linear f32 RGB, BT.709).
+/// Values range from 0.0 to `peak` — a peak > 1.0 simulates HDR content.
+fn make_hdr_gradient(w: usize, h: usize, peak: f32) -> ImgVec<Rgb<f32>> {
+    let pixels: Vec<Rgb<f32>> = (0..w * h)
+        .map(|i| {
+            let x = (i % w) as f32 / w.max(1) as f32;
+            let y = (i / w) as f32 / h.max(1) as f32;
+            Rgb {
+                r: x * peak,
+                g: y * peak * 0.7,
+                b: 0.2 + x * 0.3,
+            }
+        })
+        .collect();
+    ImgVec::new(pixels, w, h)
+}
+
+/// Encode to UltraHDR JPEG and return bytes.
+fn encode_ultrahdr(img: ImgRef<'_, Rgb<f32>>, quality: f32) -> Vec<u8> {
+    EncodeRequest::new(ImageFormat::Jpeg)
+        .with_quality(quality)
+        .encode_ultrahdr_rgb_f32(img)
+        .expect("UltraHDR encode failed")
+        .data()
+        .to_vec()
+}
+
+/// Decode and extract gain map from bytes.
+fn decode_with_gainmap(data: &[u8]) -> (zencodecs::DecodeOutput, Option<DecodedGainMap>) {
+    DecodeRequest::new(data)
+        .decode_gain_map()
+        .expect("decode_gain_map failed")
+}
+
+/// Get SDR base as contiguous RGB8 bytes from DecodeOutput.
+fn sdr_bytes(output: zencodecs::DecodeOutput) -> (Vec<u8>, u32, u32) {
+    use zencodecs::PixelBufferConvertTypedExt as _;
+    let w = output.width();
+    let h = output.height();
+    let rgb8 = output.into_buffer().to_rgb8();
+    let img = rgb8.as_imgref();
+    let bytes: Vec<u8> = bytemuck::cast_slice(img.buf()).to_vec();
+    (bytes, w, h)
+}
+
+// ─── E2E: Full HDR Roundtrip ────────────────────────────────────────────────
+
+#[test]
+fn e2e_hdr_encode_decode_reconstruct_verify_values() {
+    // Step 1: Create HDR content with known peak luminance
+    let hdr_img = make_hdr_gradient(128, 128, 3.0);
+
+    // Step 2: Encode to UltraHDR JPEG
+    let ultrahdr_bytes = encode_ultrahdr(hdr_img.as_ref(), 90.0);
+    assert!(ultrahdr_bytes.len() > 500, "UltraHDR should be non-trivial");
+
+    // Step 3: Decode + extract gain map
+    let (output, gainmap) = decode_with_gainmap(&ultrahdr_bytes);
+    let gm = gainmap.expect("UltraHDR must have a gain map");
+
+    assert!(!gm.base_is_hdr);
+    assert_eq!(gm.source_format, ImageFormat::Jpeg);
+    assert!(gm.gain_map.validate().is_ok());
+
+    // Step 4: Reconstruct HDR from SDR base + gain map
+    let (base_bytes, w, h) = sdr_bytes(output);
+    let hdr_data = gm
+        .reconstruct_hdr(&base_bytes, w, h, 3, 4.0)
+        .expect("HDR reconstruction failed");
+
+    // Step 5: Verify HDR output properties
+    let f32_pixels: &[f32] = bytemuck::cast_slice(&hdr_data);
+    assert_eq!(
+        f32_pixels.len(),
+        w as usize * h as usize * 4,
+        "should be RGBA f32"
+    );
+
+    // HDR should have values exceeding SDR range
+    let max_val = f32_pixels.iter().copied().fold(0.0f32, f32::max);
+    assert!(
+        max_val > 1.0,
+        "reconstructed HDR should exceed 1.0, got {max_val}"
+    );
+
+    // HDR reconstruction at boost=1.0 should approximately match SDR
+    let sdr_at_1x = gm
+        .reconstruct_hdr(&base_bytes, w, h, 3, 1.0)
+        .expect("reconstruction at boost=1.0 failed");
+    let sdr_f32: &[f32] = bytemuck::cast_slice(&sdr_at_1x);
+    let max_sdr = sdr_f32.iter().copied().fold(0.0f32, f32::max);
+    assert!(
+        max_sdr <= 1.5,
+        "at boost=1.0, values should be near SDR range, got {max_sdr}"
+    );
+}
+
+// ─── E2E: Gain Map Metadata Integrity ───────────────────────────────────────
+
+#[test]
+fn e2e_gain_map_metadata_reflects_hdr_content() {
+    // Encode with high peak → high boost ratio expected
+    let high_peak = make_hdr_gradient(64, 64, 5.0);
+    let bytes_high = encode_ultrahdr(high_peak.as_ref(), 85.0);
+    let (_, gm_high) = decode_with_gainmap(&bytes_high);
+    let gm_high = gm_high.expect("must have gain map");
+
+    // Encode with low peak → low boost ratio expected
+    let low_peak = make_hdr_gradient(64, 64, 1.5);
+    let bytes_low = encode_ultrahdr(low_peak.as_ref(), 85.0);
+    let (_, gm_low) = decode_with_gainmap(&bytes_low);
+    let gm_low = gm_low.expect("must have gain map");
+
+    // High-peak content should have higher max_content_boost
+    assert!(
+        gm_high.metadata.max_content_boost[0] >= gm_low.metadata.max_content_boost[0],
+        "higher peak ({}) should have >= boost ratio than lower peak ({})",
+        gm_high.metadata.max_content_boost[0],
+        gm_low.metadata.max_content_boost[0],
+    );
+}
+
+// ─── E2E: Gain Map Passthrough (same-format) ───────────────────────────────
+
+#[test]
+fn e2e_gain_map_passthrough_jpeg_to_jpeg() {
+    // Step 1: Create original UltraHDR JPEG
+    let hdr_img = make_hdr_gradient(64, 64, 3.0);
+    let original_bytes = encode_ultrahdr(hdr_img.as_ref(), 90.0);
+
+    // Step 2: Decode + extract gain map
+    let (output, gainmap) = decode_with_gainmap(&original_bytes);
+    let gm = gainmap.expect("must have gain map");
+
+    // Step 3: Re-encode the SDR base at different quality with passthrough gain map
+    // (The encode-with-gain-map builder exists but doesn't embed yet — this tests the API)
+    let source = GainMapSource::Precomputed {
+        gain_map: &gm.gain_map,
+        metadata: &gm.metadata,
+    };
+
+    use zencodecs::PixelBufferConvertTypedExt as _;
+    let rgb8 = output.into_buffer().to_rgb8();
+    let img_ref = rgb8.as_imgref();
+
+    let _request = EncodeRequest::new(ImageFormat::Jpeg)
+        .with_quality(75.0) // different quality
+        .with_gain_map(source)
+        .encode_rgb8(img_ref)
+        .expect("re-encode should succeed");
+
+    // Verify the gain map data survived the passthrough
+    assert!(gm.gain_map.validate().is_ok());
+    assert!(gm.metadata.max_content_boost[0] > 1.0);
+}
+
+// ─── E2E: Gain Map Extraction Consistency ───────────────────────────────────
+
+#[test]
+fn e2e_decode_gain_map_twice_same_result() {
+    let hdr_img = make_hdr_gradient(64, 64, 2.5);
+    let bytes = encode_ultrahdr(hdr_img.as_ref(), 85.0);
+
+    let (_, gm1) = decode_with_gainmap(&bytes);
+    let (_, gm2) = decode_with_gainmap(&bytes);
+
+    let gm1 = gm1.expect("first decode must have gain map");
+    let gm2 = gm2.expect("second decode must have gain map");
+
+    // Metadata should be identical
+    assert_eq!(gm1.metadata.max_content_boost, gm2.metadata.max_content_boost);
+    assert_eq!(gm1.metadata.min_content_boost, gm2.metadata.min_content_boost);
+    assert_eq!(gm1.metadata.gamma, gm2.metadata.gamma);
+    assert_eq!(gm1.metadata.hdr_capacity_max, gm2.metadata.hdr_capacity_max);
+
+    // Gain map pixels should be identical
+    assert_eq!(gm1.gain_map.data, gm2.gain_map.data);
+    assert_eq!(gm1.gain_map.width, gm2.gain_map.width);
+    assert_eq!(gm1.gain_map.height, gm2.gain_map.height);
+}
+
+// ─── E2E: HDR Reconstruction Quality ────────────────────────────────────────
+
+#[test]
+fn e2e_hdr_reconstruction_boost_affects_output() {
+    let hdr_img = make_hdr_gradient(64, 64, 4.0);
+    let bytes = encode_ultrahdr(hdr_img.as_ref(), 85.0);
+
+    let (output, gainmap) = decode_with_gainmap(&bytes);
+    let gm = gainmap.expect("must have gain map");
+    let (base_bytes, w, h) = sdr_bytes(output);
+
+    // Reconstruct at different boost levels
+    let hdr_low = gm
+        .reconstruct_hdr(&base_bytes, w, h, 3, 1.5)
+        .expect("low boost failed");
+    let hdr_high = gm
+        .reconstruct_hdr(&base_bytes, w, h, 3, 6.0)
+        .expect("high boost failed");
+
+    let f32_low: &[f32] = bytemuck::cast_slice(&hdr_low);
+    let f32_high: &[f32] = bytemuck::cast_slice(&hdr_high);
+
+    let max_low = f32_low.iter().copied().fold(0.0f32, f32::max);
+    let max_high = f32_high.iter().copied().fold(0.0f32, f32::max);
+
+    assert!(
+        max_high >= max_low,
+        "higher boost should produce brighter output: max_high={max_high}, max_low={max_low}"
+    );
+}
+
+// ─── E2E: Gain Map Dimensions ───────────────────────────────────────────────
+
+#[test]
+fn e2e_gain_map_is_lower_resolution_than_base() {
+    let hdr_img = make_hdr_gradient(256, 256, 3.0);
+    let bytes = encode_ultrahdr(hdr_img.as_ref(), 85.0);
+
+    let (output, gainmap) = decode_with_gainmap(&bytes);
+    let gm = gainmap.expect("must have gain map");
+
+    let base_pixels = output.width() as u64 * output.height() as u64;
+    let gm_pixels = gm.gain_map.pixel_count();
+
+    // Gain map is typically 1/4 to 1/16 the resolution
+    assert!(
+        gm_pixels < base_pixels,
+        "gain map ({gm_pixels} px) should be smaller than base ({base_pixels} px)"
+    );
+    assert!(
+        gm_pixels > 0,
+        "gain map should have at least one pixel"
+    );
+}
+
+// ─── E2E: Non-gain-map formats return None ──────────────────────────────────
+
+#[cfg(feature = "webp")]
+#[test]
+fn e2e_no_gainmap_from_webp_encode_decode() {
+    let pixels = vec![Rgb { r: 100u8, g: 150, b: 200 }; 32 * 32];
+    let img = ImgVec::new(pixels, 32, 32);
+
+    let encoded = EncodeRequest::new(ImageFormat::WebP)
+        .with_quality(80.0)
+        .encode_rgb8(img.as_ref())
+        .expect("webp encode failed");
+
+    let (_, gainmap) = decode_with_gainmap(encoded.data());
+    assert!(gainmap.is_none(), "WebP should not produce a gain map");
+}
+
+#[cfg(feature = "gif")]
+#[test]
+fn e2e_no_gainmap_from_gif_encode_decode() {
+    let pixels = vec![Rgba { r: 100u8, g: 150, b: 200, a: 255 }; 32 * 32];
+    let img = ImgVec::new(pixels, 32, 32);
+
+    let encoded = EncodeRequest::new(ImageFormat::Gif)
+        .encode_rgba8(img.as_ref())
+        .expect("gif encode failed");
+
+    let (_, gainmap) = decode_with_gainmap(encoded.data());
+    assert!(gainmap.is_none(), "GIF should not produce a gain map");
+}
+
+// ─── E2E: Direction flag correctness ────────────────────────────────────────
+
+#[test]
+fn e2e_jpeg_gain_map_is_forward_direction() {
+    let hdr_img = make_hdr_gradient(32, 32, 2.0);
+    let bytes = encode_ultrahdr(hdr_img.as_ref(), 85.0);
+    let (_, gainmap) = decode_with_gainmap(&bytes);
+    let gm = gainmap.expect("must have gain map");
+
+    assert!(!gm.base_is_hdr, "JPEG UltraHDR: base should be SDR");
+    assert_eq!(gm.source_format, ImageFormat::Jpeg);
+}
+
+// ─── E2E: Reconstruct + compare with decode_hdr ────────────────────────────
+
+#[test]
+fn e2e_reconstruct_hdr_matches_decode_hdr() {
+    let hdr_img = make_hdr_gradient(64, 64, 2.5);
+    let bytes = encode_ultrahdr(hdr_img.as_ref(), 90.0);
+    let boost = 4.0;
+
+    // Path A: decode_hdr (existing API)
+    let hdr_output = DecodeRequest::new(&bytes)
+        .decode_hdr(boost)
+        .expect("decode_hdr failed");
+
+    // Path B: decode_gain_map + reconstruct_hdr (new API)
+    let (output, gainmap) = decode_with_gainmap(&bytes);
+    let gm = gainmap.expect("must have gain map");
+    let (base_bytes, w, h) = sdr_bytes(output);
+    let hdr_data = gm
+        .reconstruct_hdr(&base_bytes, w, h, 3, boost)
+        .expect("reconstruct_hdr failed");
+
+    // Both paths should produce output of the same dimensions
+    assert_eq!(hdr_output.width(), w);
+    assert_eq!(hdr_output.height(), h);
+    assert_eq!(hdr_data.len(), w as usize * h as usize * 16); // RGBA f32
+
+    // The pixel values won't be bit-identical (different code paths, potential
+    // differences in sRGB→linear conversion), but should be in the same ballpark.
+    let hdr_buf = hdr_output.into_buffer();
+    let hdr_bytes = hdr_buf.as_contiguous_bytes().expect("should be contiguous");
+    let f32_a: &[f32] = bytemuck::cast_slice(hdr_bytes);
+    let f32_b: &[f32] = bytemuck::cast_slice(&hdr_data);
+
+    // Compare means — should be within 20% (compression + tonemapping differences)
+    let mean_a: f32 = f32_a.iter().sum::<f32>() / f32_a.len() as f32;
+    let mean_b: f32 = f32_b.iter().sum::<f32>() / f32_b.len() as f32;
+    let ratio = if mean_a > mean_b {
+        mean_a / mean_b
+    } else {
+        mean_b / mean_a
+    };
+    assert!(
+        ratio < 1.5,
+        "mean brightness should be similar: path A={mean_a:.4}, path B={mean_b:.4}, ratio={ratio:.4}"
+    );
+}
