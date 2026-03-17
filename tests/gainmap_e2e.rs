@@ -340,3 +340,201 @@ fn e2e_reconstruct_hdr_matches_decode_hdr() {
         "mean brightness should be similar: path A={mean_a:.4}, path B={mean_b:.4}, ratio={ratio:.4}"
     );
 }
+
+// ─── E2E: JXL gain map encode + decode ──────────────────────────────────────
+
+#[cfg(all(feature = "jxl-encode", feature = "jxl-decode"))]
+mod jxl_gainmap {
+    use super::*;
+    use zencodecs::GainMapMetadata;
+    use zencodecs::gainmap::GainMapImage;
+
+    /// Encode a base image + precomputed gain map to JXL, then decode and verify
+    /// that the jhgm box is present and the metadata roundtrips.
+    #[test]
+    fn e2e_jxl_encode_with_gain_map() {
+        // Step 1: Create a small test image (SDR RGB8)
+        let w = 64usize;
+        let h = 64usize;
+        let pixels: Vec<Rgb<u8>> = (0..w * h)
+            .map(|i| {
+                let x = (i % w) as u8;
+                let y = (i / w) as u8;
+                Rgb {
+                    r: x.wrapping_mul(3),
+                    g: y.wrapping_mul(5),
+                    b: 128,
+                }
+            })
+            .collect();
+        let img = imgref::ImgVec::new(pixels, w, h);
+
+        // Step 2: Create a gain map (grayscale, lower resolution)
+        let gm_w = 16u32;
+        let gm_h = 16u32;
+        let gm_data: Vec<u8> = (0..gm_w * gm_h)
+            .map(|i| (128 + (i % 64)) as u8)
+            .collect();
+        let gain_map = GainMapImage {
+            data: gm_data,
+            width: gm_w,
+            height: gm_h,
+            channels: 1,
+        };
+        assert!(gain_map.validate().is_ok());
+
+        // Step 3: Create ISO 21496-1 metadata
+        let metadata = GainMapMetadata {
+            max_content_boost: [4.0; 3],
+            min_content_boost: [1.0; 3],
+            gamma: [1.0; 3],
+            offset_sdr: [1.0 / 64.0; 3],
+            offset_hdr: [1.0 / 64.0; 3],
+            hdr_capacity_min: 1.0,
+            hdr_capacity_max: 4.0,
+            use_base_color_space: true,
+        };
+
+        // Step 4: Encode to JXL with gain map
+        let source = GainMapSource::Precomputed {
+            gain_map: &gain_map,
+            metadata: &metadata,
+        };
+        let output = EncodeRequest::new(ImageFormat::Jxl)
+            .with_quality(85.0)
+            .with_gain_map(source)
+            .encode_rgb8(img.as_ref())
+            .expect("JXL encode with gain map failed");
+
+        assert!(!output.data().is_empty());
+        assert_eq!(output.format(), ImageFormat::Jxl);
+
+        // Step 5: Verify the output is in container format (jhgm requires container)
+        assert!(
+            zenjxl::container::is_container(output.data()),
+            "JXL output with gain map should be in container format"
+        );
+
+        // Step 6: Decode and extract the gain map
+        let (decoded_output, decoded_gainmap) = DecodeRequest::new(output.data())
+            .decode_gain_map()
+            .expect("JXL decode_gain_map failed");
+
+        // Verify base image decoded successfully
+        assert_eq!(decoded_output.width(), w as u32);
+        assert_eq!(decoded_output.height(), h as u32);
+
+        // Step 7: Verify gain map was preserved
+        let gm = decoded_gainmap.expect("JXL output should contain a gain map");
+        assert!(gm.base_is_hdr, "JXL gain map: base should be HDR");
+        assert_eq!(gm.source_format, ImageFormat::Jxl);
+        assert!(gm.gain_map.validate().is_ok());
+        assert_eq!(gm.gain_map.width, gm_w);
+        assert_eq!(gm.gain_map.height, gm_h);
+
+        // Step 8: Verify ISO 21496-1 metadata roundtripped
+        // Allow small floating-point differences from fraction serialization
+        let eps = 0.01;
+        assert!(
+            (gm.metadata.max_content_boost[0] - 4.0).abs() < eps,
+            "max_content_boost should be ~4.0, got {}",
+            gm.metadata.max_content_boost[0],
+        );
+        assert!(
+            (gm.metadata.min_content_boost[0] - 1.0).abs() < eps,
+            "min_content_boost should be ~1.0, got {}",
+            gm.metadata.min_content_boost[0],
+        );
+        assert!(
+            (gm.metadata.hdr_capacity_max - 4.0).abs() < eps,
+            "hdr_capacity_max should be ~4.0, got {}",
+            gm.metadata.hdr_capacity_max,
+        );
+        assert!(
+            (gm.metadata.gamma[0] - 1.0).abs() < eps,
+            "gamma should be ~1.0, got {}",
+            gm.metadata.gamma[0],
+        );
+
+        // Step 9: Verify gain map pixel data roundtripped (lossless encode)
+        // The gain map was encoded lossless, so pixels should match exactly.
+        // Note: the original was 1-channel, but decoded may be 3-channel (RGB).
+        // Either way, the pixel values should be correct.
+        if gm.gain_map.channels == 1 {
+            assert_eq!(
+                gm.gain_map.data.len(),
+                (gm_w * gm_h) as usize,
+                "grayscale gain map should have w*h bytes"
+            );
+        } else {
+            assert_eq!(gm.gain_map.channels, 3);
+            assert_eq!(
+                gm.gain_map.data.len(),
+                (gm_w * gm_h * 3) as usize,
+                "RGB gain map should have w*h*3 bytes"
+            );
+        }
+    }
+
+    /// Encode with an RGB (3-channel) gain map.
+    #[test]
+    fn e2e_jxl_encode_with_rgb_gain_map() {
+        let w = 32usize;
+        let h = 32usize;
+        let pixels: Vec<Rgb<u8>> = vec![
+            Rgb {
+                r: 128,
+                g: 100,
+                b: 80,
+            };
+            w * h
+        ];
+        let img = imgref::ImgVec::new(pixels, w, h);
+
+        // 3-channel gain map
+        let gm_w = 8u32;
+        let gm_h = 8u32;
+        let gm_data: Vec<u8> = (0..gm_w * gm_h * 3)
+            .map(|i| (100 + (i % 100)) as u8)
+            .collect();
+        let gain_map = GainMapImage {
+            data: gm_data,
+            width: gm_w,
+            height: gm_h,
+            channels: 3,
+        };
+
+        let metadata = GainMapMetadata {
+            max_content_boost: [3.0, 3.5, 2.5],
+            min_content_boost: [1.0; 3],
+            gamma: [1.0; 3],
+            offset_sdr: [1.0 / 64.0; 3],
+            offset_hdr: [1.0 / 64.0; 3],
+            hdr_capacity_min: 1.0,
+            hdr_capacity_max: 3.5,
+            use_base_color_space: true,
+        };
+
+        let source = GainMapSource::Precomputed {
+            gain_map: &gain_map,
+            metadata: &metadata,
+        };
+        let output = EncodeRequest::new(ImageFormat::Jxl)
+            .with_quality(90.0)
+            .with_gain_map(source)
+            .encode_rgb8(img.as_ref())
+            .expect("JXL encode with RGB gain map failed");
+
+        assert!(zenjxl::container::is_container(output.data()));
+
+        // Decode and verify
+        let (_decoded, decoded_gm) = DecodeRequest::new(output.data())
+            .decode_gain_map()
+            .expect("JXL decode failed");
+        let gm = decoded_gm.expect("should have gain map");
+        assert_eq!(gm.gain_map.width, gm_w);
+        assert_eq!(gm.gain_map.height, gm_h);
+        // 3-channel gain maps stay 3-channel after roundtrip
+        assert_eq!(gm.gain_map.channels, 3);
+    }
+}

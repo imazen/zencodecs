@@ -208,8 +208,8 @@ impl<'a> EncodeRequest<'a> {
     ///
     /// The gain map will be embedded in a format-appropriate way:
     /// - **JPEG**: Embedded as UltraHDR (MPF secondary image + XMP metadata)
+    /// - **JXL**: Embedded as jhgm box (requires `jxl-encode` + `jxl-decode` features)
     /// - **AVIF**: Embedded as tmap item (future, not yet implemented)
-    /// - **JXL**: Embedded as jhgm box (future, not yet implemented)
     ///
     /// Currently only [`GainMapSource::Precomputed`] is supported.
     ///
@@ -669,11 +669,25 @@ impl<'a> EncodeRequest<'a> {
                     self.stop,
                 );
             }
-            // AVIF and JXL gain map embedding will be wired when
-            // zenavif-serialize and jxl-encoder add support.
+            #[cfg(all(feature = "jxl-encode", feature = "jxl-decode"))]
+            if format == ImageFormat::Jxl {
+                return crate::codecs::jxl_enc::encode_with_precomputed_gainmap(
+                    &adapted.data,
+                    adapted.width,
+                    adapted.rows,
+                    adapted.descriptor,
+                    Some(resolved_quality),
+                    gain_map,
+                    metadata,
+                    self.stop,
+                );
+            }
+            // AVIF gain map embedding requires zenavif encoder pipeline changes
+            // (serializer supports tmap, but encoder doesn't thread it through yet).
             return Err(at!(CodecError::UnsupportedOperation {
                 format,
-                detail: "gain map embedding not yet supported for this format",
+                detail: "gain map embedding not yet supported for this format \
+                         (JPEG and JXL only; AVIF support in progress)",
             }));
         }
 
