@@ -32,6 +32,7 @@ zenpng = { path = "../zenpng", optional = true, features = ["zencodec"] }
 zenjxl = { path = "../zenjxl", optional = true, default-features = false, features = ["zencodec"] }
 heic-decoder = { path = "../heic-decoder-rs", optional = true, default-features = false, features = ["zencodec"] }
 zenbitmaps = { path = "../zenbitmaps", optional = true, features = ["zencodec"] }
+zenraw = { path = "../zenraw", optional = true, default-features = false, features = ["rawloader", "std", "zencodec", "exif"] }
 
 # Pipeline (optional, feature-gated)
 zenresize = { path = "../zenresize", optional = true, default-features = false, features = ["std", "layout"] }
@@ -68,6 +69,9 @@ jxl-encode = ["dep:zenjxl", "zenjxl/encode"]
 heic-decode = ["dep:heic-decoder"]
 bitmaps = ["dep:zenbitmaps"]
 bitmaps-bmp = ["bitmaps", "zenbitmaps/bmp"]
+raw-decode = ["dep:zenraw"]
+raw-decode-exif = ["raw-decode", "zenraw/exif"]
+raw-decode-xmp = ["raw-decode", "zenraw/xmp"]
 
 # Pipeline
 pipeline = ["dep:zenresize"]
@@ -76,7 +80,7 @@ pipeline = ["dep:zenresize"]
 moxcms = []  # Disabled for now
 
 # All codecs
-all = ["jpeg", "jpeg-ultrahdr", "webp", "gif", "gif-zenquant", "gif-quantizr", "png", "png-zenquant", "avif-decode", "avif-encode", "jxl-decode", "jxl-encode", "heic-decode", "bitmaps-bmp"]
+all = ["jpeg", "jpeg-ultrahdr", "webp", "gif", "gif-zenquant", "gif-quantizr", "png", "png-zenquant", "avif-decode", "avif-encode", "jxl-decode", "jxl-encode", "heic-decode", "bitmaps-bmp", "raw-decode", "raw-decode-exif", "raw-decode-xmp"]
 
 # Calibration harness (all lossy encoders)
 calibrate = ["jpeg", "webp", "png", "avif-decode", "avif-encode", "jxl-decode", "jxl-encode", "std"]
@@ -112,3 +116,4 @@ required-features = ["calibrate"]
 [patch.crates-io]
 zenpixels = { path = "../zenpixels/zenpixels" }
 zenpixels-convert = { path = "../zenpixels/zenpixels-convert" }
+whereat = { path = "../whereat" }

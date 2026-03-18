@@ -354,6 +354,49 @@ impl<'a> DecodeRequest<'a> {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // RAW/DNG preview extraction
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Extract the embedded JPEG preview from a RAW/DNG file.
+    ///
+    /// DNG files commonly contain a reduced-resolution JPEG preview in IFD0.
+    /// Apple ProRAW (APPLEDNG) files embed a full-resolution sRGB JPEG.
+    ///
+    /// Returns the raw JPEG bytes, or `None` if:
+    /// - The data is not a RAW/DNG file
+    /// - No JPEG preview is embedded
+    /// - The `raw-decode-exif` feature is not enabled
+    ///
+    /// The returned bytes can be decoded through a separate `DecodeRequest`:
+    ///
+    /// ```no_run
+    /// use zencodecs::DecodeRequest;
+    ///
+    /// let raw_data: &[u8] = &[]; // DNG file bytes
+    /// if let Some(preview_jpeg) = DecodeRequest::new(raw_data).extract_raw_preview() {
+    ///     let preview = DecodeRequest::new(&preview_jpeg).decode()?;
+    ///     println!("Preview: {}x{}", preview.width(), preview.height());
+    /// }
+    /// # Ok::<(), whereat::At<zencodecs::CodecError>>(())
+    /// ```
+    #[cfg(feature = "raw-decode-exif")]
+    pub fn extract_raw_preview(&self) -> Option<alloc::vec::Vec<u8>> {
+        crate::codecs::raw::extract_preview(self.data)
+    }
+
+    /// Read structured EXIF and DNG metadata from a RAW/DNG file.
+    ///
+    /// Uses zenraw's kamadak-exif parser, which reads the full TIFF IFD
+    /// structure including DNG-specific tags (color matrices, white balance,
+    /// calibration illuminants).
+    ///
+    /// Returns `None` if the data is not a RAW/DNG file or parsing fails.
+    #[cfg(feature = "raw-decode-exif")]
+    pub fn read_raw_metadata(&self) -> Option<zenraw::exif::ExifMetadata> {
+        crate::codecs::raw::read_raw_metadata(self.data)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // Streaming decode
     // ═══════════════════════════════════════════════════════════════════
 
@@ -490,6 +533,17 @@ impl<'a> DecodeRequest<'a> {
             }
             #[cfg(not(feature = "bitmaps"))]
             ImageFormat::Farbfeld => Err(at!(CodecError::UnsupportedFormat(format))),
+
+            // RAW/DNG: Custom format from zenraw
+            #[cfg(feature = "raw-decode")]
+            ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => {
+                crate::codecs::raw::decode(
+                    self.data,
+                    self.codec_config,
+                    self.limits,
+                    self.stop,
+                )
+            }
 
             _ => Err(at!(CodecError::UnsupportedFormat(format))),
         }

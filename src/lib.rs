@@ -184,3 +184,6 @@ pub use zenbitmaps::{
 
 #[cfg(feature = "bitmaps-bmp")]
 pub use zenbitmaps::{BmpDecodeJob, BmpDecoderConfig, BmpEncodeJob, BmpEncoderConfig};
+
+#[cfg(feature = "raw-decode")]
+pub use zenraw::{RawDecodeConfig, RawDecoderConfig};

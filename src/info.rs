@@ -7,8 +7,20 @@ use crate::{CodecError, CodecRegistry, ImageFormat};
 use whereat::at;
 
 /// Detect image format from magic bytes using the common format registry.
+///
+/// Also checks for RAW/DNG files when the `raw-decode` feature is enabled,
+/// since these use `ImageFormat::Custom` and are not in the common registry.
 pub(crate) fn detect_format(data: &[u8]) -> Option<ImageFormat> {
-    zencodec::ImageFormatRegistry::common().detect(data)
+    // Try common formats first (JPEG, PNG, GIF, WebP, etc.)
+    if let Some(fmt) = zencodec::ImageFormatRegistry::common().detect(data) {
+        return Some(fmt);
+    }
+    // Try RAW/DNG detection
+    #[cfg(feature = "raw-decode")]
+    if let Some(fmt) = crate::codecs::raw::detect_raw_format(data) {
+        return Some(fmt);
+    }
+    None
 }
 
 /// Probe image metadata without decoding pixels.
@@ -183,6 +195,12 @@ fn probe_codec(data: &[u8], format: ImageFormat) -> Result<ImageInfo> {
         ImageFormat::Farbfeld => crate::codecs::farbfeld::probe(data),
         #[cfg(not(feature = "bitmaps"))]
         ImageFormat::Farbfeld => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        // RAW/DNG: Custom format from zenraw
+        #[cfg(feature = "raw-decode")]
+        ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => {
+            crate::codecs::raw::probe(data)
+        }
 
         _ => Err(at!(CodecError::UnsupportedFormat(format))),
     }

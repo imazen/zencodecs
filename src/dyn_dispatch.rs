@@ -104,6 +104,12 @@ fn build_dyn_decoder_config(
         #[cfg(not(feature = "bitmaps"))]
         ImageFormat::Farbfeld => Err(at!(CodecError::UnsupportedFormat(format))),
 
+        // RAW/DNG: Custom format from zenraw
+        #[cfg(feature = "raw-decode")]
+        ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => {
+            Ok(Box::new(build_raw_decoder(codec_config)))
+        }
+
         _ => Err(at!(CodecError::UnsupportedFormat(format))),
     }
 }
@@ -186,6 +192,12 @@ pub(crate) fn dyn_push_decode(
         #[cfg(not(feature = "bitmaps"))]
         ImageFormat::Farbfeld => Err(at!(CodecError::UnsupportedFormat(format))),
 
+        // RAW/DNG: Custom format from zenraw
+        #[cfg(feature = "raw-decode")]
+        ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => {
+            push_dec!(build_raw_decoder(params.codec_config))
+        }
+
         _ => Err(at!(CodecError::UnsupportedFormat(format))),
     }
 }
@@ -245,6 +257,15 @@ fn build_avif_decoder(codec_config: Option<&CodecConfig>) -> zenavif::AvifDecode
     let mut config = zenavif::AvifDecoderConfig::new();
     if let Some(cfg) = codec_config.and_then(|c| c.avif_decoder.as_ref()) {
         *config.inner_mut() = cfg.as_ref().clone();
+    }
+    config
+}
+
+#[cfg(feature = "raw-decode")]
+fn build_raw_decoder(codec_config: Option<&CodecConfig>) -> zenraw::RawDecoderConfig {
+    let mut config = zenraw::RawDecoderConfig::new();
+    if let Some(cfg) = codec_config.and_then(|c| c.raw_decoder.as_ref()) {
+        config = zenraw::RawDecoderConfig::from_config(cfg.as_ref().clone());
     }
     config
 }
@@ -347,6 +368,10 @@ pub(crate) fn decoder_id_for_format(format: ImageFormat) -> CodecId {
         ImageFormat::Pnm => CodecId::PnmDecode,
         ImageFormat::Bmp => CodecId::BmpDecode,
         ImageFormat::Farbfeld => CodecId::FarbfeldDecode,
+        #[cfg(feature = "raw-decode")]
+        ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => {
+            CodecId::ZenrawDecode
+        }
         _ => CodecId::Custom("unknown"),
     }
 }

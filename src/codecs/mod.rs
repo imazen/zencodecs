@@ -38,3 +38,6 @@ pub(crate) mod bmp;
 
 #[cfg(feature = "bitmaps")]
 pub(crate) mod farbfeld;
+
+#[cfg(feature = "raw-decode")]
+pub(crate) mod raw;

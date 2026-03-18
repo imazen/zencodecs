@@ -100,6 +100,32 @@ pub struct ExifData {
     pub exposure_program: Option<u16>,
     /// Exposure compensation in EV (tag 0x9204).
     pub exposure_compensation: Option<SRational>,
+
+    // DNG-specific (populated from IFD0 DNG tags)
+    /// DNG format version (tag 0xC612). E.g., `[1, 6, 0, 0]` for DNG 1.6.
+    pub dng_version: Option<[u8; 4]>,
+    /// Unique camera model string from DNG (tag 0xC614).
+    pub unique_camera_model: Option<String>,
+    /// DNG ColorMatrix1 (tag 0xC621). Flattened 3x3 row-major SRATIONAL values as f64.
+    pub color_matrix_1: Option<Vec<f64>>,
+    /// DNG ColorMatrix2 (tag 0xC622). Flattened 3x3 row-major SRATIONAL values as f64.
+    pub color_matrix_2: Option<Vec<f64>>,
+    /// DNG ForwardMatrix1 (tag 0xC714). Flattened 3x3 row-major SRATIONAL values as f64.
+    pub forward_matrix_1: Option<Vec<f64>>,
+    /// DNG ForwardMatrix2 (tag 0xC715). Flattened 3x3 row-major SRATIONAL values as f64.
+    pub forward_matrix_2: Option<Vec<f64>>,
+    /// DNG AnalogBalance (tag 0xC627). Per-channel analog gain as RATIONAL f64.
+    pub analog_balance: Option<Vec<f64>>,
+    /// DNG AsShotNeutral (tag 0xC628). White balance as per-channel RATIONAL f64.
+    pub as_shot_neutral: Option<Vec<f64>>,
+    /// DNG AsShotWhiteXY (tag 0xC629). White point chromaticity (x, y).
+    pub as_shot_white_xy: Option<(f64, f64)>,
+    /// DNG BaselineExposure (tag 0xC62A). EV compensation as SRATIONAL f64.
+    pub baseline_exposure: Option<f64>,
+    /// DNG CalibrationIlluminant1 (tag 0xC65A). EXIF LightSource enum value.
+    pub calibration_illuminant_1: Option<u16>,
+    /// DNG CalibrationIlluminant2 (tag 0xC65B). EXIF LightSource enum value.
+    pub calibration_illuminant_2: Option<u16>,
 }
 
 /// Unsigned rational number (two u32 values).
@@ -283,6 +309,20 @@ const TAG_PIXEL_Y_DIMENSION: u16 = 0xA003;
 const TAG_WHITE_BALANCE: u16 = 0xA403;
 const TAG_FOCAL_LENGTH_35MM: u16 = 0xA405;
 const TAG_LENS_MODEL: u16 = 0xA434;
+
+// DNG IFD0 tags
+const TAG_DNG_VERSION: u16 = 0xC612;
+const TAG_UNIQUE_CAMERA_MODEL: u16 = 0xC614;
+const TAG_COLOR_MATRIX_1: u16 = 0xC621;
+const TAG_COLOR_MATRIX_2: u16 = 0xC622;
+const TAG_ANALOG_BALANCE: u16 = 0xC627;
+const TAG_AS_SHOT_NEUTRAL: u16 = 0xC628;
+const TAG_AS_SHOT_WHITE_XY: u16 = 0xC629;
+const TAG_BASELINE_EXPOSURE: u16 = 0xC62A;
+const TAG_CALIBRATION_ILLUMINANT_1: u16 = 0xC65A;
+const TAG_CALIBRATION_ILLUMINANT_2: u16 = 0xC65B;
+const TAG_FORWARD_MATRIX_1: u16 = 0xC714;
+const TAG_FORWARD_MATRIX_2: u16 = 0xC715;
 
 // GPS IFD tags
 const TAG_GPS_LATITUDE_REF: u16 = 0x0001;
@@ -510,6 +550,102 @@ fn read_byte(reader: &Reader<'_>, entry: &IfdEntry, entry_offset: usize) -> Opti
     reader.data.get(off).copied()
 }
 
+/// Read N BYTE values from an IFD entry into a fixed-size array.
+fn read_bytes_4(reader: &Reader<'_>, entry: &IfdEntry, entry_offset: usize) -> Option<[u8; 4]> {
+    if entry.type_id != TYPE_BYTE || entry.count < 4 {
+        return None;
+    }
+    let off = entry.data_offset(entry_offset)?;
+    let b = reader.data.get(off..off + 4)?;
+    Some([b[0], b[1], b[2], b[3]])
+}
+
+/// Read a vector of SRATIONAL values as f64 from an IFD entry.
+fn read_srational_vec(
+    reader: &Reader<'_>,
+    entry: &IfdEntry,
+    entry_offset: usize,
+) -> Option<Vec<f64>> {
+    if entry.type_id != TYPE_SRATIONAL || entry.count == 0 {
+        return None;
+    }
+    let off = entry.data_offset(entry_offset)?;
+    let mut vals = Vec::with_capacity(entry.count as usize);
+    for i in 0..entry.count as usize {
+        let base = off + i * 8;
+        let num = reader.i32_at(base)?;
+        let den = reader.i32_at(base + 4)?;
+        vals.push(if den == 0 {
+            0.0
+        } else {
+            num as f64 / den as f64
+        });
+    }
+    Some(vals)
+}
+
+/// Read a SRATIONAL scalar as f64 from an IFD entry.
+fn read_srational_f64(
+    reader: &Reader<'_>,
+    entry: &IfdEntry,
+    entry_offset: usize,
+) -> Option<f64> {
+    if entry.type_id != TYPE_SRATIONAL || entry.count < 1 {
+        return None;
+    }
+    let off = entry.data_offset(entry_offset)?;
+    let num = reader.i32_at(off)?;
+    let den = reader.i32_at(off + 4)?;
+    Some(if den == 0 {
+        0.0
+    } else {
+        num as f64 / den as f64
+    })
+}
+
+/// Read a vector of RATIONAL values as f64 from an IFD entry.
+fn read_rational_vec(
+    reader: &Reader<'_>,
+    entry: &IfdEntry,
+    entry_offset: usize,
+) -> Option<Vec<f64>> {
+    if entry.type_id != TYPE_RATIONAL || entry.count == 0 {
+        return None;
+    }
+    let off = entry.data_offset(entry_offset)?;
+    let mut vals = Vec::with_capacity(entry.count as usize);
+    for i in 0..entry.count as usize {
+        let base = off + i * 8;
+        let num = reader.u32_at(base)?;
+        let den = reader.u32_at(base + 4)?;
+        vals.push(if den == 0 {
+            0.0
+        } else {
+            num as f64 / den as f64
+        });
+    }
+    Some(vals)
+}
+
+/// Read 2 RATIONAL values as (f64, f64) from an IFD entry.
+fn read_rational_xy(
+    reader: &Reader<'_>,
+    entry: &IfdEntry,
+    entry_offset: usize,
+) -> Option<(f64, f64)> {
+    if entry.type_id != TYPE_RATIONAL || entry.count < 2 {
+        return None;
+    }
+    let off = entry.data_offset(entry_offset)?;
+    let x_num = reader.u32_at(off)?;
+    let x_den = reader.u32_at(off + 4)?;
+    let y_num = reader.u32_at(off + 8)?;
+    let y_den = reader.u32_at(off + 12)?;
+    let x = if x_den == 0 { 0.0 } else { x_num as f64 / x_den as f64 };
+    let y = if y_den == 0 { 0.0 } else { y_num as f64 / y_den as f64 };
+    Some((x, y))
+}
+
 // =========================================================================
 // IFD walking
 // =========================================================================
@@ -686,7 +822,7 @@ pub fn parse_exif(data: &[u8]) -> Result<ExifData, ExifError> {
     Ok(exif)
 }
 
-/// Parse IFD0 tags into ExifData.
+/// Parse IFD0 tags into ExifData, including DNG-specific tags.
 fn parse_ifd0_tags(reader: &Reader<'_>, ifd: &ParsedIfd, exif: &mut ExifData) {
     for (entry, offset) in &ifd.entries {
         match entry.tag {
@@ -695,6 +831,41 @@ fn parse_ifd0_tags(reader: &Reader<'_>, ifd: &ParsedIfd, exif: &mut ExifData) {
             TAG_ORIENTATION => exif.orientation = read_short(reader, entry, *offset),
             TAG_SOFTWARE => exif.software = read_ascii(reader, entry, *offset),
             TAG_DATE_TIME => exif.date_time = read_ascii(reader, entry, *offset),
+            // DNG-specific tags
+            TAG_DNG_VERSION => exif.dng_version = read_bytes_4(reader, entry, *offset),
+            TAG_UNIQUE_CAMERA_MODEL => {
+                exif.unique_camera_model = read_ascii(reader, entry, *offset);
+            }
+            TAG_COLOR_MATRIX_1 => {
+                exif.color_matrix_1 = read_srational_vec(reader, entry, *offset);
+            }
+            TAG_COLOR_MATRIX_2 => {
+                exif.color_matrix_2 = read_srational_vec(reader, entry, *offset);
+            }
+            TAG_FORWARD_MATRIX_1 => {
+                exif.forward_matrix_1 = read_srational_vec(reader, entry, *offset);
+            }
+            TAG_FORWARD_MATRIX_2 => {
+                exif.forward_matrix_2 = read_srational_vec(reader, entry, *offset);
+            }
+            TAG_ANALOG_BALANCE => {
+                exif.analog_balance = read_rational_vec(reader, entry, *offset);
+            }
+            TAG_AS_SHOT_NEUTRAL => {
+                exif.as_shot_neutral = read_rational_vec(reader, entry, *offset);
+            }
+            TAG_AS_SHOT_WHITE_XY => {
+                exif.as_shot_white_xy = read_rational_xy(reader, entry, *offset);
+            }
+            TAG_BASELINE_EXPOSURE => {
+                exif.baseline_exposure = read_srational_f64(reader, entry, *offset);
+            }
+            TAG_CALIBRATION_ILLUMINANT_1 => {
+                exif.calibration_illuminant_1 = read_short(reader, entry, *offset);
+            }
+            TAG_CALIBRATION_ILLUMINANT_2 => {
+                exif.calibration_illuminant_2 = read_short(reader, entry, *offset);
+            }
             _ => {}
         }
     }
@@ -747,6 +918,69 @@ fn parse_exif_ifd_tags(reader: &Reader<'_>, ifd: &ParsedIfd, exif: &mut ExifData
 pub fn parse_exif_from_output(output: &DecodeOutput) -> Option<ExifData> {
     let exif_bytes = output.info().embedded_metadata.exif.as_deref()?;
     parse_exif(exif_bytes).ok()
+}
+
+/// Convert zenraw's `ExifMetadata` to zencodecs' `ExifData`.
+///
+/// Populates both standard EXIF fields and DNG-specific fields
+/// from zenraw's kamadak-exif-based metadata extraction.
+#[cfg(feature = "raw-decode-exif")]
+pub fn from_raw_metadata(raw: &zenraw::exif::ExifMetadata) -> ExifData {
+    ExifData {
+        make: raw.make.clone(),
+        model: raw.model.clone(),
+        software: raw.software.clone(),
+        date_time: raw.date_time.clone(),
+        exposure_time: raw.exposure_time.map(|(n, d)| Rational::new(n, d)),
+        f_number: raw.f_number.map(|(n, d)| Rational::new(n, d)),
+        iso: raw.iso,
+        focal_length: raw.focal_length.map(|(n, d)| Rational::new(n, d)),
+        lens_model: raw.lens_model.clone(),
+        orientation: raw.orientation,
+        gps_latitude: raw.gps_latitude.map(|dec| {
+            let abs = dec.abs();
+            let degrees = abs.floor();
+            let minutes_f = (abs - degrees) * 60.0;
+            let minutes = minutes_f.floor();
+            let seconds = (minutes_f - minutes) * 60.0;
+            GpsCoordinate {
+                degrees,
+                minutes,
+                seconds,
+                reference: if dec >= 0.0 { 'N' } else { 'S' },
+            }
+        }),
+        gps_longitude: raw.gps_longitude.map(|dec| {
+            let abs = dec.abs();
+            let degrees = abs.floor();
+            let minutes_f = (abs - degrees) * 60.0;
+            let minutes = minutes_f.floor();
+            let seconds = (minutes_f - minutes) * 60.0;
+            GpsCoordinate {
+                degrees,
+                minutes,
+                seconds,
+                reference: if dec >= 0.0 { 'E' } else { 'W' },
+            }
+        }),
+        gps_altitude: raw.gps_altitude,
+        width: raw.width,
+        height: raw.height,
+        // DNG-specific fields
+        dng_version: raw.dng_version,
+        unique_camera_model: raw.unique_camera_model.clone(),
+        color_matrix_1: raw.color_matrix_1.clone(),
+        color_matrix_2: raw.color_matrix_2.clone(),
+        forward_matrix_1: raw.forward_matrix_1.clone(),
+        forward_matrix_2: raw.forward_matrix_2.clone(),
+        analog_balance: raw.analog_balance.clone(),
+        as_shot_neutral: raw.as_shot_neutral.clone(),
+        as_shot_white_xy: raw.as_shot_white_xy,
+        baseline_exposure: raw.baseline_exposure,
+        calibration_illuminant_1: raw.calibration_illuminant_1,
+        calibration_illuminant_2: raw.calibration_illuminant_2,
+        ..Default::default()
+    }
 }
 
 // =========================================================================
@@ -1286,6 +1520,127 @@ mod tests {
         );
         let exif = parse_exif(&tiff).unwrap();
         assert_eq!(exif.gps_altitude, Some(-15.0));
+    }
+
+    // =====================================================================
+    // 4b. DNG-specific fields
+    // =====================================================================
+
+    #[test]
+    fn dng_version_parsed() {
+        let le = true;
+        // DNG version 1.6.0.0 stored as 4 BYTEs
+        let tiff = build_tiff(
+            le,
+            &[(TAG_DNG_VERSION, TYPE_BYTE, 4, &[1, 6, 0, 0])],
+        );
+        let exif = parse_exif(&tiff).unwrap();
+        assert_eq!(exif.dng_version, Some([1, 6, 0, 0]));
+    }
+
+    #[test]
+    fn dng_unique_camera_model() {
+        let le = true;
+        let tiff = build_tiff(
+            le,
+            &[
+                (TAG_UNIQUE_CAMERA_MODEL, TYPE_ASCII, 18, b"Nikon D850 (DNG)\0\0"),
+            ],
+        );
+        let exif = parse_exif(&tiff).unwrap();
+        assert_eq!(
+            exif.unique_camera_model.as_deref(),
+            Some("Nikon D850 (DNG)")
+        );
+    }
+
+    #[test]
+    fn dng_color_matrix_and_white_balance() {
+        let le = true;
+        // 3x3 color matrix = 9 SRATIONAL values
+        // Simple identity-ish matrix for testing
+        let mut cm_bytes = Vec::new();
+        let vals: [(i32, i32); 9] = [
+            (10000, 10000), (0, 10000), (0, 10000),     // row 0
+            (0, 10000), (10000, 10000), (0, 10000),     // row 1
+            (0, 10000), (0, 10000), (10000, 10000),     // row 2
+        ];
+        for (num, den) in &vals {
+            push_i32(&mut cm_bytes, *num, le);
+            push_i32(&mut cm_bytes, *den, le);
+        }
+
+        // AsShotNeutral: 3 RATIONAL values (white balance)
+        let mut wb_bytes = Vec::new();
+        push_u32(&mut wb_bytes, 4096, le);
+        push_u32(&mut wb_bytes, 10000, le);
+        push_u32(&mut wb_bytes, 5000, le);
+        push_u32(&mut wb_bytes, 10000, le);
+        push_u32(&mut wb_bytes, 7500, le);
+        push_u32(&mut wb_bytes, 10000, le);
+
+        // BaselineExposure: 1 SRATIONAL
+        let be_bytes = make_srational_bytes(-1, 2, le);
+
+        // CalibrationIlluminant1: SHORT (17 = Standard illuminant A)
+        let cal_bytes = make_short_bytes(17, le);
+
+        let tiff = build_tiff(
+            le,
+            &[
+                (TAG_COLOR_MATRIX_1, TYPE_SRATIONAL, 9, &cm_bytes),
+                (TAG_AS_SHOT_NEUTRAL, TYPE_RATIONAL, 3, &wb_bytes),
+                (TAG_BASELINE_EXPOSURE, TYPE_SRATIONAL, 1, &be_bytes),
+                (
+                    TAG_CALIBRATION_ILLUMINANT_1,
+                    TYPE_SHORT,
+                    1,
+                    &cal_bytes,
+                ),
+            ],
+        );
+        let exif = parse_exif(&tiff).unwrap();
+
+        // Color matrix should be 9 values
+        let cm = exif.color_matrix_1.as_ref().unwrap();
+        assert_eq!(cm.len(), 9);
+        assert!((cm[0] - 1.0).abs() < 0.001);
+        assert!((cm[1] - 0.0).abs() < 0.001);
+        assert!((cm[4] - 1.0).abs() < 0.001);
+        assert!((cm[8] - 1.0).abs() < 0.001);
+
+        // White balance: 3 values
+        let wb = exif.as_shot_neutral.as_ref().unwrap();
+        assert_eq!(wb.len(), 3);
+        assert!((wb[0] - 0.4096).abs() < 0.001);
+        assert!((wb[1] - 0.5).abs() < 0.001);
+        assert!((wb[2] - 0.75).abs() < 0.001);
+
+        // Baseline exposure
+        assert!((exif.baseline_exposure.unwrap() - (-0.5)).abs() < 0.001);
+
+        // Calibration illuminant
+        assert_eq!(exif.calibration_illuminant_1, Some(17));
+    }
+
+    #[test]
+    fn dng_as_shot_white_xy() {
+        let le = true;
+        // 2 RATIONAL values for chromaticity
+        let mut xy_bytes = Vec::new();
+        push_u32(&mut xy_bytes, 3457, le);
+        push_u32(&mut xy_bytes, 10000, le);
+        push_u32(&mut xy_bytes, 3585, le);
+        push_u32(&mut xy_bytes, 10000, le);
+
+        let tiff = build_tiff(
+            le,
+            &[(TAG_AS_SHOT_WHITE_XY, TYPE_RATIONAL, 2, &xy_bytes)],
+        );
+        let exif = parse_exif(&tiff).unwrap();
+        let (x, y) = exif.as_shot_white_xy.unwrap();
+        assert!((x - 0.3457).abs() < 0.0001);
+        assert!((y - 0.3585).abs() < 0.0001);
     }
 
     // =====================================================================

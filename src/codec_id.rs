@@ -54,6 +54,10 @@ pub enum CodecId {
     /// heic-decoder decoder
     HeicDecode,
 
+    // RAW/DNG
+    /// zenraw decoder (RAW/DNG)
+    ZenrawDecode,
+
     // Bitmaps
     /// zenbitmaps PNM decoder
     PnmDecode,
@@ -83,6 +87,9 @@ impl CodecId {
             Self::ZenavifDecode | Self::RavifEncode => ImageFormat::Avif,
             Self::ZenjxlDecode | Self::JxlEncoderEncode => ImageFormat::Jxl,
             Self::HeicDecode => ImageFormat::Heic,
+            // ZenrawDecode uses Custom format; return Unknown since there's no
+            // built-in RAW variant — callers should use CodecId-level matching instead.
+            Self::ZenrawDecode => ImageFormat::Unknown,
             Self::PnmDecode | Self::PnmEncode => ImageFormat::Pnm,
             Self::BmpDecode | Self::BmpEncode => ImageFormat::Bmp,
             Self::FarbfeldDecode | Self::FarbfeldEncode => ImageFormat::Farbfeld,
@@ -103,6 +110,7 @@ impl CodecId {
                 | Self::ZenavifDecode
                 | Self::ZenjxlDecode
                 | Self::HeicDecode
+                | Self::ZenrawDecode
                 | Self::PnmDecode
                 | Self::BmpDecode
                 | Self::FarbfeldDecode
@@ -141,6 +149,7 @@ impl CodecId {
             Self::ZenjxlDecode => "zenjxl (decode)",
             Self::JxlEncoderEncode => "jxl-encoder (encode)",
             Self::HeicDecode => "heic-decoder (decode)",
+            Self::ZenrawDecode => "zenraw (decode)",
             Self::PnmDecode => "zenbitmaps-pnm (decode)",
             Self::PnmEncode => "zenbitmaps-pnm (encode)",
             Self::BmpDecode => "zenbitmaps-bmp (decode)",

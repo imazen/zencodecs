@@ -84,6 +84,12 @@ pub mod avif_encode {
     pub use zenavif::{EncodeAlphaMode, EncodeBitDepth, EncodeColorModel, EncoderConfig};
 }
 
+/// RAW/DNG decode configuration from zenraw.
+#[cfg(feature = "raw-decode")]
+pub mod raw {
+    pub use zenraw::{DemosaicMethod, RawDecodeConfig};
+}
+
 // --- Unified codec config ---
 
 /// Format-specific configuration overrides.
@@ -156,6 +162,10 @@ pub struct CodecConfig {
     /// AVIF alpha quality override.
     #[cfg(feature = "avif-encode")]
     pub avif_alpha_quality: Option<f32>,
+
+    /// RAW/DNG decoder configuration (demosaic method, gamma, crop, orientation).
+    #[cfg(feature = "raw-decode")]
+    pub raw_decoder: Option<Box<raw::RawDecodeConfig>>,
 }
 
 impl CodecConfig {
@@ -242,6 +252,13 @@ impl CodecConfig {
         self.avif_alpha_quality = Some(quality);
         self
     }
+
+    /// Set RAW/DNG decoder configuration.
+    #[cfg(feature = "raw-decode")]
+    pub fn with_raw_decoder(mut self, config: raw::RawDecodeConfig) -> Self {
+        self.raw_decoder = Some(Box::new(config));
+        self
+    }
 }
 
 impl core::fmt::Debug for CodecConfig {
@@ -273,6 +290,8 @@ impl core::fmt::Debug for CodecConfig {
             d.field("avif_quality", &self.avif_quality);
             d.field("avif_speed", &self.avif_speed);
         }
+        #[cfg(feature = "raw-decode")]
+        d.field("raw_decoder", &self.raw_decoder.is_some());
 
         d.finish()
     }
