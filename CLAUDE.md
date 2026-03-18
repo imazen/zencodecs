@@ -94,8 +94,8 @@ zencodecs/
 - `ImageInfo::metadata()` returns `ImageMetadata` borrowing from the info (for roundtrip convenience)
 - `ImageMetadata<'a>` with `icc_profile`, `exif`, `xmp` fields (all `Option<&'a [u8]>`)
 - Passed to `EncodeRequest::with_metadata(&meta)`
-- **Decode extraction**: JPEG (ICC/EXIF/XMP via zenjpeg extras), WebP (ICC/EXIF/XMP via demuxer), PNG (ICC/EXIF/XMP via iTXt), AVIF/GIF (none)
-- **Encode embedding**: JPEG (ICC/EXIF/XMP), WebP (ICC/EXIF/XMP via mux), PNG (ICC/EXIF/XMP via iTXt), AVIF (EXIF only), GIF (none)
+- **Decode extraction**: JPEG (ICC/EXIF/XMP via zenjpeg extras), WebP (ICC/EXIF/XMP via demuxer), PNG (ICC/EXIF/XMP via iTXt), JXL (ICC from codestream, EXIF/XMP from container Exif/xml boxes), AVIF/GIF (none)
+- **Encode embedding**: JPEG (ICC/EXIF/XMP), WebP (ICC/EXIF/XMP via mux), PNG (ICC/EXIF/XMP via iTXt), JXL (ICC/EXIF/XMP via container boxes), AVIF (EXIF only), GIF (none)
 
 ### Pixel Conversions
 - `PixelData::to_rgb8()` and `to_rgba8()` convert any variant to 8-bit
