@@ -369,9 +369,7 @@ pub(crate) fn decoder_id_for_format(format: ImageFormat) -> CodecId {
         ImageFormat::Bmp => CodecId::BmpDecode,
         ImageFormat::Farbfeld => CodecId::FarbfeldDecode,
         #[cfg(feature = "raw-decode")]
-        ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => {
-            CodecId::ZenrawDecode
-        }
+        ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => CodecId::ZenrawDecode,
         _ => CodecId::Custom("unknown"),
     }
 }

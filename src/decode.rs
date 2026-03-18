@@ -537,12 +537,7 @@ impl<'a> DecodeRequest<'a> {
             // RAW/DNG: Custom format from zenraw
             #[cfg(feature = "raw-decode")]
             ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => {
-                crate::codecs::raw::decode(
-                    self.data,
-                    self.codec_config,
-                    self.limits,
-                    self.stop,
-                )
+                crate::codecs::raw::decode(self.data, self.codec_config, self.limits, self.stop)
             }
 
             _ => Err(at!(CodecError::UnsupportedFormat(format))),

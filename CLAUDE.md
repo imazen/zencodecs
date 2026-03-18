@@ -167,7 +167,7 @@ zencodecs/
 - **config::raw module**: Re-exports `RawDecodeConfig`, `DemosaicMethod`
 - **DecodeRequest::extract_raw_preview()**: Extract embedded JPEG preview from DNG/RAW (feature: raw-decode-exif)
 - **DecodeRequest::read_raw_metadata()**: Read structured EXIF+DNG metadata via zenraw's kamadak-exif (feature: raw-decode-exif)
-- **exif::from_raw_metadata()**: Convert `zenraw::exif::ExifMetadata` to `ExifData` (feature: raw-decode-exif)
+- **exif::from_raw_metadata()**: Convert `zenraw::exif::ExifMetadata` → `ExifData` (feature: raw-decode-exif)
 - **ExifData DNG fields**: `dng_version`, `unique_camera_model`, `color_matrix_1`/`_2`, `forward_matrix_1`/`_2`, `analog_balance`, `as_shot_neutral`, `as_shot_white_xy`, `baseline_exposure`, `calibration_illuminant_1`/`_2`
 - **EXIF parser**: IFD0 now parses all DNG tags (0xC612-0xC715) into ExifData
 - Wired into: decode dispatch, info probe, dyn_dispatch (push_decode, full_frame_decoder), codec_id mapping

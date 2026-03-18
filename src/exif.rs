@@ -585,11 +585,7 @@ fn read_srational_vec(
 }
 
 /// Read a SRATIONAL scalar as f64 from an IFD entry.
-fn read_srational_f64(
-    reader: &Reader<'_>,
-    entry: &IfdEntry,
-    entry_offset: usize,
-) -> Option<f64> {
+fn read_srational_f64(reader: &Reader<'_>, entry: &IfdEntry, entry_offset: usize) -> Option<f64> {
     if entry.type_id != TYPE_SRATIONAL || entry.count < 1 {
         return None;
     }
@@ -641,8 +637,16 @@ fn read_rational_xy(
     let x_den = reader.u32_at(off + 4)?;
     let y_num = reader.u32_at(off + 8)?;
     let y_den = reader.u32_at(off + 12)?;
-    let x = if x_den == 0 { 0.0 } else { x_num as f64 / x_den as f64 };
-    let y = if y_den == 0 { 0.0 } else { y_num as f64 / y_den as f64 };
+    let x = if x_den == 0 {
+        0.0
+    } else {
+        x_num as f64 / x_den as f64
+    };
+    let y = if y_den == 0 {
+        0.0
+    } else {
+        y_num as f64 / y_den as f64
+    };
     Some((x, y))
 }
 
@@ -1530,10 +1534,7 @@ mod tests {
     fn dng_version_parsed() {
         let le = true;
         // DNG version 1.6.0.0 stored as 4 BYTEs
-        let tiff = build_tiff(
-            le,
-            &[(TAG_DNG_VERSION, TYPE_BYTE, 4, &[1, 6, 0, 0])],
-        );
+        let tiff = build_tiff(le, &[(TAG_DNG_VERSION, TYPE_BYTE, 4, &[1, 6, 0, 0])]);
         let exif = parse_exif(&tiff).unwrap();
         assert_eq!(exif.dng_version, Some([1, 6, 0, 0]));
     }
@@ -1543,9 +1544,12 @@ mod tests {
         let le = true;
         let tiff = build_tiff(
             le,
-            &[
-                (TAG_UNIQUE_CAMERA_MODEL, TYPE_ASCII, 18, b"Nikon D850 (DNG)\0\0"),
-            ],
+            &[(
+                TAG_UNIQUE_CAMERA_MODEL,
+                TYPE_ASCII,
+                18,
+                b"Nikon D850 (DNG)\0\0",
+            )],
         );
         let exif = parse_exif(&tiff).unwrap();
         assert_eq!(
@@ -1561,9 +1565,15 @@ mod tests {
         // Simple identity-ish matrix for testing
         let mut cm_bytes = Vec::new();
         let vals: [(i32, i32); 9] = [
-            (10000, 10000), (0, 10000), (0, 10000),     // row 0
-            (0, 10000), (10000, 10000), (0, 10000),     // row 1
-            (0, 10000), (0, 10000), (10000, 10000),     // row 2
+            (10000, 10000),
+            (0, 10000),
+            (0, 10000), // row 0
+            (0, 10000),
+            (10000, 10000),
+            (0, 10000), // row 1
+            (0, 10000),
+            (0, 10000),
+            (10000, 10000), // row 2
         ];
         for (num, den) in &vals {
             push_i32(&mut cm_bytes, *num, le);
@@ -1591,12 +1601,7 @@ mod tests {
                 (TAG_COLOR_MATRIX_1, TYPE_SRATIONAL, 9, &cm_bytes),
                 (TAG_AS_SHOT_NEUTRAL, TYPE_RATIONAL, 3, &wb_bytes),
                 (TAG_BASELINE_EXPOSURE, TYPE_SRATIONAL, 1, &be_bytes),
-                (
-                    TAG_CALIBRATION_ILLUMINANT_1,
-                    TYPE_SHORT,
-                    1,
-                    &cal_bytes,
-                ),
+                (TAG_CALIBRATION_ILLUMINANT_1, TYPE_SHORT, 1, &cal_bytes),
             ],
         );
         let exif = parse_exif(&tiff).unwrap();
@@ -1633,10 +1638,7 @@ mod tests {
         push_u32(&mut xy_bytes, 3585, le);
         push_u32(&mut xy_bytes, 10000, le);
 
-        let tiff = build_tiff(
-            le,
-            &[(TAG_AS_SHOT_WHITE_XY, TYPE_RATIONAL, 2, &xy_bytes)],
-        );
+        let tiff = build_tiff(le, &[(TAG_AS_SHOT_WHITE_XY, TYPE_RATIONAL, 2, &xy_bytes)]);
         let exif = parse_exif(&tiff).unwrap();
         let (x, y) = exif.as_shot_white_xy.unwrap();
         assert!((x - 0.3457).abs() < 0.0001);

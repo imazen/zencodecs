@@ -43,7 +43,10 @@ fn build_raw_decoder(codec_config: Option<&CodecConfig>) -> zenraw::RawDecoderCo
 }
 
 /// Map a zenraw error to a CodecError.
-fn map_err(format: zencodec::ImageFormat, e: impl core::error::Error + Send + Sync + 'static) -> whereat::At<CodecError> {
+fn map_err(
+    format: zencodec::ImageFormat,
+    e: impl core::error::Error + Send + Sync + 'static,
+) -> whereat::At<CodecError> {
     at!(CodecError::Codec {
         format,
         source: alloc::boxed::Box::new(e),
@@ -52,8 +55,7 @@ fn map_err(format: zencodec::ImageFormat, e: impl core::error::Error + Send + Sy
 
 /// Probe RAW/DNG metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
-    let format = detect_raw_format(data)
-        .unwrap_or_else(raw_format);
+    let format = detect_raw_format(data).unwrap_or_else(raw_format);
     let dec = build_raw_decoder(None);
     let job = dec.job();
     job.probe(data).map_err(|e| map_err(format, e))
@@ -66,8 +68,7 @@ pub(crate) fn decode(
     limits: Option<&Limits>,
     stop: Option<&dyn Stop>,
 ) -> Result<DecodeOutput> {
-    let format = detect_raw_format(data)
-        .unwrap_or_else(raw_format);
+    let format = detect_raw_format(data).unwrap_or_else(raw_format);
     let dec = build_raw_decoder(codec_config);
     let mut job = dec.job();
     if let Some(lim) = limits {
