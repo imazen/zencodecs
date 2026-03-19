@@ -380,6 +380,7 @@ pub(crate) fn encode_ultrahdr_rgba_f32(
 
 /// Encode SDR pixels + precomputed gain map to UltraHDR JPEG.
 #[cfg(feature = "jpeg-ultrahdr")]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn encode_with_precomputed_gainmap(
     sdr_pixels: &[u8],
     width: u32,

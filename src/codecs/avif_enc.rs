@@ -61,6 +61,7 @@ pub(crate) fn build_encoding(
 /// The gain map pixels are first encoded as AV1, then the ISO 21496-1
 /// metadata and AV1 gain map are embedded via zenavif-serialize's tmap support.
 #[cfg(all(feature = "avif-encode", feature = "jpeg-ultrahdr"))]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn encode_with_precomputed_gainmap(
     pixel_data: &[u8],
     width: u32,

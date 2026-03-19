@@ -452,7 +452,7 @@ impl<'a> DecodeRequest<'a> {
     /// while let Some(frame) = decoder.render_next_frame_owned(None)? {
     ///     // frame.pixels(), frame.duration_ms(), frame.frame_index()
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn full_frame_decoder(
         self,

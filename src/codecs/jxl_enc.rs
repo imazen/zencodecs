@@ -39,6 +39,7 @@ pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<
     feature = "jxl-decode",
     feature = "jpeg-ultrahdr"
 ))]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn encode_with_precomputed_gainmap(
     pixel_data: &[u8],
     width: u32,
