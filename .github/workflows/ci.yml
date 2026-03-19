@@ -50,6 +50,45 @@ jobs:
       - name: Test
         run: cargo test
 
+  features:
+    name: Feature permutations (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-26-intel, windows-latest, windows-11-arm]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure git for private repos
+        run: git config --global url."https://x-access-token:${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: features
+      - name: Patch path deps to git refs
+        shell: bash
+        run: |
+          sed \
+            -e 's|path = "\.\./zencodec"|git = "https://github.com/imazen/zencodec"|g' \
+            -e 's|path = "\.\./zenpixels/zenpixels"|git = "https://github.com/imazen/zenpixels"|g' \
+            -e 's|path = "\.\./zenpixels/zenpixels-convert"|git = "https://github.com/imazen/zenpixels"|g' \
+            -e 's|path = "\.\./zenjpeg/zenjpeg"|git = "https://github.com/imazen/zenjpeg"|g' \
+            -e 's|path = "\.\./zenwebp"|git = "https://github.com/imazen/zenwebp"|g' \
+            -e 's|path = "\.\./zengif"|git = "https://github.com/imazen/zengif"|g' \
+            -e 's|path = "\.\./zenavif"|git = "https://github.com/imazen/zenavif"|g' \
+            -e 's|path = "\.\./zenpng"|git = "https://github.com/imazen/zenpng"|g' \
+            -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
+            -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
+            -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
+            -e '/path = "\.\./heic-decoder-rs"/d' \
+            Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
+      - name: Test (std only, no codecs)
+        run: cargo test --no-default-features --features std
+      - name: Test (jpeg + png)
+        run: cargo test --no-default-features --features "jpeg,png"
+      - name: Test (web codecs without quantizers)
+        run: cargo test --no-default-features --features "jpeg,webp,gif,png"
+
   i686:
     name: Test (i686 cross)
     runs-on: ubuntu-latest

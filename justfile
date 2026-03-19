@@ -24,6 +24,12 @@ check-no-std:
 outdated:
     cargo outdated
 
+# Feature permutation checks
+feature-check:
+    cargo test --no-default-features --features std
+    cargo test --no-default-features --features "jpeg,png"
+    cargo test --no-default-features --features "jpeg,webp,gif,png"
+
 # Cross-compilation targets (use --no-default-features --features png to avoid path deps)
 test-i686:
     cross test --no-default-features --features png --target i686-unknown-linux-gnu
