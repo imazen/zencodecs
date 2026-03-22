@@ -145,67 +145,99 @@ fn probe_format_full(data: &[u8], format: ImageFormat) -> Result<ImageInfo> {
     probe_codec(data, format)
 }
 
+/// Set gain map presence based on format capabilities.
+///
+/// Called after codec-specific probe to fill in `ImageInfo.gain_map` when
+/// the underlying codec doesn't populate it. Also keeps
+/// `supplements.gain_map` in sync.
+fn finalize_gain_map_presence(info: &mut ImageInfo) {
+    // If the codec already set a non-Unknown value, respect it
+    if !info.gain_map.is_unknown() {
+        // Sync supplements flag with the resolved gain_map state
+        info.supplements.gain_map = info.gain_map.is_present();
+        return;
+    }
+
+    match info.format {
+        // Formats that never contain gain maps
+        ImageFormat::Png
+        | ImageFormat::WebP
+        | ImageFormat::Gif
+        | ImageFormat::Bmp
+        | ImageFormat::Pnm
+        | ImageFormat::Farbfeld => {
+            info.gain_map = zencodec::gainmap::GainMapPresence::Absent;
+            info.supplements.gain_map = false;
+        }
+        // Formats that CAN contain gain maps — leave Unknown until decode
+        // (JPEG, AVIF, JXL, HEIC, RAW need full decode or deeper parsing)
+        _ => {}
+    }
+}
+
 /// Dispatch to the format-specific codec probe (requires codec feature).
 fn probe_codec(data: &[u8], format: ImageFormat) -> Result<ImageInfo> {
-    match format {
+    let mut info = match format {
         #[cfg(feature = "jpeg")]
-        ImageFormat::Jpeg => crate::codecs::jpeg::probe(data),
+        ImageFormat::Jpeg => crate::codecs::jpeg::probe(data)?,
         #[cfg(not(feature = "jpeg"))]
-        ImageFormat::Jpeg => Err(at!(CodecError::UnsupportedFormat(format))),
+        ImageFormat::Jpeg => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "webp")]
-        ImageFormat::WebP => crate::codecs::webp::probe(data),
+        ImageFormat::WebP => crate::codecs::webp::probe(data)?,
         #[cfg(not(feature = "webp"))]
-        ImageFormat::WebP => Err(at!(CodecError::UnsupportedFormat(format))),
+        ImageFormat::WebP => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "gif")]
-        ImageFormat::Gif => crate::codecs::gif::probe(data),
+        ImageFormat::Gif => crate::codecs::gif::probe(data)?,
         #[cfg(not(feature = "gif"))]
-        ImageFormat::Gif => Err(at!(CodecError::UnsupportedFormat(format))),
+        ImageFormat::Gif => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "png")]
-        ImageFormat::Png => crate::codecs::png::probe(data),
+        ImageFormat::Png => crate::codecs::png::probe(data)?,
         #[cfg(not(feature = "png"))]
-        ImageFormat::Png => Err(at!(CodecError::UnsupportedFormat(format))),
+        ImageFormat::Png => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "avif-decode")]
-        ImageFormat::Avif => crate::codecs::avif_dec::probe(data),
+        ImageFormat::Avif => crate::codecs::avif_dec::probe(data)?,
         #[cfg(not(feature = "avif-decode"))]
-        ImageFormat::Avif => Err(at!(CodecError::UnsupportedFormat(format))),
+        ImageFormat::Avif => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "jxl-decode")]
-        ImageFormat::Jxl => crate::codecs::jxl_dec::probe(data),
+        ImageFormat::Jxl => crate::codecs::jxl_dec::probe(data)?,
         #[cfg(not(feature = "jxl-decode"))]
-        ImageFormat::Jxl => Err(at!(CodecError::UnsupportedFormat(format))),
+        ImageFormat::Jxl => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "heic-decode")]
-        ImageFormat::Heic => crate::codecs::heic::probe(data),
+        ImageFormat::Heic => crate::codecs::heic::probe(data)?,
         #[cfg(not(feature = "heic-decode"))]
-        ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
+        ImageFormat::Heic => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "bitmaps")]
-        ImageFormat::Pnm => crate::codecs::pnm::probe(data),
+        ImageFormat::Pnm => crate::codecs::pnm::probe(data)?,
         #[cfg(not(feature = "bitmaps"))]
-        ImageFormat::Pnm => Err(at!(CodecError::UnsupportedFormat(format))),
+        ImageFormat::Pnm => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "bitmaps-bmp")]
-        ImageFormat::Bmp => crate::codecs::bmp::probe(data),
+        ImageFormat::Bmp => crate::codecs::bmp::probe(data)?,
         #[cfg(not(feature = "bitmaps-bmp"))]
-        ImageFormat::Bmp => Err(at!(CodecError::UnsupportedFormat(format))),
+        ImageFormat::Bmp => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "bitmaps")]
-        ImageFormat::Farbfeld => crate::codecs::farbfeld::probe(data),
+        ImageFormat::Farbfeld => crate::codecs::farbfeld::probe(data)?,
         #[cfg(not(feature = "bitmaps"))]
-        ImageFormat::Farbfeld => Err(at!(CodecError::UnsupportedFormat(format))),
+        ImageFormat::Farbfeld => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         // RAW/DNG: Custom format from zenraw
         #[cfg(feature = "raw-decode")]
         ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => {
-            crate::codecs::raw::probe(data)
+            crate::codecs::raw::probe(data)?
         }
 
-        _ => Err(at!(CodecError::UnsupportedFormat(format))),
-    }
+        _ => return Err(at!(CodecError::UnsupportedFormat(format))),
+    };
+    finalize_gain_map_presence(&mut info);
+    Ok(info)
 }
 
 #[cfg(test)]

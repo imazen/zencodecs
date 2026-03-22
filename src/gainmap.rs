@@ -86,12 +86,12 @@ pub fn params_to_metadata(p: &GainMapParams) -> GainMapMetadata {
 #[cfg(feature = "jpeg-ultrahdr")]
 pub fn metadata_to_params(m: &GainMapMetadata) -> GainMapParams {
     let mut channels = [GainMapChannel::default(); 3];
-    for i in 0..3 {
-        channels[i].min = (m.min_content_boost[i] as f64).log2();
-        channels[i].max = (m.max_content_boost[i] as f64).log2();
-        channels[i].gamma = m.gamma[i] as f64;
-        channels[i].base_offset = m.offset_sdr[i] as f64;
-        channels[i].alternate_offset = m.offset_hdr[i] as f64;
+    for (i, ch) in channels.iter_mut().enumerate() {
+        ch.min = (m.min_content_boost[i] as f64).log2();
+        ch.max = (m.max_content_boost[i] as f64).log2();
+        ch.gamma = m.gamma[i] as f64;
+        ch.base_offset = m.offset_sdr[i] as f64;
+        ch.alternate_offset = m.offset_hdr[i] as f64;
     }
     let mut params = GainMapParams::default();
     params.channels = channels;

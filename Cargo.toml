@@ -95,6 +95,10 @@ name = "gainmap_roundtrip"
 required-features = ["all", "std"]
 
 [[example]]
+name = "gainmap_inspect"
+required-features = ["jpeg-ultrahdr", "std"]
+
+[[example]]
 name = "icc_roundtrip"
 required-features = ["all", "std"]
 

@@ -51,6 +51,21 @@ fn jpeg_info_to_image_info(info: &zenjpeg::decoder::JpegInfo) -> ImageInfo {
     if let Some(ref xmp) = info.xmp {
         ii = ii.with_xmp(xmp.as_bytes().to_vec());
     }
+
+    // Detect UltraHDR gain map from XMP metadata.
+    // Gain map image dimensions are 0 because they can't be determined at
+    // probe time (the gain map is in an MPF secondary image).
+    #[cfg(feature = "jpeg-ultrahdr")]
+    if let Some(ref xmp) = info.xmp
+        && let Ok((metadata, _item_len)) = zenjpeg::ultrahdr::parse_xmp(xmp)
+    {
+        let params = crate::gainmap::metadata_to_params(&metadata);
+        ii.supplements.gain_map = true;
+        ii.gain_map = zencodec::gainmap::GainMapPresence::Available(
+            alloc::boxed::Box::new(zencodec::gainmap::GainMapInfo::new(params, 0, 0, 0)),
+        );
+    }
+
     ii
 }
 
