@@ -29,7 +29,12 @@ fn jpeg_ultrahdr_seine_gainmap() {
     let gm = gainmap.expect("JPEG UltraHDR must have a gain map");
 
     assert!(!gm.base_is_hdr, "JPEG: base should be SDR");
-    assert!(gm.gain_map.data.len() == gm.gain_map.width as usize * gm.gain_map.height as usize * gm.gain_map.channels as usize);
+    assert!(
+        gm.gain_map.data.len()
+            == gm.gain_map.width as usize
+                * gm.gain_map.height as usize
+                * gm.gain_map.channels as usize
+    );
     assert!(gm.gain_map.width > 0);
     assert!(gm.gain_map.height > 0);
 
@@ -67,7 +72,12 @@ fn avif_seine_gainmap() {
     let gm = gainmap.expect("AVIF seine must have a gain map");
 
     assert!(!gm.base_is_hdr, "AVIF: base should be SDR");
-    assert!(gm.gain_map.data.len() == gm.gain_map.width as usize * gm.gain_map.height as usize * gm.gain_map.channels as usize);
+    assert!(
+        gm.gain_map.data.len()
+            == gm.gain_map.width as usize
+                * gm.gain_map.height as usize
+                * gm.gain_map.channels as usize
+    );
 
     // Verify metadata is in LINEAR domain (ultrahdr's convention)
     let meta = &gm.metadata;

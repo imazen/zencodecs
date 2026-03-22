@@ -182,6 +182,7 @@ impl DecodedGainMap {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     #[cfg(feature = "jpeg-ultrahdr")]

@@ -10,7 +10,9 @@ fn main() {
     #[cfg(not(feature = "jpeg-ultrahdr"))]
     {
         eprintln!("This example requires the `jpeg-ultrahdr` feature.");
-        eprintln!("Run with: cargo run --example gainmap_inspect --features jpeg-ultrahdr -- <path>");
+        eprintln!(
+            "Run with: cargo run --example gainmap_inspect --features jpeg-ultrahdr -- <path>"
+        );
         std::process::exit(1);
     }
 
@@ -42,17 +44,21 @@ fn run() {
     println!("Dimensions: {}x{}", info.width, info.height);
     println!("Has alpha:  {}", info.has_alpha);
 
-    println!("\nGain map probe: {}", match &info.gain_map {
-        zencodecs::GainMapPresence::Unknown => "unknown (probe window too small or not supported)".into(),
-        zencodecs::GainMapPresence::Absent => "absent".into(),
-        zencodecs::GainMapPresence::Available(gm_info) => {
-            format!(
-                "present ({}x{}, {} ch)",
-                gm_info.width, gm_info.height, gm_info.channels
-            )
+    println!(
+        "\nGain map probe: {}",
+        match &info.gain_map {
+            zencodecs::GainMapPresence::Unknown =>
+                "unknown (probe window too small or not supported)".into(),
+            zencodecs::GainMapPresence::Absent => "absent".into(),
+            zencodecs::GainMapPresence::Available(gm_info) => {
+                format!(
+                    "present ({}x{}, {} ch)",
+                    gm_info.width, gm_info.height, gm_info.channels
+                )
+            }
+            _ => "unknown variant".into(),
         }
-        _ => "unknown variant".into(),
-    });
+    );
 
     // Decode with gain map extraction.
     println!("\nDecoding with gain map extraction...");
@@ -126,8 +132,5 @@ fn run() {
         params.alternate_hdr_headroom,
         params.linear_alternate_headroom(),
     );
-    println!(
-        "  derived direction:      {:?}",
-        params.direction(),
-    );
+    println!("  derived direction:      {:?}", params.direction(),);
 }

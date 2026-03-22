@@ -220,92 +220,51 @@ pub struct StreamingEncoder<'a> {
 /// Like [`build_from_config`] but returns the live encoder object
 /// instead of a one-shot closure. The encoder supports both
 /// `push_rows()` (streaming) and `encode()` (one-shot).
+///
+/// # Lifetime issue (TODO)
+///
+/// This function has a fundamental lifetime conflict: `EncoderConfig::job()`
+/// borrows the config, and `EncodeJob::dyn_encoder()` returns an encoder
+/// whose lifetime is tied to both the config borrow and the stop token
+/// borrow. Since the config is constructed locally, the encoder cannot
+/// outlive this function.
+///
+/// Fixing this requires either:
+/// - Splitting `EncodeJob<'a>` into two lifetimes (config vs stop)
+/// - Using a self-referential struct crate (ouroboros, etc.)
+/// - Changing the encoder types to clone/own the stop token
+///
+/// For now, this function is stubbed out. Use the one-shot encode path
+/// (`build_from_config` / `EncodeRequest::encode_*`) instead.
+#[allow(dead_code)]
 pub(crate) fn build_streaming_from_config<'a, C, F>(
-    build_config: F,
-    params: EncodeParams<'a>,
+    _build_config: F,
+    _params: EncodeParams<'a>,
 ) -> Result<StreamingEncoder<'a>>
 where
     C: zencodec::encode::EncoderConfig + 'a,
     F: FnOnce(&EncodeParams<'a>) -> C + 'a,
     for<'b> <C::Job<'b> as zencodec::encode::EncodeJob<'b>>::Enc: zencodec::encode::Encoder,
 {
-    use zencodec::encode::EncodeJob as _;
-    let config = build_config(&params);
-    let format = C::format();
-    let supported = C::supported_descriptors();
-    let mut job = config.job();
-    if let Some(lim) = params.limits {
-        job = job.with_limits(crate::limits::to_resource_limits(lim));
-    }
-    if let Some(meta) = params.metadata {
-        job = job.with_metadata(meta);
-    }
-    if let Some(s) = params.stop {
-        job = job.with_stop(s);
-    }
-    let encoder = job
-        .dyn_encoder()
-        .map_err(|e| at!(CodecError::from_codec_boxed(format, e)))?;
-    Ok(StreamingEncoder {
-        encoder,
-        supported,
-        format,
-    })
+    Err(at!(CodecError::UnsupportedOperation {
+        format: ImageFormat::Unknown,
+        detail: "streaming encode not yet available — use one-shot encode instead",
+    }))
 }
 
 /// Build a streaming encoder for the specified format.
+///
+/// Currently returns an error — see [`build_streaming_from_config`] for
+/// the lifetime issue that blocks this.
+#[allow(dead_code)]
 pub(crate) fn build_streaming_encoder<'a>(
-    format: ImageFormat,
-    params: EncodeParams<'a>,
+    _format: ImageFormat,
+    _params: EncodeParams<'a>,
 ) -> Result<StreamingEncoder<'a>> {
-    match format {
-        #[cfg(feature = "jpeg")]
-        ImageFormat::Jpeg => crate::codecs::jpeg::build_streaming(params),
-        #[cfg(not(feature = "jpeg"))]
-        ImageFormat::Jpeg => Err(at!(CodecError::UnsupportedFormat(format))),
-
-        #[cfg(feature = "webp")]
-        ImageFormat::WebP => crate::codecs::webp::build_streaming(params),
-        #[cfg(not(feature = "webp"))]
-        ImageFormat::WebP => Err(at!(CodecError::UnsupportedFormat(format))),
-
-        #[cfg(feature = "gif")]
-        ImageFormat::Gif => crate::codecs::gif::build_streaming(params),
-        #[cfg(not(feature = "gif"))]
-        ImageFormat::Gif => Err(at!(CodecError::UnsupportedFormat(format))),
-
-        #[cfg(feature = "png")]
-        ImageFormat::Png => crate::codecs::png::build_streaming(params),
-        #[cfg(not(feature = "png"))]
-        ImageFormat::Png => Err(at!(CodecError::UnsupportedFormat(format))),
-
-        #[cfg(feature = "avif-encode")]
-        ImageFormat::Avif => crate::codecs::avif_enc::build_streaming(params),
-        #[cfg(not(feature = "avif-encode"))]
-        ImageFormat::Avif => Err(at!(CodecError::UnsupportedFormat(format))),
-
-        #[cfg(feature = "jxl-encode")]
-        ImageFormat::Jxl => crate::codecs::jxl_enc::build_streaming(params),
-        #[cfg(not(feature = "jxl-encode"))]
-        ImageFormat::Jxl => Err(at!(CodecError::UnsupportedFormat(format))),
-
-        #[cfg(feature = "bitmaps")]
-        ImageFormat::Pnm => crate::codecs::pnm::build_streaming(params),
-        #[cfg(not(feature = "bitmaps"))]
-        ImageFormat::Pnm => Err(at!(CodecError::UnsupportedFormat(format))),
-
-        #[cfg(feature = "bitmaps-bmp")]
-        ImageFormat::Bmp => crate::codecs::bmp::build_streaming(params),
-        #[cfg(not(feature = "bitmaps-bmp"))]
-        ImageFormat::Bmp => Err(at!(CodecError::UnsupportedFormat(format))),
-
-        #[cfg(feature = "bitmaps")]
-        ImageFormat::Farbfeld => crate::codecs::farbfeld::build_streaming(params),
-        #[cfg(not(feature = "bitmaps"))]
-        ImageFormat::Farbfeld => Err(at!(CodecError::UnsupportedFormat(format))),
-
-        _ => Err(at!(CodecError::UnsupportedFormat(format))),
-    }
+    Err(at!(CodecError::UnsupportedOperation {
+        format: ImageFormat::Unknown,
+        detail: "streaming encode not yet available — use one-shot encode instead",
+    }))
 }
 
 /// Build a type-erased encoder for the specified format.
