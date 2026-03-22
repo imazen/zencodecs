@@ -614,53 +614,11 @@ fn extract_avif_gainmap(output: &DecodeOutput) -> Option<crate::gainmap::Decoded
 
     let avif_gm = output.extras::<zenavif::AvifGainMap>()?;
 
-    // Convert zenavif-parse's rational GainMapMetadata to ultrahdr-core's f32 GainMapMetadata
-    let meta = &avif_gm.metadata;
-    let convert_channel = |ch: &zenavif::GainMapChannel| -> (f32, f32, f32, f32, f32) {
-        let safe_div = |n: i64, d: u64| -> f32 { if d == 0 { 0.0 } else { n as f32 / d as f32 } };
-        let safe_div_u = |n: u64, d: u64| -> f32 { if d == 0 { 0.0 } else { n as f32 / d as f32 } };
-        (
-            safe_div(ch.gain_map_min_n as i64, ch.gain_map_min_d as u64), // min_content_boost
-            safe_div(ch.gain_map_max_n as i64, ch.gain_map_max_d as u64), // max_content_boost
-            safe_div_u(ch.gamma_n as u64, ch.gamma_d as u64),             // gamma
-            safe_div(ch.base_offset_n as i64, ch.base_offset_d as u64),   // offset_sdr
-            safe_div(ch.alternate_offset_n as i64, ch.alternate_offset_d as u64), // offset_hdr
-        )
-    };
-
-    let ch0 = convert_channel(&meta.channels[0]);
-    let ch1 = if meta.is_multichannel {
-        convert_channel(&meta.channels[1])
-    } else {
-        ch0
-    };
-    let ch2 = if meta.is_multichannel {
-        convert_channel(&meta.channels[2])
-    } else {
-        ch0
-    };
-
-    let base_headroom = if meta.base_hdr_headroom_d == 0 {
-        0.0
-    } else {
-        meta.base_hdr_headroom_n as f32 / meta.base_hdr_headroom_d as f32
-    };
-    let alt_headroom = if meta.alternate_hdr_headroom_d == 0 {
-        0.0
-    } else {
-        meta.alternate_hdr_headroom_n as f32 / meta.alternate_hdr_headroom_d as f32
-    };
-
-    let uhdr_metadata = crate::gainmap::GainMapMetadata {
-        min_content_boost: [ch0.0, ch1.0, ch2.0],
-        max_content_boost: [ch0.1, ch1.1, ch2.1],
-        gamma: [ch0.2, ch1.2, ch2.2],
-        offset_sdr: [ch0.3, ch1.3, ch2.3],
-        offset_hdr: [ch0.4, ch1.4, ch2.4],
-        hdr_capacity_min: base_headroom,
-        hdr_capacity_max: alt_headroom,
-        use_base_color_space: meta.use_base_colour_space,
-    };
+    // Convert zenavif-parse's rational metadata → zencodec GainMapParams (log2 domain)
+    // → ultrahdr GainMapMetadata (linear domain). This avoids the domain confusion
+    // bug where log2 rational values were previously assigned directly to linear fields.
+    let params = avif_gain_map_to_params(&avif_gm.metadata);
+    let uhdr_metadata = crate::gainmap::GainMapMetadata::from(&params);
 
     // Decode the raw AV1 gain map to pixels
     let (gm_data, gm_w, gm_h, gm_ch) = zenavif::decode_av1_obu(&avif_gm.gain_map_data).ok()?;
@@ -676,6 +634,63 @@ fn extract_avif_gainmap(output: &DecodeOutput) -> Option<crate::gainmap::Decoded
         base_is_hdr: false, // AVIF: base=SDR, gain map maps SDR→HDR
         source_format: ImageFormat::Avif,
     })
+}
+
+/// Convert zenavif-parse's rational gain map metadata to zencodec's canonical
+/// log2-domain [`GainMapParams`](zencodec::GainMapParams).
+///
+/// ISO 21496-1 stores gains and headroom as log2 rational fractions.
+/// zenavif-parse preserves these as raw numerator/denominator pairs.
+/// This function divides them to f64 and stores in `GainMapParams` which
+/// keeps gains/headroom in log2 domain (gamma/offsets are already linear).
+#[cfg(all(feature = "avif-decode", feature = "jpeg-ultrahdr"))]
+fn avif_gain_map_to_params(meta: &zenavif::GainMapMetadata) -> zencodec::GainMapParams {
+    let safe_div = |n: i64, d: u64| -> f64 {
+        if d == 0 {
+            0.0
+        } else {
+            n as f64 / d as f64
+        }
+    };
+    let safe_div_u = |n: u64, d: u64| -> f64 {
+        if d == 0 {
+            0.0
+        } else {
+            n as f64 / d as f64
+        }
+    };
+
+    let convert_channel = |ch: &zenavif::GainMapChannel| -> zencodec::GainMapChannel {
+        zencodec::GainMapChannel {
+            // Gains: n/d produces log2 value — GainMapParams stores log2
+            min: safe_div(ch.gain_map_min_n as i64, ch.gain_map_min_d as u64),
+            max: safe_div(ch.gain_map_max_n as i64, ch.gain_map_max_d as u64),
+            // Gamma and offsets: n/d produces linear value — GainMapParams stores linear
+            gamma: safe_div_u(ch.gamma_n as u64, ch.gamma_d as u64),
+            base_offset: safe_div(ch.base_offset_n as i64, ch.base_offset_d as u64),
+            alternate_offset: safe_div(ch.alternate_offset_n as i64, ch.alternate_offset_d as u64),
+        }
+    };
+
+    let mut channels = [zencodec::GainMapChannel::default(); 3];
+    channels[0] = convert_channel(&meta.channels[0]);
+    if meta.is_multichannel {
+        channels[1] = convert_channel(&meta.channels[1]);
+        channels[2] = convert_channel(&meta.channels[2]);
+    } else {
+        channels[1] = channels[0];
+        channels[2] = channels[0];
+    }
+
+    let mut params = zencodec::GainMapParams::default();
+    params.channels = channels;
+    // Headroom: n/d produces log2 value — GainMapParams stores log2
+    params.base_hdr_headroom =
+        safe_div_u(meta.base_hdr_headroom_n as u64, meta.base_hdr_headroom_d as u64);
+    params.alternate_hdr_headroom =
+        safe_div_u(meta.alternate_hdr_headroom_n as u64, meta.alternate_hdr_headroom_d as u64);
+    params.use_base_color_space = meta.use_base_colour_space;
+    params
 }
 
 /// Extract a gain map from a JXL DecodeOutput's extras, if present.
