@@ -555,4 +555,54 @@ mod tests {
             jpeg_output.data().len(),
         );
     }
+
+    /// Verify probe() returns correct info for a JPEG.
+    #[cfg(feature = "jpeg")]
+    #[test]
+    fn probe_jpeg_returns_correct_info() {
+        let img = imgref::ImgVec::new(
+            alloc::vec![
+                rgb::Rgb {
+                    r: 100u8,
+                    g: 150,
+                    b: 200
+                };
+                16 * 12
+            ],
+            16,
+            12,
+        );
+        let jpeg_output = crate::EncodeRequest::new(ImageFormat::Jpeg)
+            .with_quality(80.0)
+            .encode_full_frame_rgb8(img.as_ref())
+            .unwrap();
+
+        let info = crate::probe(jpeg_output.data(), &CodecRegistry::all()).unwrap();
+        assert_eq!(info.width, 16);
+        assert_eq!(info.height, 12);
+        assert_eq!(info.format, ImageFormat::Jpeg);
+        assert!(!info.has_alpha);
+    }
+
+    /// Verify probe() returns correct info for a PNG.
+    #[cfg(feature = "png")]
+    #[test]
+    fn probe_png_returns_correct_info() {
+        // Create a minimal PNG via the png crate
+        let mut buf = alloc::vec::Vec::new();
+        let mut encoder = png::Encoder::new(&mut buf, 20, 15);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().unwrap();
+        writer
+            .write_image_data(&alloc::vec![128u8; 20 * 15 * 4])
+            .unwrap();
+        writer.finish().unwrap();
+
+        let info = crate::probe(&buf, &CodecRegistry::all()).unwrap();
+        assert_eq!(info.width, 20);
+        assert_eq!(info.height, 15);
+        assert_eq!(info.format, ImageFormat::Png);
+        assert!(info.has_alpha);
+    }
 }
