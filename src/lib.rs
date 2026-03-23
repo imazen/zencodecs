@@ -241,13 +241,6 @@ pub fn push_decode(
 /// [`zenpixels_convert::adapt::adapt_for_encode`]. The `StreamingEncoder`
 /// provides the encoder's `supported` pixel descriptors for negotiation.
 ///
-/// # Lifetime issue (current status)
-///
-/// The streaming encoder is currently stubbed due to a lifetime GAT issue.
-/// Fix path: have each codec produce a `Box<dyn DynEncoder + 'static>`
-/// directly via a factory method that takes owned config, bypassing the
-/// GAT borrow chain. See [`dispatch::build_streaming_encoder`] for details.
-///
 /// # Example
 ///
 /// ```rust,ignore
