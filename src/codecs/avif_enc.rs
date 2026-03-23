@@ -16,7 +16,6 @@ pub(crate) fn build_trait_encoder<'a>(params: EncodeParams<'a>) -> BuiltEncoder<
     )
 }
 
-#[allow(dead_code)]
 pub(crate) fn build_streaming<'a>(
     params: EncodeParams<'a>,
 ) -> crate::error::Result<StreamingEncoder<'a>> {
