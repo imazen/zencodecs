@@ -44,15 +44,14 @@ pub(crate) fn build_from_config<'a, C, F>(
 where
     C: zencodec::encode::EncoderConfig + 'a,
     F: FnOnce(&EncodeParams<'a>) -> C + 'a,
-    for<'b> <C::Job<'b> as zencodec::encode::EncodeJob<'b>>::Enc: zencodec::encode::Encoder,
+    <C::Job as zencodec::encode::EncodeJob>::Enc: zencodec::encode::Encoder,
 {
     BuiltEncoder {
         encoder: Box::new(move |pixels| {
             use zencodec::encode::{EncodeJob as _, Encoder as _};
             // Check cancellation before starting the encode.
-            // The stop token has lifetime 'a which is shorter than 'static,
-            // so we cannot pass it into Job<'static>::with_stop(). Instead,
-            // we check it at the zencodecs dispatch level.
+            // The stop parameter is borrowed (&dyn Stop), but with_stop()
+            // requires an owned StopToken. Check at the dispatch level.
             if let Some(s) = params.stop {
                 s.check()
                     .map_err(|_| at!(CodecError::Cancelled))?;
@@ -139,7 +138,7 @@ pub trait AnyEncoder: Send + Sync {
 impl<C> AnyEncoder for C
 where
     C: zencodec::encode::EncoderConfig,
-    for<'a> <C::Job<'a> as zencodec::encode::EncodeJob<'a>>::Enc: zencodec::encode::Encoder,
+    <C::Job as zencodec::encode::EncodeJob>::Enc: zencodec::encode::Encoder,
 {
     fn format(&self) -> ImageFormat {
         C::format()
@@ -184,9 +183,8 @@ where
         )
         .map_err(|e| at!(CodecError::InvalidInput(alloc::format!("pixel slice: {e}"))))?;
 
-        // Check cancellation before encoding. The stop token has a
-        // shorter-than-'static lifetime so it cannot be forwarded into
-        // Job<'static>::with_stop().
+        // Check cancellation before encoding. Stop token forwarding requires
+        // 'static, but the `stop` parameter is borrowed. Check at dispatch level.
         if let Some(s) = stop {
             s.check()
                 .map_err(|_| at!(CodecError::Cancelled))?;
@@ -230,14 +228,13 @@ pub struct StreamingEncoder<'a> {
 /// instead of a one-shot closure. The encoder supports both
 /// `push_rows()` (streaming) and `encode()` (one-shot).
 ///
-/// Works because `EncoderConfig::job(self)` consumes the config,
-/// producing a `Job<'static>`. The encoder returned by
-/// `dyn_encoder()` is therefore `'static` — no config borrow.
+/// Works because `EncoderConfig::job(self)` consumes the config.
+/// The encoder returned by `dyn_encoder()` is `'static`.
 ///
-/// The stop token is NOT forwarded into the job because
-/// `Job<'static>::with_stop()` requires `&'static dyn Stop`,
-/// and callers typically have `&'a dyn Stop`. For streaming
-/// encode the caller controls pacing, so this is fine.
+/// The stop token is NOT forwarded into the job because the
+/// `stop` parameter is borrowed (`&'a dyn Stop`), while
+/// `with_stop()` requires an owned `StopToken`. For streaming
+/// encode the caller controls pacing, so this is acceptable.
 pub(crate) fn build_streaming_from_config<'a, C, F>(
     build_config: F,
     params: EncodeParams<'a>,
@@ -245,7 +242,7 @@ pub(crate) fn build_streaming_from_config<'a, C, F>(
 where
     C: zencodec::encode::EncoderConfig + 'static,
     F: FnOnce(&EncodeParams<'a>) -> C + 'a,
-    for<'b> <C::Job<'b> as zencodec::encode::EncodeJob<'b>>::Enc: zencodec::encode::Encoder,
+    <C::Job as zencodec::encode::EncodeJob>::Enc: zencodec::encode::Encoder,
 {
     use zencodec::encode::EncodeJob as _;
     let config = build_config(&params);
