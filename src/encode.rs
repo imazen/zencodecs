@@ -399,7 +399,7 @@ impl<'a> EncodeRequest<'a> {
         self,
         width: u32,
         height: u32,
-    ) -> Result<crate::dispatch::StreamingEncoder<'a>> {
+    ) -> Result<crate::dispatch::StreamingEncoder> {
         let default_registry = CodecRegistry::all();
         let registry = self.registry.unwrap_or(&default_registry);
         let default_policy = CodecPolicy::new();

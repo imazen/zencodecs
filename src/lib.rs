@@ -263,14 +263,14 @@ pub fn push_decode(
 /// // se.encoder.push_rows(strip)?;
 /// // let output = se.encoder.finish()?;
 /// ```
-pub fn streaming_encoder<'a>(
+pub fn streaming_encoder(
     format: ImageFormat,
     decision: &FormatDecision,
     width: u32,
     height: u32,
-    metadata: Option<&'a zencodec::Metadata>,
-    registry: &'a CodecRegistry,
-) -> error::Result<StreamingEncoder<'a>> {
+    metadata: Option<&zencodec::Metadata>,
+    registry: &CodecRegistry,
+) -> error::Result<StreamingEncoder> {
     let mut request = EncodeRequest::new(format)
         .with_quality(decision.quality.quality)
         .with_registry(registry);

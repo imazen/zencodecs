@@ -211,10 +211,13 @@ where
 /// with [`DynEncoder::finish()`]. Use [`adapt_for_encode`] per-strip
 /// to convert pixel formats without materializing the full image.
 ///
+/// All codec encoders are `'static` (they clone/Arc their config), so this
+/// type has no lifetime parameter.
+///
 /// [`adapt_for_encode`]: zenpixels_convert::adapt::adapt_for_encode
-pub struct StreamingEncoder<'a> {
+pub struct StreamingEncoder {
     /// The type-erased encoder. Call `push_rows()` per strip, `finish()` when done.
-    pub encoder: Box<dyn zencodec::encode::DynEncoder + 'a>,
+    pub encoder: Box<dyn zencodec::encode::DynEncoder>,
     /// Pixel formats this encoder accepts natively (from codec's `supported_descriptors()`).
     /// Pass to `adapt_for_encode` to pick the cheapest conversion.
     pub supported: &'static [PixelDescriptor],
@@ -229,22 +232,27 @@ pub struct StreamingEncoder<'a> {
 /// `push_rows()` (streaming) and `encode()` (one-shot).
 ///
 /// Works because `EncoderConfig::job(self)` consumes the config.
-/// The encoder returned by `dyn_encoder()` is `'static`.
+/// The encoder returned by `dyn_encoder()` is `'static` — all codec
+/// encoders own their data (clone/Arc configs).
 ///
-/// The stop token is NOT forwarded into the job because the
-/// `stop` parameter is borrowed (`&'a dyn Stop`), while
-/// `with_stop()` requires an owned `StopToken`. For streaming
-/// encode the caller controls pacing, so this is acceptable.
-pub(crate) fn build_streaming_from_config<'a, C, F>(
+/// Cancellation is checked once before building the encoder.
+/// For streaming encode the caller controls pacing and can check
+/// the stop token between `push_rows()` calls.
+pub(crate) fn build_streaming_from_config<C, F>(
     build_config: F,
-    params: EncodeParams<'a>,
-) -> Result<StreamingEncoder<'a>>
+    params: EncodeParams<'_>,
+) -> Result<StreamingEncoder>
 where
     C: zencodec::encode::EncoderConfig + 'static,
-    F: FnOnce(&EncodeParams<'a>) -> C + 'a,
+    F: FnOnce(&EncodeParams<'_>) -> C,
     <C::Job as zencodec::encode::EncodeJob>::Enc: zencodec::encode::Encoder,
 {
     use zencodec::encode::EncodeJob as _;
+    // Check cancellation before building the encoder.
+    if let Some(s) = params.stop {
+        s.check()
+            .map_err(|_| at!(CodecError::Cancelled))?;
+    }
     let config = build_config(&params);
     let mut job = config.job();
     if let Some(lim) = params.limits {
@@ -252,9 +260,6 @@ where
     }
     if let Some(meta) = params.metadata {
         job = job.with_metadata(meta);
-    }
-    if let Some(s) = params.stop {
-        job = job.with_stop(s);
     }
     let format = C::format();
     let encoder = job
@@ -268,10 +273,10 @@ where
 }
 
 /// Build a streaming encoder for the specified format.
-pub(crate) fn build_streaming_encoder<'a>(
+pub(crate) fn build_streaming_encoder(
     format: ImageFormat,
-    params: EncodeParams<'a>,
-) -> Result<StreamingEncoder<'a>> {
+    params: EncodeParams<'_>,
+) -> Result<StreamingEncoder> {
     match format {
         #[cfg(feature = "jpeg")]
         ImageFormat::Jpeg => crate::codecs::jpeg::build_streaming(params),
