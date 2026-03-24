@@ -311,6 +311,58 @@ pub fn probe(data: &[u8], registry: &CodecRegistry) -> error::Result<zencodec::I
     from_bytes_with_registry(data, registry)
 }
 
+/// Full-frame decode: decode an entire image to pixels.
+///
+/// Convenience wrapper around [`DecodeRequest::decode_full_frame()`].
+/// Use this when you genuinely need all pixels in memory (e.g., for resize,
+/// analysis, or non-streaming consumers). Prefer [`push_decode`] for
+/// streaming workloads.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use zencodecs::{decode_full_frame, CodecRegistry};
+///
+/// let output = zencodecs::decode_full_frame(&jpeg_bytes, &CodecRegistry::all())?;
+/// println!("{}x{}", output.width(), output.height());
+/// ```
+pub fn decode_full_frame(
+    data: &[u8],
+    registry: &CodecRegistry,
+) -> error::Result<DecodeOutput> {
+    DecodeRequest::new(data)
+        .with_registry(registry)
+        .decode_full_frame()
+}
+
+/// Decode an image and extract its gain map, if present.
+///
+/// Convenience wrapper around [`DecodeRequest::decode_gain_map()`].
+/// Returns the base image decode output plus an optional gain map.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use zencodecs::{decode_gain_map, CodecRegistry};
+///
+/// let (output, gainmap) = zencodecs::decode_gain_map(&jpeg_bytes, &CodecRegistry::all())?;
+/// if let Some(gm) = gainmap {
+///     println!("Gain map: {}x{}", gm.gain_map.width, gm.gain_map.height);
+/// }
+/// ```
+#[cfg(feature = "jpeg-ultrahdr")]
+pub fn decode_gain_map(
+    data: &[u8],
+    registry: &CodecRegistry,
+) -> error::Result<(
+    DecodeOutput,
+    Option<gainmap::DecodedGainMap>,
+)> {
+    DecodeRequest::new(data)
+        .with_registry(registry)
+        .decode_gain_map()
+}
+
 /// Transcode an image: decode and re-encode to a different format/quality.
 ///
 /// This is a convenience wrapper around [`transcode::transcode`].

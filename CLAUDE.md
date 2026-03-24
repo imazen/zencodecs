@@ -177,6 +177,21 @@ zencodecs/
 - Re-exports: `RawDecodeConfig`, `RawDecoderConfig` from lib.rs
 - 4 new DNG EXIF tests (dng_version, unique_camera_model, color_matrix+white_balance, as_shot_white_xy)
 
+### v3 zenpipe-facing API (2026-03-24)
+- **Top-level `probe(data, registry)`**: Convenience wrapper for format detection + header parse
+- **Top-level `push_decode(data, sink, registry)`**: Primary streaming decode entry point
+- **Top-level `streaming_encoder(format, decision, w, h, metadata, registry)`**: Primary streaming encode entry point
+- **Top-level `decode_full_frame(data, registry)`**: Convenience for full materialization decode
+- **Top-level `decode_gain_map(data, registry)`**: Convenience for decode + gain map extraction
+- **Top-level `transcode(data, decision, opts, registry)`**: Convenience for decode→encode
+- **`ImageFacts::from_image_info(info)`**: Build facts from probe result for format selection
+- **`select_format_from_intent(intent, facts, registry, policy)`**: The oracle — resolves CodecIntent + ImageFacts into FormatDecision
+- **`FormatDecision` quality accessors**: `jpeg_quality()`, `webp_quality()`, `jxl_distance()`, `avif_quality()`, `png_quality_range()`, `gif_quality()`, `jxl_effort()`, `avif_speed()`
+- **`FormatDecision` constructors**: `Default`, `for_format(fmt)`, `for_format_quality(fmt, q)`
+- **`QualityIntentNode`** (feature `zenode`): Node with `to_codec_intent()` for pipeline integration
+- **`StreamingEncoder`**: Contains `Box<dyn DynEncoder>` + supported pixel descriptors + format
+- All 8 APIs zenpipe needs are confirmed present and tested
+
 ### What's NOT implemented yet
 - Pull-based streaming decode (DynStreamingDecoder + 'a lifetime blocked by GAT config borrow — use push_decode instead)
 - Color management (moxcms)

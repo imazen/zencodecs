@@ -52,7 +52,40 @@ pub struct FormatDecision {
     pub trace: Vec<SelectionStep>,
 }
 
+impl Default for FormatDecision {
+    fn default() -> Self {
+        Self {
+            format: ImageFormat::Jpeg,
+            quality: QualityIntent::default(),
+            lossless: false,
+            hints: BTreeMap::new(),
+            matte: None,
+            trace: Vec::new(),
+        }
+    }
+}
+
 impl FormatDecision {
+    /// Create a decision for a specific format with default quality.
+    ///
+    /// Useful when you know the target format and just need a decision struct
+    /// for the streaming encoder.
+    pub fn for_format(format: ImageFormat) -> Self {
+        Self {
+            format,
+            ..Default::default()
+        }
+    }
+
+    /// Create a decision for a specific format and quality.
+    pub fn for_format_quality(format: ImageFormat, quality: f32) -> Self {
+        Self {
+            format,
+            quality: QualityIntent::from_quality(quality),
+            ..Default::default()
+        }
+    }
+
     /// Per-codec hints for the selected format.
     ///
     /// Returns a reference to the hints map. Empty if no hints were
@@ -107,6 +140,49 @@ impl FormatDecision {
             return v;
         }
         self.quality.avif_quality()
+    }
+
+    /// The PNG quantization quality range (min, max), considering per-codec hint override.
+    pub fn png_quality_range(&self) -> (u8, u8) {
+        if let Some(q) = self.hints.get("quality")
+            && let Ok(v) = q.parse::<u8>()
+        {
+            // Single value: use as both min and max
+            return (v, v);
+        }
+        self.quality.png_quality_range()
+    }
+
+    /// The GIF quality (for quantization), considering per-codec hint override.
+    ///
+    /// Returns a generic 0-100 value used for quantizer quality settings.
+    pub fn gif_quality(&self) -> f32 {
+        if let Some(q) = self.hints.get("quality")
+            && let Ok(v) = q.parse::<f32>()
+        {
+            return v;
+        }
+        self.quality.quality
+    }
+
+    /// The JXL effort, considering per-codec hint override.
+    pub fn jxl_effort(&self) -> u8 {
+        if let Some(e) = self.hints.get("effort")
+            && let Ok(v) = e.parse::<u8>()
+        {
+            return v;
+        }
+        self.quality.jxl_effort()
+    }
+
+    /// The AVIF speed, considering per-codec hint override.
+    pub fn avif_speed(&self) -> u8 {
+        if let Some(s) = self.hints.get("speed")
+            && let Ok(v) = s.parse::<u8>()
+        {
+            return v;
+        }
+        self.quality.avif_speed()
     }
 }
 
@@ -223,5 +299,94 @@ mod tests {
             ],
         };
         assert_eq!(decision.trace.len(), 2);
+    }
+
+    #[test]
+    fn default_impl() {
+        let decision = FormatDecision::default();
+        assert_eq!(decision.format, ImageFormat::Jpeg);
+        assert!(!decision.lossless);
+        assert!(decision.hints.is_empty());
+        assert!(decision.matte.is_none());
+        assert!(decision.trace.is_empty());
+    }
+
+    #[test]
+    fn for_format_constructor() {
+        let decision = FormatDecision::for_format(ImageFormat::WebP);
+        assert_eq!(decision.format, ImageFormat::WebP);
+        assert!(!decision.lossless);
+    }
+
+    #[test]
+    fn for_format_quality_constructor() {
+        let decision = FormatDecision::for_format_quality(ImageFormat::Png, 85.0);
+        assert_eq!(decision.format, ImageFormat::Png);
+        assert!((decision.quality.quality - 85.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn hints_override_avif_quality() {
+        let mut hints = BTreeMap::new();
+        hints.insert("quality".into(), "65.0".into());
+        let decision = FormatDecision {
+            format: ImageFormat::Avif,
+            quality: QualityIntent::from_quality(73.0),
+            hints,
+            ..Default::default()
+        };
+        assert!((decision.avif_quality() - 65.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn png_quality_range_from_calibration() {
+        let decision = FormatDecision::for_format_quality(ImageFormat::Png, 73.0);
+        let (min, max) = decision.png_quality_range();
+        assert_eq!(min, 50);
+        assert_eq!(max, 100);
+    }
+
+    #[test]
+    fn hints_override_png_quality() {
+        let mut hints = BTreeMap::new();
+        hints.insert("quality".into(), "80".into());
+        let decision = FormatDecision {
+            format: ImageFormat::Png,
+            hints,
+            ..Default::default()
+        };
+        let (min, max) = decision.png_quality_range();
+        assert_eq!(min, 80);
+        assert_eq!(max, 80);
+    }
+
+    #[test]
+    fn gif_quality_default() {
+        let decision = FormatDecision::for_format_quality(ImageFormat::Gif, 73.0);
+        assert!((decision.gif_quality() - 73.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn hints_override_jxl_effort() {
+        let mut hints = BTreeMap::new();
+        hints.insert("effort".into(), "7".into());
+        let decision = FormatDecision {
+            format: ImageFormat::Jxl,
+            hints,
+            ..Default::default()
+        };
+        assert_eq!(decision.jxl_effort(), 7);
+    }
+
+    #[test]
+    fn hints_override_avif_speed() {
+        let mut hints = BTreeMap::new();
+        hints.insert("speed".into(), "4".into());
+        let decision = FormatDecision {
+            format: ImageFormat::Avif,
+            hints,
+            ..Default::default()
+        };
+        assert_eq!(decision.avif_speed(), 4);
     }
 }
