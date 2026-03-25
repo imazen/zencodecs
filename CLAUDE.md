@@ -53,6 +53,12 @@ zencodecs/
 │   ├── registry.rs       # CodecRegistry — runtime enable/disable + capability queries
 │   ├── decode.rs         # DecodeRequest (one-shot, push, animation, gain map, depth map)
 │   ├── encode.rs         # EncodeRequest (one-shot, animation, quality profiles, gain map)
+│   ├── intent.rs         # CodecIntent — parsed user intent for format selection and quality
+│   ├── decision.rs       # FormatDecision — resolved output of codec selection
+│   ├── exif.rs           # Lightweight EXIF/TIFF IFD parser
+│   ├── riapi_parse.rs    # RIAPI codec key parsing and engine detection
+│   ├── transcode.rs      # Transcode API and streaming decode→encode bridge
+│   ├── zennode_defs.rs   # QualityIntentNode for pipeline integration (feature: zennode)
 │   ├── gainmap.rs        # Format-agnostic gain map types (DecodedGainMap, GainMapSource)
 │   ├── depthmap.rs       # Format-agnostic depth map types (DecodedDepthMap, DepthImage, conversions)
 │   └── codecs/
@@ -67,6 +73,7 @@ zencodecs/
 │       ├── jxl_enc.rs    # jxl-encoder adapter
 │       ├── heic.rs       # heic-decoder adapter
 │       ├── raw.rs        # zenraw RAW/DNG adapter (feature: raw-decode)
+│       ├── tiff.rs       # zentiff adapter (feature: tiff)
 │       ├── pnm.rs        # zenbitmaps PNM adapter
 │       ├── bmp.rs        # zenbitmaps BMP adapter
 │       └── farbfeld.rs   # zenbitmaps Farbfeld adapter
@@ -81,8 +88,8 @@ zencodecs/
 
 ### Pixel Handling
 - `rgb` and `imgref` are mandatory dependencies (not feature-gated)
-- `PixelData` enum replaces old `PixelLayout`: `Rgb8(ImgVec<Rgb<u8>>)`, `Rgba8`, `Rgb16`, `Rgba16`, `RgbF32`, `RgbaF32`, `Gray8`
-- `DecodeOutput` contains `pixels: PixelData` + `info: ImageInfo` (no separate width/height/layout)
+- `PixelBuffer` (from zenpixels) is the pixel container type
+- `DecodeOutput` contains `pixels: PixelBuffer` + `info: ImageInfo` (no separate width/height/layout)
 - Encode uses typed methods: `encode_rgb8(ImgRef<Rgb<u8>>)`, `encode_rgba8(ImgRef<Rgba<u8>>)`
 
 ### Codec Configs
@@ -99,9 +106,7 @@ zencodecs/
 - **Encode embedding**: JPEG (ICC/EXIF/XMP), WebP (ICC/EXIF/XMP via mux), PNG (ICC/EXIF/XMP via iTXt), JXL (ICC/EXIF/XMP via container boxes), AVIF (EXIF only), GIF (none)
 
 ### Pixel Conversions
-- `PixelData::to_rgb8()` and `to_rgba8()` convert any variant to 8-bit
-- `PixelData::as_bytes()` returns raw bytes
-- `PixelData::has_alpha()`, `width()`, `height()` accessors
+- `PixelBuffer` provides pixel format conversion, byte access, and dimension accessors via zenpixels
 
 ### v2 Additions (2026-03-16)
 - **CodecId**: identifies specific codec implementations for policy targeting
@@ -740,7 +745,7 @@ or similar. Not a full classifier. Document the heuristic precisely.
 
 ## Known Issues
 
-(none yet — crate not implemented)
+(none currently tracked)
 
 ## User Feedback Log
 
