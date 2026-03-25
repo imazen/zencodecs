@@ -19,7 +19,7 @@ use crate::format_set::FormatSet;
 use crate::intent::{CodecIntent, FormatChoice};
 use crate::policy::CodecPolicy;
 use crate::quality::QualityIntent;
-use crate::registry::CodecRegistry;
+use crate::registry::AllowedFormats;
 use crate::trace::{SelectionStep, SelectionTrace};
 use crate::{CodecError, ImageFormat};
 
@@ -95,7 +95,7 @@ pub struct FormatSelection {
 pub fn select_format(
     facts: &ImageFacts,
     intent: &QualityIntent,
-    registry: &CodecRegistry,
+    registry: &AllowedFormats,
     policy: &CodecPolicy,
 ) -> crate::Result<FormatSelection> {
     let mut trace = SelectionTrace::new();
@@ -162,7 +162,7 @@ pub fn select_format(
 pub fn select_format_from_intent(
     intent: &CodecIntent,
     facts: &ImageFacts,
-    registry: &CodecRegistry,
+    registry: &AllowedFormats,
     policy: &CodecPolicy,
 ) -> crate::Result<FormatDecision> {
     let lossless = intent.resolve_lossless(facts.is_lossless_source);
@@ -258,7 +258,7 @@ pub fn select_format_from_intent(
 fn select_format_with_allowed(
     facts: &ImageFacts,
     intent: &QualityIntent,
-    registry: &CodecRegistry,
+    registry: &AllowedFormats,
     policy: &CodecPolicy,
     allowed: &FormatSet,
 ) -> crate::Result<FormatSelection> {
@@ -278,7 +278,7 @@ fn select_format_with_allowed(
 }
 
 /// Available output formats, filtered by registry and policy.
-pub fn available_encode_formats(registry: &CodecRegistry, policy: &CodecPolicy) -> FormatSet {
+pub fn available_encode_formats(registry: &AllowedFormats, policy: &CodecPolicy) -> FormatSet {
     let mut set = FormatSet::EMPTY;
     for format in registry.encodable_formats() {
         if policy.is_format_allowed(format) {
@@ -344,7 +344,7 @@ mod tests {
 
     /// Helper: select format with all codecs available and no policy.
     fn select(facts: &ImageFacts, intent: &QualityIntent) -> ImageFormat {
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::new();
         select_format(facts, intent, &registry, &policy)
             .unwrap()
@@ -416,7 +416,7 @@ mod tests {
             ..Default::default()
         };
         let intent = QualityIntent::from_quality(73.0);
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::web_safe_output();
         let result = select_format(&facts, &intent, &registry, &policy).unwrap();
         assert!(
@@ -432,7 +432,7 @@ mod tests {
     fn trace_records_decisions() {
         let facts = ImageFacts::default();
         let intent = QualityIntent::from_quality(73.0);
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::web_safe_output();
         let result = select_format(&facts, &intent, &registry, &policy).unwrap();
         assert!(!result.trace.is_empty());
@@ -460,7 +460,7 @@ mod tests {
     fn no_encoder_returns_error() {
         let facts = ImageFacts::default();
         let intent = QualityIntent::from_quality(73.0);
-        let registry = CodecRegistry::none();
+        let registry = AllowedFormats::none();
         let policy = CodecPolicy::new();
         let result = select_format(&facts, &intent, &registry, &policy);
         assert!(result.is_err());
@@ -481,7 +481,7 @@ mod tests {
             pixel_count: 1_000_000,
             ..Default::default()
         };
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::new();
         let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
         assert_eq!(decision.format, ImageFormat::WebP);
@@ -500,7 +500,7 @@ mod tests {
             pixel_count: 1_000_000,
             ..Default::default()
         };
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::new();
         let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
         // Auto should select something reasonable
@@ -519,7 +519,7 @@ mod tests {
             is_lossless_source: true,
             ..Default::default()
         };
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::new();
         let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
         assert_eq!(decision.format, ImageFormat::Png);
@@ -539,7 +539,7 @@ mod tests {
             source_format: Some(ImageFormat::Png),
             ..Default::default()
         };
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::new();
         let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
         assert!(decision.lossless);
@@ -558,7 +558,7 @@ mod tests {
             .insert("progressive".into(), "true".into());
 
         let facts = ImageFacts::default();
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::new();
         let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
         assert_eq!(decision.hints.get("quality"), Some(&"75".to_string()));
@@ -573,7 +573,7 @@ mod tests {
             ..Default::default()
         };
         let facts = ImageFacts::default();
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::new();
         let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
         assert_eq!(decision.matte, Some([255, 0, 0]));
@@ -588,7 +588,7 @@ mod tests {
             ..Default::default()
         };
         let facts = ImageFacts::default();
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::new();
         let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
         // DPR 1.0 should raise quality from 73 to ~91
@@ -606,7 +606,7 @@ mod tests {
             pixel_count: 1_000_000,
             ..Default::default()
         };
-        let registry = CodecRegistry::all();
+        let registry = AllowedFormats::all();
         let policy = CodecPolicy::new();
         let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
         assert!(
@@ -625,7 +625,7 @@ mod tests {
             ..Default::default()
         };
         let facts = ImageFacts::default();
-        let registry = CodecRegistry::none();
+        let registry = AllowedFormats::none();
         let policy = CodecPolicy::new();
         let result = select_format_from_intent(&intent, &facts, &registry, &policy);
         assert!(result.is_err());

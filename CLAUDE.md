@@ -188,7 +188,7 @@ zencodecs/
 - **`select_format_from_intent(intent, facts, registry, policy)`**: The oracle — resolves CodecIntent + ImageFacts into FormatDecision
 - **`FormatDecision` quality accessors**: `jpeg_quality()`, `webp_quality()`, `jxl_distance()`, `avif_quality()`, `png_quality_range()`, `gif_quality()`, `jxl_effort()`, `avif_speed()`
 - **`FormatDecision` constructors**: `Default`, `for_format(fmt)`, `for_format_quality(fmt, q)`
-- **`QualityIntentNode`** (feature `zenode`): Node with `to_codec_intent()` for pipeline integration
+- **`QualityIntentNode`** (feature `zennode`): Node with `to_codec_intent()` for pipeline integration
 - **`StreamingEncoder`**: Contains `Box<dyn DynEncoder>` + supported pixel descriptors + format
 - All 8 APIs zenpipe needs are confirmed present and tested
 

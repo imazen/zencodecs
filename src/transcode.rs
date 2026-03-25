@@ -28,7 +28,7 @@ use zenpixels::{PixelDescriptor, PixelSliceMut};
 
 use crate::decision::FormatDecision;
 use crate::error::Result;
-use crate::{CodecError, CodecRegistry, ImageFormat};
+use crate::{CodecError, AllowedFormats, ImageFormat};
 use whereat::at;
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -39,12 +39,12 @@ use whereat::at;
 ///
 /// Controls metadata roundtrip, supplement handling, and alpha compositing.
 #[derive(Clone, Debug, Default)]
-pub struct TranscodeOptions<'a> {
+pub struct TranscodeOptions {
     /// Metadata to embed in the output (EXIF, ICC, XMP).
     ///
     /// - `None` (default): extract metadata from the source and roundtrip it.
     /// - `Some(meta)`: use the provided metadata instead of the source's.
-    pub metadata: Option<&'a zencodec::Metadata>,
+    pub metadata: Option<zencodec::Metadata>,
 
     /// How to handle container supplements (gain maps, depth maps, etc.)
     /// during transcode.
@@ -151,7 +151,7 @@ pub struct TranscodeOutput {
 /// # Example
 ///
 /// ```rust,ignore
-/// use zencodecs::{transcode, TranscodeOptions, FormatDecision, CodecRegistry};
+/// use zencodecs::{transcode, TranscodeOptions, FormatDecision, AllowedFormats};
 /// use zencodecs::quality::QualityIntent;
 /// use zencodecs::ImageFormat;
 ///
@@ -168,15 +168,15 @@ pub struct TranscodeOutput {
 ///     &jpeg_bytes,
 ///     &decision,
 ///     &TranscodeOptions::default(),
-///     &CodecRegistry::all(),
+///     &AllowedFormats::all(),
 /// )?;
 /// assert_eq!(output.format, ImageFormat::WebP);
 /// ```
 pub fn transcode(
     data: &[u8],
     decision: &FormatDecision,
-    opts: &TranscodeOptions<'_>,
-    registry: &CodecRegistry,
+    opts: &TranscodeOptions,
+    registry: &AllowedFormats,
 ) -> Result<TranscodeOutput> {
     // Step 1: Decode the source image (full materialization for now)
     let decoded = crate::DecodeRequest::new(data)
@@ -184,20 +184,15 @@ pub fn transcode(
         .decode_full_frame()?;
 
     // Step 2: Determine metadata to embed
-    let source_metadata;
-    let metadata = match opts.metadata {
+    let metadata = match opts.metadata.clone() {
         Some(m) => m,
         None => {
             // Roundtrip metadata from source via probe
             match crate::info::from_bytes_with_registry(data, registry) {
-                Ok(info) => {
-                    source_metadata = info.metadata();
-                    &source_metadata
-                }
+                Ok(info) => info.metadata(),
                 Err(_) => {
                     // No metadata to roundtrip — proceed without it
-                    source_metadata = zencodec::Metadata::none();
-                    &source_metadata
+                    zencodec::Metadata::none()
                 }
             }
         }
@@ -486,7 +481,7 @@ mod tests {
             jpeg_output.data(),
             &decision,
             &TranscodeOptions::default(),
-            &CodecRegistry::all(),
+            &AllowedFormats::all(),
         )
         .unwrap();
 
@@ -539,7 +534,7 @@ mod tests {
             jpeg_output.data(),
             &decision,
             &TranscodeOptions::default(),
-            &CodecRegistry::all(),
+            &AllowedFormats::all(),
         )
         .unwrap();
 
@@ -577,7 +572,7 @@ mod tests {
             .encode_full_frame_rgb8(img.as_ref())
             .unwrap();
 
-        let info = crate::probe(jpeg_output.data(), &CodecRegistry::all()).unwrap();
+        let info = crate::probe(jpeg_output.data(), &AllowedFormats::all()).unwrap();
         assert_eq!(info.width, 16);
         assert_eq!(info.height, 12);
         assert_eq!(info.format, ImageFormat::Jpeg);
@@ -599,7 +594,7 @@ mod tests {
             .unwrap();
         writer.finish().unwrap();
 
-        let info = crate::probe(&buf, &CodecRegistry::all()).unwrap();
+        let info = crate::probe(&buf, &AllowedFormats::all()).unwrap();
         assert_eq!(info.width, 20);
         assert_eq!(info.height, 15);
         assert_eq!(info.format, ImageFormat::Png);

@@ -5,7 +5,7 @@ pub use zencodec::decode::DecodeOutput;
 use crate::config::CodecConfig;
 use crate::error::Result;
 use crate::policy::CodecPolicy;
-use crate::{CodecError, CodecRegistry, ImageFormat, ImageInfo, Limits, StopToken};
+use crate::{CodecError, AllowedFormats, ImageFormat, ImageInfo, Limits, StopToken};
 use whereat::at;
 
 /// Image decode request builder.
@@ -25,7 +25,7 @@ pub struct DecodeRequest<'a> {
     format: Option<ImageFormat>,
     limits: Option<&'a Limits>,
     stop: Option<StopToken>,
-    registry: Option<&'a CodecRegistry>,
+    registry: Option<&'a AllowedFormats>,
     codec_config: Option<&'a CodecConfig>,
     policy: Option<CodecPolicy>,
 }
@@ -66,7 +66,7 @@ impl<'a> DecodeRequest<'a> {
     }
 
     /// Set a codec registry to control which formats are enabled.
-    pub fn with_registry(mut self, registry: &'a CodecRegistry) -> Self {
+    pub fn with_registry(mut self, registry: &'a AllowedFormats) -> Self {
         self.registry = Some(registry);
         self
     }
@@ -89,7 +89,7 @@ impl<'a> DecodeRequest<'a> {
 
     /// Resolve format (auto-detect or explicit) and check registry.
     fn resolve_format(&self) -> Result<ImageFormat> {
-        let default_registry = CodecRegistry::all();
+        let default_registry = AllowedFormats::all();
         let registry = self.registry.unwrap_or(&default_registry);
         let format = match self.format {
             Some(f) => f,
@@ -803,7 +803,7 @@ mod tests {
     #[test]
     fn disabled_format_error() {
         let jpeg_data = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
-        let registry = CodecRegistry::none();
+        let registry = AllowedFormats::none();
 
         let result = DecodeRequest::new(&jpeg_data)
             .with_registry(&registry)

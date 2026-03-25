@@ -59,9 +59,9 @@
 //! ### Control Available Codecs
 //!
 //! ```no_run
-//! use zencodecs::{CodecRegistry, ImageFormat, DecodeRequest};
+//! use zencodecs::{AllowedFormats, ImageFormat, DecodeRequest};
 //!
-//! let registry = CodecRegistry::none()
+//! let registry = AllowedFormats::none()
 //!     .with_decode(ImageFormat::Jpeg, true)
 //!     .with_decode(ImageFormat::Png, true);
 //!
@@ -111,8 +111,8 @@ pub mod riapi_parse;
 pub mod select;
 pub mod trace;
 pub mod transcode;
-#[cfg(feature = "zenode")]
-pub mod zenode_defs;
+#[cfg(feature = "zennode")]
+pub mod zennode_defs;
 
 // Re-exports
 pub use codec_id::CodecId;
@@ -130,7 +130,7 @@ pub use limits::{Limits, Stop};
 pub use zencodec::StopToken;
 pub use policy::CodecPolicy;
 pub use quality::{QualityIntent, QualityProfile};
-pub use registry::CodecRegistry;
+pub use registry::AllowedFormats;
 #[cfg(feature = "riapi")]
 pub use riapi_parse::{CodecEngine, parse_codec_keys};
 pub use select::ImageFacts;
@@ -217,16 +217,16 @@ pub use zenraw::{RawDecodeConfig, RawDecoderConfig};
 /// # Example
 ///
 /// ```rust,ignore
-/// use zencodecs::{push_decode, CodecRegistry};
+/// use zencodecs::{push_decode, AllowedFormats};
 ///
 /// let mut sink = /* your DecodeRowSink impl */;
-/// let info = zencodecs::push_decode(&data, &mut sink, &CodecRegistry::all())?;
+/// let info = zencodecs::push_decode(&data, &mut sink, &AllowedFormats::all())?;
 /// println!("Decoded {}x{}", info.width(), info.height());
 /// ```
 pub fn push_decode(
     data: &[u8],
     sink: &mut dyn zencodec::decode::DecodeRowSink,
-    registry: &CodecRegistry,
+    registry: &AllowedFormats,
 ) -> error::Result<zencodec::decode::OutputInfo> {
     DecodeRequest::new(data)
         .with_registry(registry)
@@ -245,7 +245,7 @@ pub fn push_decode(
 /// # Example
 ///
 /// ```rust,ignore
-/// use zencodecs::{streaming_encoder, CodecRegistry, FormatDecision, ImageFormat};
+/// use zencodecs::{streaming_encoder, AllowedFormats, FormatDecision, ImageFormat};
 /// use zencodecs::quality::QualityIntent;
 ///
 /// let decision = FormatDecision {
@@ -259,7 +259,7 @@ pub fn push_decode(
 ///     &decision,
 ///     1920, 1080,
 ///     None,
-///     &CodecRegistry::all(),
+///     &AllowedFormats::all(),
 /// )?;
 /// // se.encoder.push_rows(strip)?;
 /// // let output = se.encoder.finish()?;
@@ -269,8 +269,8 @@ pub fn streaming_encoder(
     decision: &FormatDecision,
     width: u32,
     height: u32,
-    metadata: Option<&zencodec::Metadata>,
-    registry: &CodecRegistry,
+    metadata: Option<zencodec::Metadata>,
+    registry: &AllowedFormats,
 ) -> error::Result<StreamingEncoder> {
     let mut request = EncodeRequest::new(format)
         .with_quality(decision.quality.quality)
@@ -300,14 +300,14 @@ pub fn streaming_encoder(
 /// # Example
 ///
 /// ```no_run
-/// use zencodecs::{probe, CodecRegistry};
+/// use zencodecs::{probe, AllowedFormats};
 ///
 /// let data: &[u8] = &[]; // your image bytes
-/// let info = zencodecs::probe(data, &CodecRegistry::all())?;
+/// let info = zencodecs::probe(data, &AllowedFormats::all())?;
 /// println!("{}x{} {:?}", info.width, info.height, info.format);
 /// # Ok::<(), whereat::At<zencodecs::CodecError>>(())
 /// ```
-pub fn probe(data: &[u8], registry: &CodecRegistry) -> error::Result<zencodec::ImageInfo> {
+pub fn probe(data: &[u8], registry: &AllowedFormats) -> error::Result<zencodec::ImageInfo> {
     from_bytes_with_registry(data, registry)
 }
 
@@ -321,14 +321,14 @@ pub fn probe(data: &[u8], registry: &CodecRegistry) -> error::Result<zencodec::I
 /// # Example
 ///
 /// ```rust,ignore
-/// use zencodecs::{decode_full_frame, CodecRegistry};
+/// use zencodecs::{decode_full_frame, AllowedFormats};
 ///
-/// let output = zencodecs::decode_full_frame(&jpeg_bytes, &CodecRegistry::all())?;
+/// let output = zencodecs::decode_full_frame(&jpeg_bytes, &AllowedFormats::all())?;
 /// println!("{}x{}", output.width(), output.height());
 /// ```
 pub fn decode_full_frame(
     data: &[u8],
-    registry: &CodecRegistry,
+    registry: &AllowedFormats,
 ) -> error::Result<DecodeOutput> {
     DecodeRequest::new(data)
         .with_registry(registry)
@@ -343,9 +343,9 @@ pub fn decode_full_frame(
 /// # Example
 ///
 /// ```rust,ignore
-/// use zencodecs::{decode_gain_map, CodecRegistry};
+/// use zencodecs::{decode_gain_map, AllowedFormats};
 ///
-/// let (output, gainmap) = zencodecs::decode_gain_map(&jpeg_bytes, &CodecRegistry::all())?;
+/// let (output, gainmap) = zencodecs::decode_gain_map(&jpeg_bytes, &AllowedFormats::all())?;
 /// if let Some(gm) = gainmap {
 ///     println!("Gain map: {}x{}", gm.gain_map.width, gm.gain_map.height);
 /// }
@@ -353,7 +353,7 @@ pub fn decode_full_frame(
 #[cfg(feature = "jpeg-ultrahdr")]
 pub fn decode_gain_map(
     data: &[u8],
-    registry: &CodecRegistry,
+    registry: &AllowedFormats,
 ) -> error::Result<(
     DecodeOutput,
     Option<gainmap::DecodedGainMap>,
@@ -371,13 +371,13 @@ pub fn decode_gain_map(
 /// # Example
 ///
 /// ```rust,ignore
-/// use zencodecs::{transcode, TranscodeOptions, FormatDecision, CodecRegistry};
+/// use zencodecs::{transcode, TranscodeOptions, FormatDecision, AllowedFormats};
 ///
 /// let output = zencodecs::transcode(
 ///     &jpeg_bytes,
 ///     &decision,
 ///     &TranscodeOptions::default(),
-///     &CodecRegistry::all(),
+///     &AllowedFormats::all(),
 /// )?;
 /// ```
 pub use transcode::transcode;

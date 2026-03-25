@@ -1,21 +1,21 @@
 //! Zenode node definitions for codec intent.
 //!
 //! Provides [`QualityIntentNode`], a self-documenting pipeline node that
-//! bridges zenode's parameter system with zencodecs' [`CodecIntent`].
+//! bridges zennode's parameter system with zencodecs' [`CodecIntent`].
 //!
-//! Feature-gated behind `feature = "zenode"`.
+//! Feature-gated behind `feature = "zennode"`.
 
 extern crate alloc;
 use alloc::string::String;
 
-use zenode::*;
+use zennode::*;
 
 use crate::ImageFormat;
 use crate::format_set::FormatSet;
 use crate::intent::{BoolKeep, CodecIntent, FormatChoice};
 use crate::quality::QualityProfile;
 
-/// Format selection and quality profile for encoding (zenode node).
+/// Format selection and quality profile for encoding (zennode node).
 ///
 /// This node controls output format selection and quality. It supports
 /// both RIAPI querystring keys and JSON API fields, matching imageflow's

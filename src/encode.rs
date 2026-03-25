@@ -11,7 +11,7 @@ use crate::pixel::{Bgra, Gray, ImgRef, Rgb, Rgba};
 use crate::policy::CodecPolicy;
 use crate::quality::{QualityIntent, QualityProfile};
 use crate::select::ImageFacts;
-use crate::{CodecError, CodecRegistry, ImageFormat, Limits, Metadata, StopToken};
+use crate::{CodecError, AllowedFormats, ImageFormat, Limits, Metadata, StopToken};
 use whereat::at;
 use zenpixels::{AlphaMode, PixelDescriptor};
 
@@ -40,8 +40,8 @@ pub struct EncodeRequest<'a> {
     lossless: bool,
     limits: Option<&'a Limits>,
     stop: Option<StopToken>,
-    metadata: Option<&'a Metadata>,
-    registry: Option<&'a CodecRegistry>,
+    metadata: Option<Metadata>,
+    registry: Option<&'a AllowedFormats>,
     codec_config: Option<&'a CodecConfig>,
     policy: Option<CodecPolicy>,
     image_facts: Option<ImageFacts>,
@@ -135,13 +135,13 @@ impl<'a> EncodeRequest<'a> {
     /// Not all formats support all metadata types. Unsupported metadata
     /// is silently ignored — GIF ignores all metadata, AVIF encode only
     /// supports EXIF, etc.
-    pub fn with_metadata(mut self, metadata: &'a Metadata) -> Self {
+    pub fn with_metadata(mut self, metadata: Metadata) -> Self {
         self.metadata = Some(metadata);
         self
     }
 
     /// Set a codec registry to control which formats are enabled.
-    pub fn with_registry(mut self, registry: &'a CodecRegistry) -> Self {
+    pub fn with_registry(mut self, registry: &'a AllowedFormats) -> Self {
         self.registry = Some(registry);
         self
     }
@@ -246,7 +246,7 @@ impl<'a> EncodeRequest<'a> {
     /// the SDR base JPEG quality.
     #[cfg(feature = "jpeg-ultrahdr")]
     pub fn encode_ultrahdr_rgb_f32(self, img: ImgRef<Rgb<f32>>) -> Result<EncodeOutput> {
-        let default_registry = CodecRegistry::all();
+        let default_registry = AllowedFormats::all();
         let registry = self.registry.unwrap_or(&default_registry);
 
         if !registry.can_encode(ImageFormat::Jpeg) {
@@ -271,7 +271,7 @@ impl<'a> EncodeRequest<'a> {
     /// The `quality` setting controls the SDR base JPEG quality.
     #[cfg(feature = "jpeg-ultrahdr")]
     pub fn encode_ultrahdr_rgba_f32(self, img: ImgRef<Rgba<f32>>) -> Result<EncodeOutput> {
-        let default_registry = CodecRegistry::all();
+        let default_registry = AllowedFormats::all();
         let registry = self.registry.unwrap_or(&default_registry);
 
         if !registry.can_encode(ImageFormat::Jpeg) {
@@ -316,7 +316,7 @@ impl<'a> EncodeRequest<'a> {
         width: u32,
         height: u32,
     ) -> Result<alloc::boxed::Box<dyn zencodec::encode::DynFullFrameEncoder>> {
-        let default_registry = CodecRegistry::all();
+        let default_registry = AllowedFormats::all();
         let registry = self.registry.unwrap_or(&default_registry);
 
         let format = match self.format {
@@ -400,7 +400,7 @@ impl<'a> EncodeRequest<'a> {
         width: u32,
         height: u32,
     ) -> Result<crate::dispatch::StreamingEncoder> {
-        let default_registry = CodecRegistry::all();
+        let default_registry = AllowedFormats::all();
         let registry = self.registry.unwrap_or(&default_registry);
         let default_policy = CodecPolicy::new();
         let policy = self.policy.as_ref().unwrap_or(&default_policy);
@@ -768,7 +768,7 @@ impl<'a> EncodeRequest<'a> {
         stride: usize,
         has_alpha: bool,
     ) -> Result<EncodeOutput> {
-        let default_registry = CodecRegistry::all();
+        let default_registry = AllowedFormats::all();
         let registry = self.registry.unwrap_or(&default_registry);
         let default_policy = CodecPolicy::new();
         let policy = self.policy.as_ref().unwrap_or(&default_policy);
@@ -956,7 +956,7 @@ mod tests {
             .with_icc(b"fake_icc".as_slice())
             .with_exif(b"fake_exif".as_slice())
             .with_xmp(b"fake_xmp".as_slice());
-        let _request = EncodeRequest::new(ImageFormat::Jpeg).with_metadata(&meta);
+        let _request = EncodeRequest::new(ImageFormat::Jpeg).with_metadata(meta);
     }
 
     #[test]

@@ -62,7 +62,7 @@ fn main() {
     for (name, format, expected) in &formats {
         let encoded = EncodeRequest::new(*format)
             .with_quality(85.0)
-            .with_metadata(&meta)
+            .with_metadata(meta.clone())
             .encode_full_frame_rgb8(img)
             .expect("encode failed");
 

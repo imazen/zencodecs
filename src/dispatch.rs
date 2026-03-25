@@ -17,7 +17,7 @@ pub(crate) struct EncodeParams<'a> {
     pub quality: Option<f32>,
     pub effort: Option<u32>,
     pub lossless: bool,
-    pub metadata: Option<&'a Metadata>,
+    pub metadata: Option<Metadata>,
     pub codec_config: Option<&'a CodecConfig>,
     pub limits: Option<&'a Limits>,
     pub stop: Option<StopToken>,
@@ -103,7 +103,7 @@ pub trait AnyEncoder: Send + Sync {
     fn encode_pixels(
         &self,
         pixels: PixelSlice<'_>,
-        metadata: Option<&Metadata>,
+        metadata: Option<Metadata>,
         limits: Option<&Limits>,
         stop: Option<StopToken>,
     ) -> Result<EncodeOutput>;
@@ -147,7 +147,7 @@ where
     fn encode_pixels(
         &self,
         pixels: PixelSlice<'_>,
-        metadata: Option<&Metadata>,
+        metadata: Option<Metadata>,
         limits: Option<&Limits>,
         stop: Option<StopToken>,
     ) -> Result<EncodeOutput> {

@@ -44,7 +44,7 @@ fn main() {
     let mut prev_icc = original_icc.to_vec();
     let first_encoded = EncodeRequest::new(chain[0].1)
         .with_quality(95.0)
-        .with_metadata(&meta)
+        .with_metadata(meta)
         .encode_full_frame_rgb8(img)
         .expect("encode failed");
 
@@ -84,7 +84,7 @@ fn main() {
 
         let encoded = EncodeRequest::new(format)
             .with_quality(95.0)
-            .with_metadata(&step_meta)
+            .with_metadata(step_meta)
             .encode_full_frame_rgb8(step_img)
             .expect("encode failed");
 

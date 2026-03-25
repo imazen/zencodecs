@@ -80,6 +80,21 @@ impl FormatSet {
         self
     }
 
+    /// Const-compatible version of [`with`](Self::with).
+    ///
+    /// Use this in `const` or `static` contexts where `&mut self` isn't available.
+    pub const fn with_const(self, format: ImageFormat) -> Self {
+        match Self::bit(format) {
+            Some(b) => Self(self.0 | b),
+            None => self,
+        }
+    }
+
+    /// Create from raw bits (for const contexts).
+    pub(crate) const fn from_bits(bits: u16) -> Self {
+        Self(bits)
+    }
+
     /// Insert a format.
     pub fn insert(&mut self, format: ImageFormat) {
         if let Some(b) = Self::bit(format) {

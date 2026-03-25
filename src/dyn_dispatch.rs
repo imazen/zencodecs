@@ -281,7 +281,7 @@ pub(crate) struct AnimEncodeParams<'a> {
     pub quality: Option<f32>,
     pub effort: Option<u32>,
     pub lossless: bool,
-    pub metadata: Option<&'a crate::Metadata>,
+    pub metadata: Option<crate::Metadata>,
     pub codec_config: Option<&'a CodecConfig>,
     pub limits: Option<&'a Limits>,
     pub stop: Option<StopToken>,

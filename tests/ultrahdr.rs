@@ -133,7 +133,7 @@ fn ultrahdr_roundtrip_rgba_f32() {
 #[test]
 fn ultrahdr_encode_disabled_registry() {
     let img = hdr_rgb_f32_image(32, 32);
-    let registry = zencodecs::CodecRegistry::none();
+    let registry = zencodecs::AllowedFormats::none();
 
     let result = EncodeRequest::new(ImageFormat::Jpeg)
         .with_registry(&registry)

@@ -555,7 +555,7 @@ mod tests {
             pixel_count: 1_000_000,
             ..Default::default()
         };
-        let registry = crate::registry::CodecRegistry::all();
+        let registry = crate::registry::AllowedFormats::all();
         let policy = crate::policy::CodecPolicy::new();
         let decision =
             crate::select::select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();

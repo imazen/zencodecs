@@ -3,7 +3,7 @@
 pub use zencodec::ImageInfo;
 
 use crate::error::Result;
-use crate::{CodecError, CodecRegistry, ImageFormat};
+use crate::{CodecError, AllowedFormats, ImageFormat};
 use whereat::at;
 
 /// Detect image format from magic bytes using the common format registry.
@@ -30,13 +30,13 @@ pub(crate) fn detect_format(data: &[u8]) -> Option<ImageFormat> {
 /// Uses format auto-detection and dispatches to the appropriate codec's probe.
 /// All compiled-in codecs are attempted.
 pub fn from_bytes(data: &[u8]) -> Result<ImageInfo> {
-    from_bytes_with_registry(data, &CodecRegistry::all())
+    from_bytes_with_registry(data, &AllowedFormats::all())
 }
 
 /// Probe image metadata with a specific registry.
 ///
 /// Only formats enabled in the registry will be attempted.
-pub fn from_bytes_with_registry(data: &[u8], registry: &CodecRegistry) -> Result<ImageInfo> {
+pub fn from_bytes_with_registry(data: &[u8], registry: &AllowedFormats) -> Result<ImageInfo> {
     let format = detect_format(data).ok_or_else(|| at!(CodecError::UnrecognizedFormat))?;
 
     if !registry.can_decode(format) {
@@ -257,7 +257,7 @@ mod tests {
     #[test]
     fn disabled_format() {
         let jpeg_data = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
-        let registry = CodecRegistry::none();
+        let registry = AllowedFormats::none();
 
         let result = from_bytes_with_registry(&jpeg_data, &registry);
         assert!(matches!(

@@ -9,7 +9,7 @@ conversion, and metadata handling. This makes it:
 1. **Hard to stabilize** — too many responsibilities changing at different rates
 2. **Hard to depend on** — downstream crates get all the complexity even if they need one thing
 3. **Confused about its boundary with zenpipe** — both want to own encode/decode orchestration
-4. **Missing its zenode integration** — QualityIntent is currently in zenode with hardcoded
+4. **Missing its zennode integration** — QualityIntent is currently in zennode with hardcoded
    boolean fields instead of using zencodecs' own FormatSet
 
 And critically:
@@ -519,17 +519,17 @@ The key router (in imageflow) partitions keys before zencodecs sees them.
 policy, which is zenpipe's responsibility. The key router should route it
 to the CMS/decode partition, not to zencodecs.
 
-## QualityIntent Node (zenode integration)
+## QualityIntent Node (zennode integration)
 
-When the `zenode` feature is enabled, zencodecs exposes a zenode node that wraps
+When the `zennode` feature is enabled, zencodecs exposes a zennode node that wraps
 `CodecIntent` for use in node graphs.
 
 ```rust
-// In zencodecs, behind feature = "zenode"
+// In zencodecs, behind feature = "zennode"
 
 /// Format selection and quality profile for encoding.
 ///
-/// This is the zenode-native wrapper around CodecIntent. The node's parameters
+/// This is the zennode-native wrapper around CodecIntent. The node's parameters
 /// map directly to RIAPI codec keys. At resolve time, the node produces a
 /// FormatDecision that the pipeline sink uses to configure the encoder.
 #[derive(Node, Clone, Debug)]
@@ -590,7 +590,7 @@ passed separately via the node graph's encode-phase context.
 ## Relationship Diagram
 
 ```
-                    zenode (infrastructure)
+                    zennode (infrastructure)
                    /          |            \
                   /           |             \
     codec crates            zenpipe          zencodecs
@@ -649,10 +649,10 @@ The key router is imageflow's responsibility. zencodecs provides the vocabulary
 
 ```
 zencodec (traits) ← all codec crates
-zenode ← all codec crates (optional), zencodecs (optional), zenpipe (optional)
-zencodecs → zencodec, zenode (optional)
-zenpipe → zencodec, zenode (optional), zenresize, zenlayout
-imageflow → zencodecs, zenpipe, zenode, all codec crates
+zennode ← all codec crates (optional), zencodecs (optional), zenpipe (optional)
+zencodecs → zencodec, zennode (optional)
+zenpipe → zencodec, zennode (optional), zenresize, zenlayout
+imageflow → zencodecs, zenpipe, zennode, all codec crates
 CLI tools → zencodecs only
 ```
 
@@ -720,7 +720,7 @@ let intent = CodecIntent {
 };
 ```
 
-No zenpipe, no zenode, no graph — just codec I/O with full container fidelity.
+No zenpipe, no zennode, no graph — just codec I/O with full container fidelity.
 
 ## What stays in zencodecs
 
@@ -771,8 +771,8 @@ No zenpipe, no zenode, no graph — just codec I/O with full container fidelity.
 | `CodecIntent` + parsing | imageflow (scattered) | Codec selection IS zencodecs' job |
 | `QualityIntent` + calibration tables | imageflow (scattered) | Quality mapping IS zencodecs' job |
 | `FormatChoice`, `BoolKeep`, `PerCodecHints` | imageflow (scattered) | Types that support codec intent |
-| `QualityIntentNode` (zenode) | zenode/nodes.rs | Node wrapper for CodecIntent |
-| `Encode` zenode node | New | "Encode to io_id with these settings" |
+| `QualityIntentNode` (zennode) | zennode/nodes.rs | Node wrapper for CodecIntent |
+| `Encode` zennode node | New | "Encode to io_id with these settings" |
 | `CodecEngine` detection | New | Legacy/Modern engine routing |
 
 ## Migration Plan
@@ -796,11 +796,11 @@ No zenpipe, no zenode, no graph — just codec I/O with full container fidelity.
 6. Remove `PixelData` wrapper (use zenpixels directly)
 7. Remove color management stubs (moves to zenpipe)
 
-### Phase 3: Add zenode integration
+### Phase 3: Add zennode integration
 
-1. Add `zenode` optional dependency
+1. Add `zennode` optional dependency
 2. Define `zencodecs.quality_intent` node wrapping CodecIntent
-3. Remove `zenode.quality_intent` from zenode
+3. Remove `zennode.quality_intent` from zennode
 4. Add `Encode` node (format-agnostic: io_id + quality_intent reference)
 
 ### Phase 4: Wire into zenpipe + imageflow
