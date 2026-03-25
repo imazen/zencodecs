@@ -217,12 +217,8 @@ pub fn transcode(
         request = request.with_effort(effort);
     }
 
-    // Convert decoded pixels to the appropriate encoding call
-    use zenpixels_convert::PixelBufferConvertTypedExt as _;
     let buffer = decoded.into_buffer();
-    let rgb8 = buffer.to_rgb8();
-
-    let encode_output = request.encode_full_frame_rgb8(rgb8.as_imgref())?;
+    let encode_output = request.encode(buffer.as_slice(), buffer.descriptor().has_alpha())?;
 
     Ok(TranscodeOutput {
         data: encode_output.into_vec(),
@@ -463,7 +459,7 @@ mod tests {
         // Encode to JPEG first
         let jpeg_output = crate::EncodeRequest::new(ImageFormat::Jpeg)
             .with_quality(75.0)
-            .encode_full_frame_rgb8(img.as_ref())
+            .encode(zenpixels::PixelSlice::from(img.as_ref()).erase(), false)
             .unwrap();
         assert!(!jpeg_output.data().is_empty());
 
@@ -518,7 +514,7 @@ mod tests {
 
         let jpeg_output = crate::EncodeRequest::new(ImageFormat::Jpeg)
             .with_quality(90.0)
-            .encode_full_frame_rgb8(img.as_ref())
+            .encode(zenpixels::PixelSlice::from(img.as_ref()).erase(), false)
             .unwrap();
 
         let decision = FormatDecision {
@@ -569,7 +565,7 @@ mod tests {
         );
         let jpeg_output = crate::EncodeRequest::new(ImageFormat::Jpeg)
             .with_quality(80.0)
-            .encode_full_frame_rgb8(img.as_ref())
+            .encode(zenpixels::PixelSlice::from(img.as_ref()).erase(), false)
             .unwrap();
 
         let info = crate::probe(jpeg_output.data(), &AllowedFormats::all()).unwrap();

@@ -887,9 +887,10 @@ mod tests {
             2,
             2,
         );
+        let ps = zenpixels::PixelSlice::from(pixels.as_ref()).erase();
         let encoded = EncodeRequest::new(ImageFormat::WebP)
             .with_quality(50.0)
-            .encode_full_frame_rgb8(pixels.as_ref())
+            .encode(ps, false)
             .unwrap();
 
         let (output, depth) = DecodeRequest::new(encoded.data())

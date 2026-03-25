@@ -35,13 +35,13 @@
 //!
 //! ```no_run
 //! use zencodecs::{EncodeRequest, ImageFormat};
-//! use zencodecs::pixel::{ImgVec, Rgba};
+//! use zenpixels::{PixelBuffer, PixelDescriptor};
 //!
-//! let pixels = ImgVec::new(vec![Rgba { r: 0u8, g: 0, b: 0, a: 255 }; 100*100], 100, 100);
+//! let buf = PixelBuffer::new_fill(100, 100, PixelDescriptor::RGBA8_SRGB, &[0, 0, 0, 255]).unwrap();
 //! let webp = EncodeRequest::new(ImageFormat::WebP)
 //!     .with_quality(85.0)
-//!     .encode_full_frame_rgba8(pixels.as_ref())?;
-//! println!("Encoded {} bytes", webp.len());
+//!     .encode(buf.as_slice(), false)?;
+//! println!("Encoded {} bytes", webp.data().len());
 //! # Ok::<(), whereat::At<zencodecs::CodecError>>(())
 //! ```
 //!
