@@ -153,45 +153,45 @@ pub(crate) fn extract_gainmap(data: &[u8]) -> Option<crate::gainmap::DecodedGain
     // Otherwise, synthesize from Apple's headroom value.
     let metadata = if gm_info.gain_map_max.is_some() || gm_info.alternate_headroom.is_some() {
         // ISO 21496-1 style metadata present — convert to GainMapMetadata.
+        // XMP gain/headroom values are already in log2 domain.
         let gain_max = gm_info
             .gain_map_max
             .or(gm_info.alternate_headroom)
             .unwrap_or(1.0);
-        let max_boost = 2.0f32.powf(gain_max as f32);
         let gain_min = gm_info.gain_map_min.unwrap_or(0.0);
-        let min_boost = 2.0f32.powf(gain_min as f32);
-        let gamma = gm_info.gamma.unwrap_or(1.0) as f32;
-        let offset_sdr = gm_info.offset_sdr.unwrap_or(1.0 / 64.0) as f32;
-        let offset_hdr = gm_info.offset_hdr.unwrap_or(1.0 / 64.0) as f32;
-        let base_headroom = gm_info.base_headroom.unwrap_or(0.0) as f32;
+        let gamma = gm_info.gamma.unwrap_or(1.0);
+        let offset_sdr = gm_info.offset_sdr.unwrap_or(1.0 / 64.0);
+        let offset_hdr = gm_info.offset_hdr.unwrap_or(1.0 / 64.0);
+        let base_headroom = gm_info.base_headroom.unwrap_or(0.0);
         let alt_headroom = gm_info
             .alternate_headroom
             .or(gm_info.gain_map_max)
-            .unwrap_or(1.0) as f32;
+            .unwrap_or(1.0);
 
         GainMapMetadata {
-            max_content_boost: [max_boost; 3],
-            min_content_boost: [min_boost; 3],
+            gain_map_max: [gain_max; 3],
+            gain_map_min: [gain_min; 3],
             gamma: [gamma; 3],
-            offset_sdr: [offset_sdr; 3],
-            offset_hdr: [offset_hdr; 3],
-            hdr_capacity_min: base_headroom,
-            hdr_capacity_max: alt_headroom,
+            base_offset: [offset_sdr; 3],
+            alternate_offset: [offset_hdr; 3],
+            base_hdr_headroom: base_headroom,
+            alternate_hdr_headroom: alt_headroom,
             use_base_color_space: true,
+            ..GainMapMetadata::default()
         }
     } else if let Some(headroom) = gm_info.headroom {
         // Apple HDRGainMap style — synthesize ISO 21496-1 metadata from headroom.
-        // headroom is max brightness in stops (e.g., 2.89 stops = ~7.4x boost).
-        let max_boost = 2.0f32.powf(headroom as f32);
+        // headroom is max brightness in stops (log2 domain), e.g., 2.89 = ~7.4x boost.
         GainMapMetadata {
-            max_content_boost: [max_boost; 3],
-            min_content_boost: [1.0; 3],
+            gain_map_max: [headroom; 3],
+            gain_map_min: [0.0; 3],
             gamma: [1.0; 3],
-            offset_sdr: [1.0 / 64.0; 3],
-            offset_hdr: [1.0 / 64.0; 3],
-            hdr_capacity_min: 1.0,
-            hdr_capacity_max: headroom as f32,
+            base_offset: [1.0 / 64.0; 3],
+            alternate_offset: [1.0 / 64.0; 3],
+            base_hdr_headroom: 0.0,
+            alternate_hdr_headroom: headroom,
             use_base_color_space: true,
+            ..GainMapMetadata::default()
         }
     } else {
         // No metadata at all — use defaults.

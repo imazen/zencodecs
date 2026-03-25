@@ -94,17 +94,17 @@ fn run() {
     println!("Direction:  {:?}", direction);
     println!("Source:     {:?}", gm.source_format);
 
-    // Metadata in linear domain (as stored in GainMapMetadata / ultrahdr-core).
+    // Metadata in log2/f64 domain (as stored in GainMapMetadata / ultrahdr-core).
     let meta = &gm.metadata;
-    println!("\n--- Metadata (linear domain) ---");
-    println!("  max_content_boost: {:?}", meta.max_content_boost);
-    println!("  min_content_boost: {:?}", meta.min_content_boost);
-    println!("  gamma:             {:?}", meta.gamma);
-    println!("  offset_sdr:        {:?}", meta.offset_sdr);
-    println!("  offset_hdr:        {:?}", meta.offset_hdr);
-    println!("  hdr_capacity_min:  {}", meta.hdr_capacity_min);
-    println!("  hdr_capacity_max:  {}", meta.hdr_capacity_max);
-    println!("  use_base_cspace:   {}", meta.use_base_color_space);
+    println!("\n--- Metadata (log2/f64 domain) ---");
+    println!("  gain_map_max:          {:?}", meta.gain_map_max);
+    println!("  gain_map_min:          {:?}", meta.gain_map_min);
+    println!("  gamma:                 {:?}", meta.gamma);
+    println!("  base_offset:           {:?}", meta.base_offset);
+    println!("  alternate_offset:      {:?}", meta.alternate_offset);
+    println!("  base_hdr_headroom:     {}", meta.base_hdr_headroom);
+    println!("  alternate_hdr_headroom:{}", meta.alternate_hdr_headroom);
+    println!("  use_base_cspace:       {}", meta.use_base_color_space);
 
     // Params in log2 domain (canonical ISO 21496-1 representation).
     let params: GainMapParams = gm.params();

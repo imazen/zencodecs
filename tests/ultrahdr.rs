@@ -186,11 +186,11 @@ fn decode_gain_map_from_ultrahdr_jpeg() {
         gm.gain_map.width as usize * gm.gain_map.height as usize * gm.gain_map.channels as usize,
         "gain map data length should match dimensions"
     );
-    // Metadata should have non-trivial boost (HDR content was >1.0)
+    // Metadata should have non-trivial boost (HDR content was >1.0, so log2 > 0)
     assert!(
-        gm.metadata.max_content_boost[0] > 1.0,
-        "max_content_boost should be > 1.0, got {}",
-        gm.metadata.max_content_boost[0],
+        gm.metadata.gain_map_max[0] > 0.0,
+        "gain_map_max should be > 0.0 (log2), got {}",
+        gm.metadata.gain_map_max[0],
     );
 }
 

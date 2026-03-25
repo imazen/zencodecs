@@ -43,60 +43,52 @@ pub use zenjpeg::ultrahdr::GainMap;
 // Re-export zencodec gain map types.
 pub use zencodec::gainmap::{GainMapChannel, GainMapParams, GainMapPresence};
 
-/// Convert [`GainMapParams`] (log2 domain) → [`GainMapMetadata`] (linear domain).
+/// Convert [`GainMapParams`] (log2/f64 domain) → [`GainMapMetadata`] (log2/f64 domain).
 ///
-/// Applies `2^x` to gains and headroom fields. Gamma and offsets pass through directly.
+/// Both types now use the same domain, so this is a trivial field copy.
 #[cfg(feature = "jpeg-ultrahdr")]
 pub fn params_to_metadata(p: &GainMapParams) -> GainMapMetadata {
     GainMapMetadata {
-        min_content_boost: [
-            2.0f32.powf(p.channels[0].min as f32),
-            2.0f32.powf(p.channels[1].min as f32),
-            2.0f32.powf(p.channels[2].min as f32),
-        ],
-        max_content_boost: [
-            2.0f32.powf(p.channels[0].max as f32),
-            2.0f32.powf(p.channels[1].max as f32),
-            2.0f32.powf(p.channels[2].max as f32),
-        ],
+        gain_map_min: [p.channels[0].min, p.channels[1].min, p.channels[2].min],
+        gain_map_max: [p.channels[0].max, p.channels[1].max, p.channels[2].max],
         gamma: [
-            p.channels[0].gamma as f32,
-            p.channels[1].gamma as f32,
-            p.channels[2].gamma as f32,
+            p.channels[0].gamma,
+            p.channels[1].gamma,
+            p.channels[2].gamma,
         ],
-        offset_sdr: [
-            p.channels[0].base_offset as f32,
-            p.channels[1].base_offset as f32,
-            p.channels[2].base_offset as f32,
+        base_offset: [
+            p.channels[0].base_offset,
+            p.channels[1].base_offset,
+            p.channels[2].base_offset,
         ],
-        offset_hdr: [
-            p.channels[0].alternate_offset as f32,
-            p.channels[1].alternate_offset as f32,
-            p.channels[2].alternate_offset as f32,
+        alternate_offset: [
+            p.channels[0].alternate_offset,
+            p.channels[1].alternate_offset,
+            p.channels[2].alternate_offset,
         ],
-        hdr_capacity_min: 2.0f32.powf(p.base_hdr_headroom as f32),
-        hdr_capacity_max: 2.0f32.powf(p.alternate_hdr_headroom as f32),
+        base_hdr_headroom: p.base_hdr_headroom,
+        alternate_hdr_headroom: p.alternate_hdr_headroom,
         use_base_color_space: p.use_base_color_space,
     }
 }
 
-/// Convert [`GainMapMetadata`] (linear domain) → [`GainMapParams`] (log2 domain).
+/// Convert [`GainMapMetadata`] (log2/f64 domain) → [`GainMapParams`] (log2/f64 domain).
 ///
-/// Applies `log2(x)` to gains and headroom fields. Gamma and offsets pass through directly.
+/// Both types now use the same domain, so this is a trivial field copy.
 #[cfg(feature = "jpeg-ultrahdr")]
 pub fn metadata_to_params(m: &GainMapMetadata) -> GainMapParams {
     let mut channels = [GainMapChannel::default(); 3];
     for (i, ch) in channels.iter_mut().enumerate() {
-        ch.min = (m.min_content_boost[i] as f64).log2();
-        ch.max = (m.max_content_boost[i] as f64).log2();
-        ch.gamma = m.gamma[i] as f64;
-        ch.base_offset = m.offset_sdr[i] as f64;
-        ch.alternate_offset = m.offset_hdr[i] as f64;
+        ch.min = m.gain_map_min[i];
+        ch.max = m.gain_map_max[i];
+        ch.gamma = m.gamma[i];
+        ch.base_offset = m.base_offset[i];
+        ch.alternate_offset = m.alternate_offset[i];
     }
     let mut params = GainMapParams::default();
     params.channels = channels;
-    params.base_hdr_headroom = (m.hdr_capacity_min as f64).log2();
-    params.alternate_hdr_headroom = (m.hdr_capacity_max as f64).log2();
+    params.base_hdr_headroom = m.base_hdr_headroom;
+    params.alternate_hdr_headroom = m.alternate_hdr_headroom;
     params.use_base_color_space = m.use_base_color_space;
     params
 }
@@ -162,8 +154,7 @@ pub enum GainMapSource<'a> {
 
 #[cfg(feature = "jpeg-ultrahdr")]
 impl DecodedGainMap {
-    /// Convert the stored linear-domain metadata to the canonical
-    /// log2-domain [`GainMapParams`].
+    /// Convert the stored [`GainMapMetadata`] to the canonical [`GainMapParams`].
     pub fn params(&self) -> GainMapParams {
         metadata_to_params(&self.metadata)
     }
@@ -196,14 +187,15 @@ mod tests {
                 channels: 1,
             },
             metadata: GainMapMetadata {
-                max_content_boost: [4.0; 3],
-                min_content_boost: [1.0; 3],
+                gain_map_max: [2.0; 3],
+                gain_map_min: [0.0; 3],
                 gamma: [1.0; 3],
-                offset_sdr: [1.0 / 64.0; 3],
-                offset_hdr: [1.0 / 64.0; 3],
-                hdr_capacity_min: 1.0,
-                hdr_capacity_max: 4.0,
+                base_offset: [1.0 / 64.0; 3],
+                alternate_offset: [1.0 / 64.0; 3],
+                base_hdr_headroom: 0.0,
+                alternate_hdr_headroom: 2.0,
                 use_base_color_space: true,
+                ..GainMapMetadata::default()
             },
             base_is_hdr: false,
             source_format: ImageFormat::Jpeg,
@@ -240,14 +232,15 @@ mod tests {
             channels: 1,
         };
         let meta = GainMapMetadata {
-            max_content_boost: [4.0; 3],
-            min_content_boost: [1.0; 3],
+            gain_map_max: [2.0; 3],
+            gain_map_min: [0.0; 3],
             gamma: [1.0; 3],
-            offset_sdr: [1.0 / 64.0; 3],
-            offset_hdr: [1.0 / 64.0; 3],
-            hdr_capacity_min: 1.0,
-            hdr_capacity_max: 4.0,
+            base_offset: [1.0 / 64.0; 3],
+            alternate_offset: [1.0 / 64.0; 3],
+            base_hdr_headroom: 0.0,
+            alternate_hdr_headroom: 2.0,
             use_base_color_space: true,
+            ..GainMapMetadata::default()
         };
         let source = GainMapSource::Precomputed {
             gain_map: &img,
@@ -258,7 +251,7 @@ mod tests {
                 assert_eq!(gain_map.width, 8);
                 assert_eq!(gain_map.height, 8);
                 assert_eq!(gain_map.channels, 1);
-                assert_eq!(metadata.max_content_boost[0], 4.0);
+                assert_eq!(metadata.gain_map_max[0], 2.0);
             }
         }
     }
@@ -267,20 +260,21 @@ mod tests {
     #[test]
     fn params_metadata_roundtrip() {
         let meta = GainMapMetadata {
-            max_content_boost: [4.0; 3],
-            min_content_boost: [1.0; 3],
+            gain_map_max: [2.0; 3],
+            gain_map_min: [0.0; 3],
             gamma: [1.0; 3],
-            offset_sdr: [1.0 / 64.0; 3],
-            offset_hdr: [1.0 / 64.0; 3],
-            hdr_capacity_min: 1.0,
-            hdr_capacity_max: 4.0,
+            base_offset: [1.0 / 64.0; 3],
+            alternate_offset: [1.0 / 64.0; 3],
+            base_hdr_headroom: 0.0,
+            alternate_hdr_headroom: 2.0,
             use_base_color_space: true,
+            ..GainMapMetadata::default()
         };
         let params = metadata_to_params(&meta);
         let meta2 = params_to_metadata(&params);
         for i in 0..3 {
-            assert!((meta.max_content_boost[i] - meta2.max_content_boost[i]).abs() < 0.01);
-            assert!((meta.min_content_boost[i] - meta2.min_content_boost[i]).abs() < 0.01);
+            assert!((meta.gain_map_max[i] - meta2.gain_map_max[i]).abs() < 0.01);
+            assert!((meta.gain_map_min[i] - meta2.gain_map_min[i]).abs() < 0.01);
             assert!((meta.gamma[i] - meta2.gamma[i]).abs() < 0.01);
         }
     }

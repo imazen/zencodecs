@@ -38,15 +38,15 @@ fn jpeg_ultrahdr_seine_gainmap() {
     assert!(gm.gain_map.width > 0);
     assert!(gm.gain_map.height > 0);
 
-    // Verify metadata is sane
+    // Verify metadata is sane (log2 domain: 0.0 = no boost)
     let meta = &gm.metadata;
     assert!(
-        meta.max_content_boost[0] >= 1.0,
-        "max_content_boost should be >= 1.0 (linear)"
+        meta.gain_map_max[0] >= 0.0,
+        "gain_map_max should be >= 0.0 (log2)"
     );
     assert!(
-        meta.hdr_capacity_max >= 1.0,
-        "hdr_capacity_max should be >= 1.0 (linear)"
+        meta.alternate_hdr_headroom >= 0.0,
+        "alternate_hdr_headroom should be >= 0.0 (log2)"
     );
 
     // Verify canonical params are in log2 domain
@@ -79,17 +79,17 @@ fn avif_seine_gainmap() {
                 * gm.gain_map.channels as usize
     );
 
-    // Verify metadata is in LINEAR domain (ultrahdr's convention)
+    // Verify metadata is in log2 domain (ultrahdr-core 0.3 convention)
     let meta = &gm.metadata;
     assert!(
-        meta.max_content_boost[0] >= 1.0,
-        "max_content_boost should be >= 1.0 (linear), got {}",
-        meta.max_content_boost[0],
+        meta.gain_map_max[0] >= 0.0,
+        "gain_map_max should be >= 0.0 (log2), got {}",
+        meta.gain_map_max[0],
     );
     assert!(
-        meta.hdr_capacity_max >= 1.0,
-        "hdr_capacity_max should be >= 1.0 (linear), got {}",
-        meta.hdr_capacity_max,
+        meta.alternate_hdr_headroom >= 0.0,
+        "alternate_hdr_headroom should be >= 0.0 (log2), got {}",
+        meta.alternate_hdr_headroom,
     );
 
     // Verify canonical params are in log2 domain
@@ -97,10 +97,10 @@ fn avif_seine_gainmap() {
     assert!(params.validate().is_ok());
 }
 
-/// AVIF regression: headroom 13/10 in ISO 21496-1 is log2 1.3,
-/// which must produce LINEAR 2^1.3 ≈ 2.462, NOT 1.3.
+/// AVIF regression: headroom 13/10 in ISO 21496-1 is log2 1.3.
+/// Both GainMapMetadata and GainMapParams now store this in log2 domain.
 #[test]
-fn avif_headroom_log2_linear_regression() {
+fn avif_headroom_log2_domain() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../zenavif/tests/vectors/libavif/seine_sdr_gainmap_srgb.avif"
@@ -118,29 +118,20 @@ fn avif_headroom_log2_linear_regression() {
 
     // The seine file has alternate_hdr_headroom = 13/10 = 1.3 (log2 domain)
     // This was confirmed from zenavif-parse tests.
-    // In log2 domain (GainMapParams): alternate_hdr_headroom ≈ 1.3
-    // In linear domain (GainMapMetadata): hdr_capacity_max ≈ 2^1.3 ≈ 2.462
+    // Both GainMapMetadata and GainMapParams now use log2 domain.
 
-    // The linear value must NOT be ~1.3 (that was the old bug)
+    // Verify the metadata value is approximately 1.3 (log2)
     assert!(
-        meta.hdr_capacity_max > 2.0,
-        "hdr_capacity_max should be 2^1.3 ≈ 2.46, NOT the raw log2 value 1.3. Got: {}",
-        meta.hdr_capacity_max,
+        (meta.alternate_hdr_headroom - 1.3).abs() < 0.01,
+        "alternate_hdr_headroom should be ~1.3 (log2), got {}",
+        meta.alternate_hdr_headroom,
     );
 
-    // Verify the log2 value is approximately 1.3
+    // Verify params agrees (trivial copy now)
     assert!(
         (params.alternate_hdr_headroom - 1.3).abs() < 0.01,
         "log2 alternate_hdr_headroom should be ~1.3, got {}",
         params.alternate_hdr_headroom,
-    );
-
-    // Verify the linear value is 2^1.3
-    let expected_linear = 2.0f32.powf(1.3);
-    assert!(
-        (meta.hdr_capacity_max - expected_linear).abs() < 0.1,
-        "linear hdr_capacity_max should be ~{expected_linear}, got {}",
-        meta.hdr_capacity_max,
     );
 }
 

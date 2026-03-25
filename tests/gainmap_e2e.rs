@@ -186,12 +186,12 @@ fn e2e_gain_map_metadata_reflects_hdr_content() {
     let (_, gm_low) = decode_with_gainmap(&bytes_low);
     let gm_low = gm_low.expect("must have gain map");
 
-    // High-peak content should have higher max_content_boost
+    // High-peak content should have higher gain_map_max (log2 domain)
     assert!(
-        gm_high.metadata.max_content_boost[0] >= gm_low.metadata.max_content_boost[0],
-        "higher peak ({}) should have >= boost ratio than lower peak ({})",
-        gm_high.metadata.max_content_boost[0],
-        gm_low.metadata.max_content_boost[0],
+        gm_high.metadata.gain_map_max[0] >= gm_low.metadata.gain_map_max[0],
+        "higher peak ({}) should have >= gain_map_max than lower peak ({})",
+        gm_high.metadata.gain_map_max[0],
+        gm_low.metadata.gain_map_max[0],
     );
 }
 
@@ -225,7 +225,7 @@ fn e2e_gain_map_passthrough_jpeg_to_jpeg() {
 
     // Verify the gain map data survived the passthrough
     assert_gain_map_valid(&gm.gain_map);
-    assert!(gm.metadata.max_content_boost[0] > 1.0);
+    assert!(gm.metadata.gain_map_max[0] > 0.0);
 }
 
 // ─── E2E: Gain Map Extraction Consistency ───────────────────────────────────
@@ -242,16 +242,13 @@ fn e2e_decode_gain_map_twice_same_result() {
     let gm2 = gm2.expect("second decode must have gain map");
 
     // Metadata should be identical
-    assert_eq!(
-        gm1.metadata.max_content_boost,
-        gm2.metadata.max_content_boost
-    );
-    assert_eq!(
-        gm1.metadata.min_content_boost,
-        gm2.metadata.min_content_boost
-    );
+    assert_eq!(gm1.metadata.gain_map_max, gm2.metadata.gain_map_max);
+    assert_eq!(gm1.metadata.gain_map_min, gm2.metadata.gain_map_min);
     assert_eq!(gm1.metadata.gamma, gm2.metadata.gamma);
-    assert_eq!(gm1.metadata.hdr_capacity_max, gm2.metadata.hdr_capacity_max);
+    assert_eq!(
+        gm1.metadata.alternate_hdr_headroom,
+        gm2.metadata.alternate_hdr_headroom
+    );
 
     // Gain map pixels should be identical
     assert_eq!(gm1.gain_map.data, gm2.gain_map.data);
@@ -430,16 +427,17 @@ mod jxl_gainmap {
             channels: 1,
         };
 
-        // Step 3: Create ISO 21496-1 metadata
+        // Step 3: Create ISO 21496-1 metadata (log2/f64 domain)
         let metadata = GainMapMetadata {
-            max_content_boost: [4.0; 3],
-            min_content_boost: [1.0; 3],
+            gain_map_max: [2.0; 3],
+            gain_map_min: [0.0; 3],
             gamma: [1.0; 3],
-            offset_sdr: [1.0 / 64.0; 3],
-            offset_hdr: [1.0 / 64.0; 3],
-            hdr_capacity_min: 1.0,
-            hdr_capacity_max: 4.0,
+            base_offset: [1.0 / 64.0; 3],
+            alternate_offset: [1.0 / 64.0; 3],
+            base_hdr_headroom: 0.0,
+            alternate_hdr_headroom: 2.0,
             use_base_color_space: true,
+            ..GainMapMetadata::default()
         };
 
         // Step 4: Encode to JXL with gain map
@@ -479,22 +477,22 @@ mod jxl_gainmap {
         assert_eq!(gm.gain_map.width, gm_w);
         assert_eq!(gm.gain_map.height, gm_h);
 
-        // Step 8: Verify ISO 21496-1 metadata roundtripped
+        // Step 8: Verify ISO 21496-1 metadata roundtripped (log2 domain)
         let eps = 0.01;
         assert!(
-            (gm.metadata.max_content_boost[0] - 4.0).abs() < eps,
-            "max_content_boost should be ~4.0, got {}",
-            gm.metadata.max_content_boost[0],
+            (gm.metadata.gain_map_max[0] - 2.0).abs() < eps,
+            "gain_map_max should be ~2.0 (log2), got {}",
+            gm.metadata.gain_map_max[0],
         );
         assert!(
-            (gm.metadata.min_content_boost[0] - 1.0).abs() < eps,
-            "min_content_boost should be ~1.0, got {}",
-            gm.metadata.min_content_boost[0],
+            (gm.metadata.gain_map_min[0] - 0.0).abs() < eps,
+            "gain_map_min should be ~0.0 (log2), got {}",
+            gm.metadata.gain_map_min[0],
         );
         assert!(
-            (gm.metadata.hdr_capacity_max - 4.0).abs() < eps,
-            "hdr_capacity_max should be ~4.0, got {}",
-            gm.metadata.hdr_capacity_max,
+            (gm.metadata.alternate_hdr_headroom - 2.0).abs() < eps,
+            "alternate_hdr_headroom should be ~2.0 (log2), got {}",
+            gm.metadata.alternate_hdr_headroom,
         );
         assert!(
             (gm.metadata.gamma[0] - 1.0).abs() < eps,
@@ -548,14 +546,15 @@ mod jxl_gainmap {
         };
 
         let metadata = GainMapMetadata {
-            max_content_boost: [3.0, 3.5, 2.5],
-            min_content_boost: [1.0; 3],
+            gain_map_max: [3.0f64.log2(), 3.5f64.log2(), 2.5f64.log2()],
+            gain_map_min: [0.0; 3],
             gamma: [1.0; 3],
-            offset_sdr: [1.0 / 64.0; 3],
-            offset_hdr: [1.0 / 64.0; 3],
-            hdr_capacity_min: 1.0,
-            hdr_capacity_max: 3.5,
+            base_offset: [1.0 / 64.0; 3],
+            alternate_offset: [1.0 / 64.0; 3],
+            base_hdr_headroom: 0.0,
+            alternate_hdr_headroom: 3.5f64.log2(),
             use_base_color_space: true,
+            ..GainMapMetadata::default()
         };
 
         let source = GainMapSource::Precomputed {
