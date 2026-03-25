@@ -155,10 +155,12 @@ pub use depthmap::{
 
 // zencodec trait re-exports
 pub use zencodec::decode::{
-    DecodeJob, DecodeRowSink, DecoderConfig, DynAnimationFrameDecoder, DynStreamingDecoder,
-    OutputInfo,
+    DecodeJob, DecodePolicy, DecodeRowSink, DecoderConfig, DynAnimationFrameDecoder,
+    DynStreamingDecoder, OutputInfo,
 };
-pub use zencodec::encode::{DynAnimationFrameEncoder, DynEncoder, EncodeJob, EncoderConfig};
+pub use zencodec::encode::{
+    DynAnimationFrameEncoder, DynEncoder, EncodeJob, EncodePolicy, EncoderConfig,
+};
 pub use zencodec::{AnimationFrame, OwnedAnimationFrame};
 
 // Pixel conversion extension traits

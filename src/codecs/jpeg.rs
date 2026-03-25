@@ -73,6 +73,7 @@ pub(crate) fn decode(
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
     stop: Option<StopToken>,
+    decode_policy: Option<zencodec::decode::DecodePolicy>,
 ) -> Result<DecodeOutput> {
     let mut dec = zenjpeg::JpegDecoderConfig::new();
     if let Some(cfg) = codec_config.and_then(|c| c.jpeg_decoder.as_ref()) {
@@ -84,6 +85,9 @@ pub(crate) fn decode(
     }
     if let Some(s) = stop {
         job = job.with_stop(s);
+    }
+    if let Some(dp) = decode_policy {
+        job = job.with_policy(dp);
     }
     job.decoder(Cow::Borrowed(data), &[])
         .map_err(|e| at!(CodecError::from_codec(ImageFormat::Jpeg, e)))?

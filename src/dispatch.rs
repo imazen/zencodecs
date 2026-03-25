@@ -21,6 +21,7 @@ pub(crate) struct EncodeParams<'a> {
     pub codec_config: Option<&'a CodecConfig>,
     pub limits: Option<&'a Limits>,
     pub stop: Option<StopToken>,
+    pub encode_policy: Option<zencodec::encode::EncodePolicy>,
 }
 
 /// Type-erased one-shot encode closure.
@@ -59,6 +60,9 @@ where
             }
             if let Some(meta) = params.metadata {
                 job = job.with_metadata(meta);
+            }
+            if let Some(ep) = params.encode_policy {
+                job = job.with_policy(ep);
             }
             let format = C::format();
             let enc = job
@@ -251,6 +255,9 @@ where
     }
     if let Some(meta) = params.metadata {
         job = job.with_metadata(meta);
+    }
+    if let Some(ep) = params.encode_policy {
+        job = job.with_policy(ep);
     }
     let format = C::format();
     let encoder = job

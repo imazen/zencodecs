@@ -12,6 +12,7 @@ use crate::quality::{QualityIntent, QualityProfile};
 use crate::select::ImageFacts;
 use crate::{AllowedFormats, CodecError, ImageFormat, Limits, Metadata, StopToken};
 use whereat::at;
+use zencodec::encode::EncodePolicy;
 use zenpixels::PixelDescriptor;
 
 pub use zencodec::encode::EncodeOutput;
@@ -43,6 +44,7 @@ pub struct EncodeRequest<'a> {
     registry: Option<&'a AllowedFormats>,
     codec_config: Option<&'a CodecConfig>,
     policy: Option<CodecPolicy>,
+    encode_policy: Option<EncodePolicy>,
     image_facts: Option<ImageFacts>,
     /// Quality for UltraHDR gain map JPEG (0-100). Only used by `encode_ultrahdr_*`.
     #[cfg(feature = "jpeg-ultrahdr")]
@@ -68,6 +70,7 @@ impl<'a> EncodeRequest<'a> {
             registry: None,
             codec_config: None,
             policy: None,
+            encode_policy: None,
             image_facts: None,
             #[cfg(feature = "jpeg-ultrahdr")]
             gainmap_quality: None,
@@ -91,6 +94,7 @@ impl<'a> EncodeRequest<'a> {
             registry: None,
             codec_config: None,
             policy: None,
+            encode_policy: None,
             image_facts: None,
             #[cfg(feature = "jpeg-ultrahdr")]
             gainmap_quality: None,
@@ -180,6 +184,25 @@ impl<'a> EncodeRequest<'a> {
     /// and which output formats are candidates for auto-selection.
     pub fn with_policy(mut self, policy: CodecPolicy) -> Self {
         self.policy = Some(policy);
+        self
+    }
+
+    /// Set encode security policy.
+    ///
+    /// Controls which metadata the encoder embeds in the output.
+    /// See [`EncodePolicy`] for details.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use zencodecs::{EncodeRequest, ImageFormat};
+    /// use zencodec::encode::EncodePolicy;
+    ///
+    /// let request = EncodeRequest::new(ImageFormat::Jpeg)
+    ///     .with_encode_policy(EncodePolicy::strip_all().with_embed_icc(true));
+    /// ```
+    pub fn with_encode_policy(mut self, policy: EncodePolicy) -> Self {
+        self.encode_policy = Some(policy);
         self
     }
 
@@ -343,6 +366,7 @@ impl<'a> EncodeRequest<'a> {
                 codec_config: self.codec_config,
                 limits: self.limits,
                 stop: self.stop,
+                encode_policy: self.encode_policy,
                 canvas_width: width,
                 canvas_height: height,
                 loop_count: None,
@@ -436,6 +460,7 @@ impl<'a> EncodeRequest<'a> {
             codec_config: self.codec_config,
             limits: self.limits,
             stop: self.stop,
+            encode_policy: self.encode_policy,
         };
 
         crate::dispatch::build_streaming_encoder(format, params)
@@ -568,6 +593,7 @@ impl<'a> EncodeRequest<'a> {
             codec_config: self.codec_config,
             limits: self.limits,
             stop: self.stop.clone(),
+            encode_policy: self.encode_policy,
         };
 
         let built = crate::dispatch::build_encoder(format, params)?;

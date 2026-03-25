@@ -7,6 +7,7 @@ use crate::error::Result;
 use crate::policy::CodecPolicy;
 use crate::{AllowedFormats, CodecError, ImageFormat, ImageInfo, Limits, StopToken};
 use whereat::at;
+use zencodec::decode::DecodePolicy;
 
 /// Image decode request builder.
 ///
@@ -28,6 +29,7 @@ pub struct DecodeRequest<'a> {
     registry: Option<&'a AllowedFormats>,
     codec_config: Option<&'a CodecConfig>,
     policy: Option<CodecPolicy>,
+    decode_policy: Option<DecodePolicy>,
 }
 
 impl<'a> DecodeRequest<'a> {
@@ -44,6 +46,7 @@ impl<'a> DecodeRequest<'a> {
             registry: None,
             codec_config: None,
             policy: None,
+            decode_policy: None,
         }
     }
 
@@ -84,6 +87,27 @@ impl<'a> DecodeRequest<'a> {
     /// are checked during format detection.
     pub fn with_policy(mut self, policy: CodecPolicy) -> Self {
         self.policy = Some(policy);
+        self
+    }
+
+    /// Set decode security policy.
+    ///
+    /// Controls what the decoder is allowed to do: metadata extraction,
+    /// progressive/interlaced support, animation, truncated input handling,
+    /// and strict parsing. See [`DecodePolicy`] for details.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use zencodecs::DecodeRequest;
+    /// use zencodec::decode::DecodePolicy;
+    ///
+    /// let data: &[u8] = &[];
+    /// let request = DecodeRequest::new(data)
+    ///     .with_decode_policy(DecodePolicy::strict().with_allow_icc(true));
+    /// ```
+    pub fn with_decode_policy(mut self, policy: DecodePolicy) -> Self {
+        self.decode_policy = Some(policy);
         self
     }
 
@@ -349,33 +373,43 @@ impl<'a> DecodeRequest<'a> {
             limits: self.limits,
             stop: self.stop.clone(),
             preferred: &[],
+            decode_policy: self.decode_policy,
         }
     }
 
     /// Dispatch to format-specific decoder.
     fn decode_format(self, format: ImageFormat) -> Result<DecodeOutput> {
+        let dp = self.decode_policy;
         match format {
             #[cfg(feature = "jpeg")]
-            ImageFormat::Jpeg => {
-                crate::codecs::jpeg::decode(self.data, self.codec_config, self.limits, self.stop)
-            }
+            ImageFormat::Jpeg => crate::codecs::jpeg::decode(
+                self.data,
+                self.codec_config,
+                self.limits,
+                self.stop,
+                dp,
+            ),
             #[cfg(not(feature = "jpeg"))]
             ImageFormat::Jpeg => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "webp")]
-            ImageFormat::WebP => {
-                crate::codecs::webp::decode(self.data, self.codec_config, self.limits, self.stop)
-            }
+            ImageFormat::WebP => crate::codecs::webp::decode(
+                self.data,
+                self.codec_config,
+                self.limits,
+                self.stop,
+                dp,
+            ),
             #[cfg(not(feature = "webp"))]
             ImageFormat::WebP => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "gif")]
-            ImageFormat::Gif => crate::codecs::gif::decode(self.data, self.limits, self.stop),
+            ImageFormat::Gif => crate::codecs::gif::decode(self.data, self.limits, self.stop, dp),
             #[cfg(not(feature = "gif"))]
             ImageFormat::Gif => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "png")]
-            ImageFormat::Png => crate::codecs::png::decode(self.data, self.limits, self.stop),
+            ImageFormat::Png => crate::codecs::png::decode(self.data, self.limits, self.stop, dp),
             #[cfg(not(feature = "png"))]
             ImageFormat::Png => Err(at!(CodecError::UnsupportedFormat(format))),
 
@@ -395,29 +429,29 @@ impl<'a> DecodeRequest<'a> {
             ImageFormat::Jxl => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "heic-decode")]
-            ImageFormat::Heic => crate::codecs::heic::decode(self.data, self.limits, self.stop),
+            ImageFormat::Heic => crate::codecs::heic::decode(self.data, self.limits, self.stop, dp),
             #[cfg(not(feature = "heic-decode"))]
             ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "bitmaps")]
-            ImageFormat::Pnm => crate::codecs::pnm::decode(self.data, self.limits, self.stop),
+            ImageFormat::Pnm => crate::codecs::pnm::decode(self.data, self.limits, self.stop, dp),
             #[cfg(not(feature = "bitmaps"))]
             ImageFormat::Pnm => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "bitmaps-bmp")]
-            ImageFormat::Bmp => crate::codecs::bmp::decode(self.data, self.limits, self.stop),
+            ImageFormat::Bmp => crate::codecs::bmp::decode(self.data, self.limits, self.stop, dp),
             #[cfg(not(feature = "bitmaps-bmp"))]
             ImageFormat::Bmp => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "bitmaps")]
             ImageFormat::Farbfeld => {
-                crate::codecs::farbfeld::decode(self.data, self.limits, self.stop)
+                crate::codecs::farbfeld::decode(self.data, self.limits, self.stop, dp)
             }
             #[cfg(not(feature = "bitmaps"))]
             ImageFormat::Farbfeld => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "tiff")]
-            ImageFormat::Tiff => crate::codecs::tiff::decode(self.data, self.limits, self.stop),
+            ImageFormat::Tiff => crate::codecs::tiff::decode(self.data, self.limits, self.stop, dp),
             #[cfg(not(feature = "tiff"))]
             ImageFormat::Tiff => Err(at!(CodecError::UnsupportedFormat(format))),
 
@@ -1034,8 +1068,8 @@ mod tests {
             assert!(gm.gain_map.width > 0 && gm.gain_map.height > 0);
             assert_eq!(gm.source_format, ImageFormat::Custom(&zenraw::DNG_FORMAT));
             std::eprintln!(
-                "  hdr_capacity_max={} base_is_hdr={}",
-                gm.metadata.hdr_capacity_max,
+                "  alternate_hdr_headroom={} base_is_hdr={}",
+                gm.metadata.alternate_hdr_headroom,
                 gm.base_is_hdr
             );
         } else {

@@ -42,6 +42,7 @@ pub(crate) struct DecodeParams<'a> {
     pub limits: Option<&'a Limits>,
     pub stop: Option<StopToken>,
     pub preferred: &'a [zenpixels::PixelDescriptor],
+    pub decode_policy: Option<zencodec::decode::DecodePolicy>,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -141,6 +142,9 @@ pub(crate) fn dyn_push_decode(
             if let Some(ref s) = params.stop {
                 job = job.with_stop(s.clone());
             }
+            if let Some(dp) = params.decode_policy {
+                job = job.with_policy(dp);
+            }
             job.push_decoder(Cow::Borrowed(params.data), sink, params.preferred)
                 .map_err(|e| at!(CodecError::from_codec(format, e)))
         }};
@@ -229,6 +233,9 @@ pub(crate) fn dyn_animation_frame_decoder(
     if let Some(lim) = params.limits {
         job.set_limits(to_resource_limits(lim));
     }
+    if let Some(dp) = params.decode_policy {
+        job.set_policy(dp);
+    }
     let data = Cow::Owned(params.data.to_vec());
     job.into_animation_frame_decoder(data, params.preferred)
         .map_err(|e| wrap_boxed(format, e))
@@ -295,6 +302,7 @@ pub(crate) struct AnimEncodeParams<'a> {
     pub codec_config: Option<&'a CodecConfig>,
     pub limits: Option<&'a Limits>,
     pub stop: Option<StopToken>,
+    pub encode_policy: Option<zencodec::encode::EncodePolicy>,
     pub canvas_width: u32,
     pub canvas_height: u32,
     pub loop_count: Option<u32>,
@@ -317,6 +325,9 @@ pub(crate) fn dyn_animation_frame_encoder(
             }
             if let Some(meta) = params.metadata {
                 job = job.with_metadata(meta);
+            }
+            if let Some(ep) = params.encode_policy {
+                job = job.with_policy(ep);
             }
             job = job.with_canvas_size(params.canvas_width, params.canvas_height);
             if let Some(lc) = params.loop_count {
