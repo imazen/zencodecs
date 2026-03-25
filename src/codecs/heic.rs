@@ -1,4 +1,4 @@
-//! HEIC decode adapter -- delegates to heic-decoder via trait interface.
+//! HEIC decode adapter -- delegates to heic via trait interface.
 
 use alloc::borrow::Cow;
 
@@ -12,7 +12,7 @@ use zencodec::decode::Decode;
 
 /// Probe HEIC metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
-    let dec = heic_decoder::HeicDecoderConfig::new();
+    let dec = heic::HeicDecoderConfig::new();
     let job = dec.job();
     job.probe(data)
         .map_err(|e| at!(CodecError::from_codec(ImageFormat::Heic, e)))
@@ -25,7 +25,7 @@ pub(crate) fn decode(
     stop: Option<StopToken>,
     decode_policy: Option<zencodec::decode::DecodePolicy>,
 ) -> Result<DecodeOutput> {
-    let dec = heic_decoder::HeicDecoderConfig::new();
+    let dec = heic::HeicDecoderConfig::new();
     let mut job = dec.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));

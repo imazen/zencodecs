@@ -33,7 +33,7 @@ zenavif = { path = "../zenavif", optional = true, features = ["zencodec"] }
 zenavif-parse = { path = "../zenavif-parse", optional = true, features = ["eager"] }
 zenpng = { path = "../zenpng", optional = true, features = ["zencodec"] }
 zenjxl = { path = "../zenjxl", optional = true, default-features = false, features = ["zencodec"] }
-heic-decoder = { path = "../heic", optional = true, default-features = false, features = ["zencodec"] }
+heic = { path = "../heic", optional = true, default-features = false, features = ["zencodec"] }
 zenbitmaps = { path = "../zenbitmaps", optional = true, features = ["zencodec"] }
 zentiff = { path = "../zentiff", optional = true, features = ["zencodec"] }
 zenraw = { path = "../zenraw", optional = true, default-features = false, features = ["rawloader", "std", "zencodec", "exif"] }
@@ -70,7 +70,7 @@ avif-decode = ["dep:zenavif"]
 avif-encode = ["dep:zenavif", "zenavif/encode", "dep:zenavif-parse"]
 jxl-decode = ["dep:zenjxl", "zenjxl/decode"]
 jxl-encode = ["dep:zenjxl", "zenjxl/encode"]
-heic-decode = ["dep:heic-decoder"]
+heic-decode = ["dep:heic"]
 bitmaps = ["dep:zenbitmaps"]
 bitmaps-bmp = ["bitmaps", "zenbitmaps/bmp"]
 tiff = ["dep:zentiff"]

@@ -86,7 +86,7 @@ fn build_dyn_decoder_config(
         ImageFormat::Jxl => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "heic-decode")]
-        ImageFormat::Heic => Ok(Box::new(heic_decoder::HeicDecoderConfig::new())),
+        ImageFormat::Heic => Ok(Box::new(heic::HeicDecoderConfig::new())),
         #[cfg(not(feature = "heic-decode"))]
         ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
 
@@ -182,7 +182,7 @@ pub(crate) fn dyn_push_decode(
         ImageFormat::Jxl => Err(at!(CodecError::UnsupportedFormat(format))),
 
         #[cfg(feature = "heic-decode")]
-        ImageFormat::Heic => push_dec!(heic_decoder::HeicDecoderConfig::new()),
+        ImageFormat::Heic => push_dec!(heic::HeicDecoderConfig::new()),
         #[cfg(not(feature = "heic-decode"))]
         ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
 

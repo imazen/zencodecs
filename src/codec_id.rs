@@ -51,7 +51,7 @@ pub enum CodecId {
     JxlEncoderEncode,
 
     // HEIC
-    /// heic-decoder decoder
+    /// heic decoder
     HeicDecode,
 
     // RAW/DNG
@@ -157,7 +157,7 @@ impl CodecId {
             Self::RavifEncode => "ravif (encode)",
             Self::ZenjxlDecode => "zenjxl (decode)",
             Self::JxlEncoderEncode => "jxl-encoder (encode)",
-            Self::HeicDecode => "heic-decoder (decode)",
+            Self::HeicDecode => "heic (decode)",
             Self::ZenrawDecode => "zenraw (decode)",
             Self::PnmDecode => "zenbitmaps-pnm (decode)",
             Self::PnmEncode => "zenbitmaps-pnm (encode)",

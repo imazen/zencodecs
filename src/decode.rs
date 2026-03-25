@@ -223,7 +223,7 @@ impl<'a> DecodeRequest<'a> {
     ///   1. GDepth XMP (Android, base64-encoded depth with near/far/units metadata)
     ///   2. Dynamic Depth Format / DDF (Android, appended images with XMP container directory)
     ///   3. MPF Disparity secondary image (iPhone portrait mode)
-    /// - **HEIC**: Auxiliary depth image via heic-decoder.
+    /// - **HEIC**: Auxiliary depth image via heic.
     /// - **AVIF**: Auxiliary depth image via zenavif.
     /// - **Other formats**: Returns `None` for depth map.
     ///
@@ -757,29 +757,29 @@ fn extract_jpeg_depth(
 /// Extract a depth map from a HEIC DecodeOutput's extras, if present.
 ///
 /// HEIC files can contain auxiliary depth images (Apple portrait mode).
-/// This is a stub — actual extraction requires heic-decoder support for
+/// This is a stub — actual extraction requires heic support for
 /// Extract depth map from HEIC auxiliary image.
 ///
-/// Uses heic-decoder's `decode_depth()` to decode the HEVC depth auxiliary item.
+/// Uses heic's `decode_depth()` to decode the HEVC depth auxiliary item.
 #[cfg(feature = "heic-decode")]
 fn extract_heic_depth(data: &[u8]) -> Option<crate::depthmap::DecodedDepthMap> {
     use crate::depthmap::*;
 
-    let config = heic_decoder::DecoderConfig::new();
+    let config = heic::DecoderConfig::new();
     let depth_map = config.decode_depth(data).ok()?;
 
-    // Convert heic-decoder's DepthRepresentationInfo to our DepthFormat
+    // Convert heic's DepthRepresentationInfo to our DepthFormat
     let (format, units) = match depth_map.depth_info.representation_type {
-        heic_decoder::DepthRepresentationType::UniformInverseZ => {
+        heic::DepthRepresentationType::UniformInverseZ => {
             (DepthFormat::RangeInverse, DepthUnits::Meters)
         }
-        heic_decoder::DepthRepresentationType::UniformDisparity => {
+        heic::DepthRepresentationType::UniformDisparity => {
             (DepthFormat::Disparity, DepthUnits::Diopters)
         }
-        heic_decoder::DepthRepresentationType::UniformZ => {
+        heic::DepthRepresentationType::UniformZ => {
             (DepthFormat::RangeLinear, DepthUnits::Meters)
         }
-        heic_decoder::DepthRepresentationType::NonuniformDisparity => {
+        heic::DepthRepresentationType::NonuniformDisparity => {
             (DepthFormat::Disparity, DepthUnits::Diopters)
         }
         _ => (DepthFormat::AbsoluteDepth, DepthUnits::Meters),

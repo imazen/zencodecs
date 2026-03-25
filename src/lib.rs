@@ -202,7 +202,7 @@ pub use zenjxl::{JxlDecodeJob, JxlDecoderConfig};
 pub use zenjxl::{JxlEncodeJob, JxlEncoderConfig};
 
 #[cfg(feature = "heic-decode")]
-pub use heic_decoder::{HeicDecodeJob, HeicDecoderConfig};
+pub use heic::{HeicDecodeJob, HeicDecoderConfig};
 
 #[cfg(feature = "bitmaps")]
 pub use zenbitmaps::{
