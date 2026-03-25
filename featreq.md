@@ -5,7 +5,7 @@ webp/, gif/, avif/) plus ~1,600 lines of registry/policy/auto-selection infrastr
 Most of this could be eliminated if zencodecs exposed the streaming capabilities that
 already exist in the underlying zencodec trait crate.
 
-## 1. Streaming Decode API
+## 1. Streaming Decode API [DONE]
 
 **Priority: High**
 
@@ -27,7 +27,7 @@ while let Some((y, pixels)) = decoder.next_batch()? {
 Also useful: `registry.streaming_available(format)` to query whether a given format
 supports streaming decode (vs. full-frame fallback).
 
-## 2. Codec Policy / Killbits
+## 2. Codec Policy / Killbits [DONE]
 
 **Priority: Medium**
 
@@ -41,7 +41,7 @@ Needed:
 - Allowlist: "only use pure-Rust codecs for this request"
 - Priority bonuses: "prefer WebP over JPEG when both are viable"
 
-## 3. Fallback Chains
+## 3. Fallback Chains [PARTIAL]
 
 **Priority: Medium**
 
@@ -52,7 +52,7 @@ lower-priority decoder for the same format. zencodecs would need:
 - Automatic fallback on decode error (configurable: on/off per request)
 - Error reporting: which decoders were tried, which failed, why
 
-## 4. Format Auto-Selection for Encode
+## 4. Format Auto-Selection for Encode [DONE]
 
 **Priority: Medium**
 
@@ -68,7 +68,7 @@ logic. This chooses the best output format based on:
 If zencodecs provided a `format_auto_select()` with these inputs, zenimage could
 drop its copy.
 
-## 5. Streaming Encode API
+## 5. Streaming Encode API [DONE]
 
 **Priority: Low (future)**
 
@@ -86,7 +86,7 @@ for strip in strips {
 let output = encoder.finish()?;
 ```
 
-## 6. Metadata Extraction at Probe Time
+## 6. Metadata Extraction at Probe Time [DONE]
 
 **Priority: Low**
 
