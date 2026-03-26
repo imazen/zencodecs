@@ -242,8 +242,40 @@ fn probe_codec(data: &[u8], format: ImageFormat) -> Result<ImageInfo> {
 
         _ => return Err(at!(CodecError::UnsupportedFormat(format))),
     };
+    // For formats that conventionally assume sRGB when no color metadata is
+    // present (JPEG, PNG, WebP, GIF), set implicit CICP so downstream
+    // encoders always have a color space signal.
+    finalize_implicit_srgb(&mut info);
     finalize_gain_map_presence(&mut info);
     Ok(info)
+}
+
+/// Set `source_color.cicp = Cicp::SRGB` when no ICC profile or CICP is present
+/// and the format's convention is to assume sRGB.
+///
+/// Formats like AVIF, JXL, and HEIC always carry explicit CICP or ICC, so
+/// this only applies to legacy formats (JPEG, PNG, WebP, GIF, BMP, PNM, Farbfeld).
+fn finalize_implicit_srgb(info: &mut ImageInfo) {
+    // Skip if any color metadata is already present.
+    if info.source_color.cicp.is_some() || info.source_color.icc_profile.is_some() {
+        return;
+    }
+
+    // Only apply to formats where sRGB is the conventional default.
+    match info.format {
+        ImageFormat::Jpeg
+        | ImageFormat::Png
+        | ImageFormat::WebP
+        | ImageFormat::Gif
+        | ImageFormat::Bmp
+        | ImageFormat::Pnm
+        | ImageFormat::Farbfeld => {
+            info.source_color.cicp = Some(zenpixels::Cicp::SRGB);
+        }
+        // AVIF, JXL, HEIC, TIFF, RAW: don't assume — these formats carry
+        // explicit color metadata, and assuming sRGB would be wrong for HDR.
+        _ => {}
+    }
 }
 
 #[cfg(test)]
