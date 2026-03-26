@@ -332,11 +332,11 @@ pub(crate) fn dyn_streaming_decoder(
         #[cfg(not(feature = "heic-decode"))]
         ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
 
-        // JPEG/PNG: use job_static(self) which consumes the config, producing
-        // Job<'static>. Combined with Cow::Owned data, the streaming decoder is 'static.
+        // JPEG/PNG: job(self) consumes the config, producing a 'static Job.
+        // Combined with Cow::Owned data, the streaming decoder is 'static.
         #[cfg(feature = "jpeg")]
         ImageFormat::Jpeg => {
-            let mut job = build_jpeg_decoder(params.codec_config).job_static();
+            let mut job = build_jpeg_decoder(params.codec_config).job();
             if let Some(lim) = params.limits {
                 job = job.with_limits(to_resource_limits(lim));
             }
@@ -356,7 +356,7 @@ pub(crate) fn dyn_streaming_decoder(
 
         #[cfg(feature = "png")]
         ImageFormat::Png => {
-            let mut job = zenpng::PngDecoderConfig::new().job_static();
+            let mut job = zenpng::PngDecoderConfig::new().job();
             if let Some(lim) = params.limits {
                 job = job.with_limits(to_resource_limits(lim));
             }
