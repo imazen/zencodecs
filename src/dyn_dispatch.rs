@@ -245,6 +245,100 @@ pub(crate) fn dyn_animation_frame_decoder(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Streaming decode — 'static (data copied to owned)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Wrap a concrete `StreamingDecode` into a boxed `DynStreamingDecoder`.
+///
+/// Local shim — zencodec's `StreamingDecoderShim` is `pub(super)`, so we
+/// implement the trait directly for a newtype wrapper.
+struct OwnedStreamingDecoderShim<S>(S);
+
+impl<S: zencodec::decode::StreamingDecode + Send> zencodec::decode::DynStreamingDecoder
+    for OwnedStreamingDecoderShim<S>
+{
+    fn next_batch(
+        &mut self,
+    ) -> core::result::Result<Option<(u32, zenpixels::PixelSlice<'_>)>, zencodec::decode::BoxedError>
+    {
+        self.0
+            .next_batch()
+            .map_err(|e| Box::new(e) as zencodec::decode::BoxedError)
+    }
+
+    fn info(&self) -> &zencodec::ImageInfo {
+        self.0.info()
+    }
+}
+
+/// Build a streaming decoder that yields scanline batches (pull model).
+///
+/// The input data is copied into owned storage so the returned decoder is
+/// `'static` and can outlive the `DecodeRequest`.
+///
+/// Not all codecs support streaming decode with owned data. Codecs that
+/// require borrowed data (JPEG, PNG) or don't support row-level decode at
+/// all (WebP, TIFF, bitmaps) will return an error. Currently GIF, AVIF,
+/// and HEIC support this path.
+pub(crate) fn dyn_streaming_decoder(
+    format: ImageFormat,
+    params: &DecodeParams<'_>,
+) -> Result<Box<dyn zencodec::decode::DynStreamingDecoder + 'static>> {
+    use zencodec::decode::{DecodeJob as _, DecoderConfig as _};
+
+    macro_rules! stream_dec {
+        ($config:expr) => {{
+            let config = $config;
+            let mut job = config.job();
+            if let Some(lim) = params.limits {
+                job = job.with_limits(to_resource_limits(lim));
+            }
+            if let Some(ref s) = params.stop {
+                job = job.with_stop(s.clone());
+            }
+            if let Some(dp) = params.decode_policy {
+                job = job.with_policy(dp);
+            }
+            let dec = job
+                .streaming_decoder(Cow::Owned(params.data.to_vec()), params.preferred)
+                .map_err(|e| at!(CodecError::from_codec(format, e)))?;
+            Ok(Box::new(OwnedStreamingDecoderShim(dec)))
+        }};
+    }
+
+    match format {
+        // Codecs with 'static streaming decoders (owned data supported):
+        #[cfg(feature = "gif")]
+        ImageFormat::Gif => stream_dec!(zengif::GifDecoderConfig::new()),
+        #[cfg(not(feature = "gif"))]
+        ImageFormat::Gif => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "avif-decode")]
+        ImageFormat::Avif => stream_dec!(build_avif_decoder(params.codec_config)),
+        #[cfg(not(feature = "avif-decode"))]
+        ImageFormat::Avif => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "heic-decode")]
+        ImageFormat::Heic => stream_dec!(heic::HeicDecoderConfig::new()),
+        #[cfg(not(feature = "heic-decode"))]
+        ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        // Codecs whose streaming decoders borrow input data (can't be 'static).
+        // JPEG and PNG streaming decoders require Cow::Borrowed; use push_decode() instead.
+        ImageFormat::Jpeg | ImageFormat::Png => Err(at!(CodecError::UnsupportedOperation {
+            format,
+            detail: "streaming decode with owned data not supported; use push_decode()",
+        })),
+
+        // Codecs that don't support row-level streaming decode at all.
+        _ => Err(at!(CodecError::UnsupportedOperation {
+            format,
+            detail: "streaming decode not supported for this format; use push_decode()",
+        })),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Per-codec config builders
 // ═══════════════════════════════════════════════════════════════════════════
 

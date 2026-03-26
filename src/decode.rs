@@ -344,6 +344,51 @@ impl<'a> DecodeRequest<'a> {
         crate::dyn_dispatch::dyn_push_decode(format, &self.decode_params(), sink)
     }
 
+    /// Build a streaming decoder that yields scanline batches (pull model).
+    ///
+    /// Returns a `Box<dyn DynStreamingDecoder>` that the caller drives by
+    /// calling [`next_batch()`](zencodec::decode::DynStreamingDecoder::next_batch)
+    /// until it returns `None`.
+    ///
+    /// The input data is copied into owned storage, so the returned decoder
+    /// is `'static` and can be moved into pipeline stages or across thread
+    /// boundaries.
+    ///
+    /// # Codec support
+    ///
+    /// Not all codecs support this path. Codecs whose streaming decoders
+    /// require borrowed data (JPEG, PNG) return an error — use
+    /// [`push_decode()`](Self::push_decode) for those formats instead. Codecs
+    /// that don't support row-level decode at all (WebP, TIFF, bitmaps) also
+    /// return an error.
+    ///
+    /// Currently supported: GIF, AVIF, HEIC.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use zencodecs::DecodeRequest;
+    ///
+    /// let data: &[u8] = &[]; // GIF bytes
+    /// let mut decoder = DecodeRequest::new(data)
+    ///     .with_format(zencodecs::ImageFormat::Gif)
+    ///     .build_streaming_decoder()?;
+    /// while let Some((y, strip)) = decoder.next_batch()
+    ///     .map_err(|e| zencodecs::CodecError::Codec {
+    ///         format: zencodecs::ImageFormat::Gif,
+    ///         source: e,
+    ///     })? {
+    ///     // process strip starting at row y
+    /// }
+    /// # Ok::<(), whereat::At<zencodecs::CodecError>>(())
+    /// ```
+    pub fn build_streaming_decoder(
+        self,
+    ) -> Result<alloc::boxed::Box<dyn zencodec::decode::DynStreamingDecoder + 'static>> {
+        let format = self.resolve_format()?;
+        crate::dyn_dispatch::dyn_streaming_decoder(format, &self.decode_params())
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // Animation decode
     // ═══════════════════════════════════════════════════════════════════
