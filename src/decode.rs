@@ -30,6 +30,9 @@ pub struct DecodeRequest<'a> {
     codec_config: Option<&'a CodecConfig>,
     policy: Option<CodecPolicy>,
     decode_policy: Option<DecodePolicy>,
+    /// When true, codecs that support gain maps will extract and attach
+    /// gain map data to the `DecodeOutput` extras. Default: false.
+    extract_gain_map: bool,
 }
 
 impl<'a> DecodeRequest<'a> {
@@ -47,6 +50,7 @@ impl<'a> DecodeRequest<'a> {
             codec_config: None,
             policy: None,
             decode_policy: None,
+            extract_gain_map: false,
         }
     }
 
@@ -108,6 +112,22 @@ impl<'a> DecodeRequest<'a> {
     /// ```
     pub fn with_decode_policy(mut self, policy: DecodePolicy) -> Self {
         self.decode_policy = Some(policy);
+        self
+    }
+
+    /// Request gain map extraction during decode.
+    ///
+    /// When `true`, codecs that support gain maps (AVIF, JXL, HEIC) will
+    /// extract and attach gain map data to the [`DecodeOutput`] extras.
+    /// The JPEG UltraHDR path is unaffected — it extracts gain maps from
+    /// MPF secondary images in a post-decode step.
+    ///
+    /// Default: `false`. Gain map extraction is opt-in because it requires
+    /// additional parsing and memory allocation for data most callers don't need.
+    ///
+    /// [`decode_gain_map()`](Self::decode_gain_map) sets this automatically.
+    pub fn with_gain_map_extraction(mut self, extract: bool) -> Self {
+        self.extract_gain_map = extract;
         self
     }
 
@@ -181,9 +201,13 @@ impl<'a> DecodeRequest<'a> {
     /// # Ok::<(), whereat::At<zencodecs::CodecError>>(())
     /// ```
     #[cfg(feature = "jpeg-ultrahdr")]
-    pub fn decode_gain_map(self) -> Result<(DecodeOutput, Option<crate::gainmap::DecodedGainMap>)> {
+    pub fn decode_gain_map(
+        mut self,
+    ) -> Result<(DecodeOutput, Option<crate::gainmap::DecodedGainMap>)> {
         let format = self.resolve_format()?;
         let data = self.data; // Save reference before consuming self
+        // Enable gain map extraction so codecs attach gain map data to extras.
+        self.extract_gain_map = true;
         let output = self.decode_format(format)?;
 
         let gainmap = match format {
@@ -376,6 +400,7 @@ impl<'a> DecodeRequest<'a> {
             stop: self.stop.clone(),
             preferred: &[],
             decode_policy: self.decode_policy,
+            extract_gain_map: self.extract_gain_map,
         }
     }
 
@@ -422,17 +447,30 @@ impl<'a> DecodeRequest<'a> {
                 self.limits,
                 self.stop,
                 dp,
+                self.extract_gain_map,
             ),
             #[cfg(not(feature = "avif-decode"))]
             ImageFormat::Avif => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "jxl-decode")]
-            ImageFormat::Jxl => crate::codecs::jxl_dec::decode(self.data, self.limits, self.stop, dp),
+            ImageFormat::Jxl => crate::codecs::jxl_dec::decode(
+                self.data,
+                self.limits,
+                self.stop,
+                dp,
+                self.extract_gain_map,
+            ),
             #[cfg(not(feature = "jxl-decode"))]
             ImageFormat::Jxl => Err(at!(CodecError::UnsupportedFormat(format))),
 
             #[cfg(feature = "heic-decode")]
-            ImageFormat::Heic => crate::codecs::heic::decode(self.data, self.limits, self.stop, dp),
+            ImageFormat::Heic => crate::codecs::heic::decode(
+                self.data,
+                self.limits,
+                self.stop,
+                dp,
+                self.extract_gain_map,
+            ),
             #[cfg(not(feature = "heic-decode"))]
             ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
 
@@ -776,9 +814,7 @@ fn extract_heic_depth(data: &[u8]) -> Option<crate::depthmap::DecodedDepthMap> {
         heic::DepthRepresentationType::UniformDisparity => {
             (DepthFormat::Disparity, DepthUnits::Diopters)
         }
-        heic::DepthRepresentationType::UniformZ => {
-            (DepthFormat::RangeLinear, DepthUnits::Meters)
-        }
+        heic::DepthRepresentationType::UniformZ => (DepthFormat::RangeLinear, DepthUnits::Meters),
         heic::DepthRepresentationType::NonuniformDisparity => {
             (DepthFormat::Disparity, DepthUnits::Diopters)
         }

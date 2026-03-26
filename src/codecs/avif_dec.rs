@@ -25,6 +25,7 @@ pub(crate) fn decode(
     limits: Option<&Limits>,
     stop: Option<StopToken>,
     decode_policy: Option<zencodec::decode::DecodePolicy>,
+    extract_gain_map: bool,
 ) -> Result<DecodeOutput> {
     let mut dec = zenavif::AvifDecoderConfig::new();
     // Apply codec config if provided
@@ -36,6 +37,9 @@ pub(crate) fn decode(
         dec = dec.with_limits(to_resource_limits(lim));
     }
     let mut job = dec.job();
+    if extract_gain_map {
+        job = job.with_extract_gain_map(true);
+    }
     if let Some(s) = stop {
         job = job.with_stop(s);
     }

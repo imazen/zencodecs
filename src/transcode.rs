@@ -178,9 +178,17 @@ pub fn transcode(
     opts: &TranscodeOptions,
     registry: &AllowedFormats,
 ) -> Result<TranscodeOutput> {
+    // Determine whether we need gain map data from the decode side.
+    let wants_gain_map = match opts.supplements {
+        SupplementPolicy::Preserve => true,
+        SupplementPolicy::Only(set) => set.contains(SupplementSet::GAIN_MAP),
+        SupplementPolicy::Strip => false,
+    };
+
     // Step 1: Decode the source image (full materialization for now)
     let decoded = crate::DecodeRequest::new(data)
         .with_registry(registry)
+        .with_gain_map_extraction(wants_gain_map)
         .decode_full_frame()?;
 
     // Step 2: Determine metadata to embed

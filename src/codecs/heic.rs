@@ -24,8 +24,12 @@ pub(crate) fn decode(
     limits: Option<&Limits>,
     stop: Option<StopToken>,
     decode_policy: Option<zencodec::decode::DecodePolicy>,
+    extract_gain_map: bool,
 ) -> Result<DecodeOutput> {
-    let dec = heic::HeicDecoderConfig::new();
+    let mut dec = heic::HeicDecoderConfig::new();
+    if extract_gain_map {
+        dec = dec.with_extract_gain_map(true);
+    }
     let mut job = dec.job();
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));

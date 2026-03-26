@@ -24,9 +24,13 @@ pub(crate) fn decode(
     limits: Option<&Limits>,
     stop: Option<StopToken>,
     decode_policy: Option<zencodec::decode::DecodePolicy>,
+    extract_gain_map: bool,
 ) -> Result<DecodeOutput> {
     let dec = zenjxl::JxlDecoderConfig::new();
     let mut job = dec.job();
+    if extract_gain_map {
+        job = job.with_extract_gain_map(true);
+    }
     if let Some(lim) = limits {
         job = job.with_limits(to_resource_limits(lim));
     }

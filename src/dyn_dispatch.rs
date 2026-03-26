@@ -43,6 +43,9 @@ pub(crate) struct DecodeParams<'a> {
     pub stop: Option<StopToken>,
     pub preferred: &'a [zenpixels::PixelDescriptor],
     pub decode_policy: Option<zencodec::decode::DecodePolicy>,
+    /// When true, codecs that support gain maps will extract and attach
+    /// gain map data to the `DecodeOutput` extras.
+    pub extract_gain_map: bool,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
