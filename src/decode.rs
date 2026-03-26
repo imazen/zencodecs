@@ -713,7 +713,8 @@ fn extract_jpeg_depth(
     let depth_data = extras.extract_depth_map(Some(file_data))?;
 
     // Decode the depth image bytes (JPEG or PNG) to get grayscale pixels
-    let depth_output = crate::codecs::jpeg::decode(&depth_data.data, None, None, None, None).ok()?;
+    let depth_output =
+        crate::codecs::jpeg::decode(&depth_data.data, None, None, None, None).ok()?;
     use zenpixels_convert::PixelBufferConvertTypedExt as _;
     let gray = depth_output.into_buffer().to_gray8();
     let gray_ref = gray.as_imgref();
