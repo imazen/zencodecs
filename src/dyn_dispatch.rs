@@ -43,9 +43,6 @@ pub(crate) struct DecodeParams<'a> {
     pub stop: Option<StopToken>,
     pub preferred: &'a [zenpixels::PixelDescriptor],
     pub decode_policy: Option<zencodec::decode::DecodePolicy>,
-    /// When true, codecs that support gain maps will extract and attach
-    /// gain map data to the `DecodeOutput` extras.
-    pub extract_gain_map: bool,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -324,11 +321,17 @@ pub(crate) fn dyn_streaming_decoder(
         ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
 
         // Codecs whose streaming decoders borrow input data (can't be 'static).
-        // JPEG and PNG streaming decoders require Cow::Borrowed; use push_decode() instead.
-        ImageFormat::Jpeg | ImageFormat::Png => Err(at!(CodecError::UnsupportedOperation {
-            format,
-            detail: "streaming decode with owned data not supported; use push_decode()",
-        })),
+        // JPEG: ScanlineReader accepts Cow::Owned, config is owned by job.
+        #[cfg(feature = "jpeg")]
+        ImageFormat::Jpeg => stream_dec!(build_jpeg_decoder(params.codec_config)),
+        #[cfg(not(feature = "jpeg"))]
+        ImageFormat::Jpeg => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        // PNG: RowDecoder accepts Cow::Owned, config is owned by job.
+        #[cfg(feature = "png")]
+        ImageFormat::Png => stream_dec!(build_png_decoder()),
+        #[cfg(not(feature = "png"))]
+        ImageFormat::Png => Err(at!(CodecError::UnsupportedFormat(format))),
 
         // Codecs that don't support row-level streaming decode at all.
         _ => Err(at!(CodecError::UnsupportedOperation {

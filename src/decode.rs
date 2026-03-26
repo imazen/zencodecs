@@ -445,7 +445,6 @@ impl<'a> DecodeRequest<'a> {
             stop: self.stop.clone(),
             preferred: &[],
             decode_policy: self.decode_policy,
-            extract_gain_map: self.extract_gain_map,
         }
     }
 

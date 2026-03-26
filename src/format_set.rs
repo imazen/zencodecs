@@ -92,11 +92,6 @@ impl FormatSet {
         }
     }
 
-    /// Create from raw bits (for const contexts).
-    pub(crate) const fn from_bits(bits: u16) -> Self {
-        Self(bits)
-    }
-
     /// Insert a format.
     pub fn insert(&mut self, format: ImageFormat) {
         if let Some(b) = Self::bit(format) {
