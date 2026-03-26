@@ -47,28 +47,28 @@ pub use zencodec::gainmap::{GainMapChannel, GainMapParams, GainMapPresence};
 /// Both types now use the same domain, so this is a trivial field copy.
 #[cfg(feature = "jpeg-ultrahdr")]
 pub fn params_to_metadata(p: &GainMapParams) -> GainMapMetadata {
-    GainMapMetadata {
-        gain_map_min: [p.channels[0].min, p.channels[1].min, p.channels[2].min],
-        gain_map_max: [p.channels[0].max, p.channels[1].max, p.channels[2].max],
-        gamma: [
-            p.channels[0].gamma,
-            p.channels[1].gamma,
-            p.channels[2].gamma,
-        ],
-        base_offset: [
-            p.channels[0].base_offset,
-            p.channels[1].base_offset,
-            p.channels[2].base_offset,
-        ],
-        alternate_offset: [
-            p.channels[0].alternate_offset,
-            p.channels[1].alternate_offset,
-            p.channels[2].alternate_offset,
-        ],
-        base_hdr_headroom: p.base_hdr_headroom,
-        alternate_hdr_headroom: p.alternate_hdr_headroom,
-        use_base_color_space: p.use_base_color_space,
-    }
+    let mut m = GainMapMetadata::new();
+    m.gain_map_min = [p.channels[0].min, p.channels[1].min, p.channels[2].min];
+    m.gain_map_max = [p.channels[0].max, p.channels[1].max, p.channels[2].max];
+    m.gamma = [
+        p.channels[0].gamma,
+        p.channels[1].gamma,
+        p.channels[2].gamma,
+    ];
+    m.base_offset = [
+        p.channels[0].base_offset,
+        p.channels[1].base_offset,
+        p.channels[2].base_offset,
+    ];
+    m.alternate_offset = [
+        p.channels[0].alternate_offset,
+        p.channels[1].alternate_offset,
+        p.channels[2].alternate_offset,
+    ];
+    m.base_hdr_headroom = p.base_hdr_headroom;
+    m.alternate_hdr_headroom = p.alternate_hdr_headroom;
+    m.use_base_color_space = p.use_base_color_space;
+    m
 }
 
 /// Convert [`GainMapMetadata`] (log2/f64 domain) → [`GainMapParams`] (log2/f64 domain).

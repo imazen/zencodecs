@@ -123,7 +123,7 @@ pub(crate) fn extract_gainmap(data: &[u8]) -> Option<crate::gainmap::DecodedGain
     let gm_info = zenraw::apple::extract_gain_map(data)?;
 
     // Decode the gain map JPEG to pixels using zencodecs' own JPEG decoder.
-    let gm_output = crate::codecs::jpeg::decode(&gm_info.jpeg_data, None, None, None).ok()?;
+    let gm_output = crate::codecs::jpeg::decode(&gm_info.jpeg_data, None, None, None, None).ok()?;
     use zenpixels_convert::PixelBufferConvertTypedExt as _;
     let gm_rgb8 = gm_output.into_buffer().to_rgb8();
     let gm_ref = gm_rgb8.as_imgref();
@@ -168,30 +168,26 @@ pub(crate) fn extract_gainmap(data: &[u8]) -> Option<crate::gainmap::DecodedGain
             .or(gm_info.gain_map_max)
             .unwrap_or(1.0);
 
-        GainMapMetadata {
-            gain_map_max: [gain_max; 3],
-            gain_map_min: [gain_min; 3],
-            gamma: [gamma; 3],
-            base_offset: [offset_sdr; 3],
-            alternate_offset: [offset_hdr; 3],
-            base_hdr_headroom: base_headroom,
-            alternate_hdr_headroom: alt_headroom,
-            use_base_color_space: true,
-            ..GainMapMetadata::default()
+        {
+            let mut m = GainMapMetadata::new();
+            m.gain_map_max = [gain_max; 3];
+            m.gain_map_min = [gain_min; 3];
+            m.gamma = [gamma; 3];
+            m.base_offset = [offset_sdr; 3];
+            m.alternate_offset = [offset_hdr; 3];
+            m.base_hdr_headroom = base_headroom;
+            m.alternate_hdr_headroom = alt_headroom;
+            m.use_base_color_space = true;
+            m
         }
     } else if let Some(headroom) = gm_info.headroom {
         // Apple HDRGainMap style — synthesize ISO 21496-1 metadata from headroom.
         // headroom is max brightness in stops (log2 domain), e.g., 2.89 = ~7.4x boost.
-        GainMapMetadata {
-            gain_map_max: [headroom; 3],
-            gain_map_min: [0.0; 3],
-            gamma: [1.0; 3],
-            base_offset: [1.0 / 64.0; 3],
-            alternate_offset: [1.0 / 64.0; 3],
-            base_hdr_headroom: 0.0,
-            alternate_hdr_headroom: headroom,
-            use_base_color_space: true,
-            ..GainMapMetadata::default()
+        {
+            let mut m = GainMapMetadata::new();
+            m.gain_map_max = [headroom; 3];
+            m.alternate_hdr_headroom = headroom;
+            m
         }
     } else {
         // No metadata at all — use defaults.

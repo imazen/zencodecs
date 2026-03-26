@@ -7,6 +7,7 @@
 use crate::config::CodecConfig;
 use crate::dispatch::EncodeParams;
 use crate::error::Result;
+use crate::pixel::{ImgRef, Rgb, Rgba};
 use crate::policy::CodecPolicy;
 use crate::quality::{QualityIntent, QualityProfile};
 use crate::select::ImageFacts;
@@ -279,7 +280,7 @@ impl<'a> EncodeRequest<'a> {
             img,
             self.quality,
             self.gainmap_quality,
-            self.metadata,
+            self.metadata.as_ref(),
             self.codec_config,
             self.limits,
             self.stop,
@@ -304,7 +305,7 @@ impl<'a> EncodeRequest<'a> {
             img,
             self.quality,
             self.gainmap_quality,
-            self.metadata,
+            self.metadata.as_ref(),
             self.codec_config,
             self.limits,
             self.stop,
