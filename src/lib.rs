@@ -143,6 +143,7 @@ pub use zencodec::Metadata;
 pub use zencodec::StopToken;
 
 // Gain map types (format-agnostic)
+pub use gainmap::decode_gain_map_source;
 #[cfg(feature = "jpeg-ultrahdr")]
 pub use gainmap::{DecodedGainMap, GainMap, GainMapMetadata, GainMapSource};
 pub use zencodec::gainmap::{GainMapDirection, GainMapInfo, GainMapParams, GainMapPresence};

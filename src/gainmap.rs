@@ -28,7 +28,6 @@
 //! streaming-capable reconstruction — far better than reimplementing the math
 //! in this crate.
 
-#[cfg(feature = "jpeg-ultrahdr")]
 use crate::ImageFormat;
 
 // Re-export the ISO 21496-1 metadata type from ultrahdr-core (via zenjpeg).
@@ -169,6 +168,116 @@ impl DecodedGainMap {
             self.gain_map.channels,
         )
     }
+}
+
+// =========================================================================
+// Unified gain map source decode
+// =========================================================================
+
+/// Decode a gain map from its raw encoded source.
+///
+/// Handles format-specific decode internally:
+/// - **JPEG**: Complete JPEG file (MPF secondary image) — decoded via [`DecodeRequest`].
+/// - **JXL**: Bare JXL codestream — decoded via [`DecodeRequest`] (zenjxl handles bare codestreams).
+/// - **AVIF**: Raw AV1 OBUs (not a valid AVIF container) — decoded via `zenavif::decode_av1_obu`.
+///
+/// Enforces a recursion limit: `depth >= 1` is rejected to prevent gain maps
+/// that themselves contain gain maps from causing unbounded recursion.
+///
+/// # Errors
+///
+/// Returns [`CodecError::InvalidInput`] if the recursion depth is exceeded.
+/// Returns [`CodecError::UnsupportedFormat`] if the gain map format is not
+/// compiled in or not supported for direct decode.
+/// Format-specific codec errors are wrapped in [`CodecError::Codec`].
+///
+/// [`DecodeRequest`]: crate::DecodeRequest
+pub fn decode_gain_map_source(
+    source: &zencodec::gainmap::GainMapSource,
+    limits: Option<&crate::Limits>,
+    stop: Option<crate::StopToken>,
+    registry: &crate::AllowedFormats,
+) -> crate::error::Result<zencodec::gainmap::DecodedGainMap> {
+    use alloc::string::ToString as _;
+    use whereat::at;
+
+    if source.depth >= 1 {
+        return Err(at!(crate::CodecError::InvalidInput(
+            "gain map recursion depth exceeded".to_string()
+        )));
+    }
+
+    match source.format {
+        // AVIF gain maps are raw AV1 OBUs, not a valid AVIF container.
+        // DecodeRequest with format=Avif would try to parse an AVIF container
+        // and fail, so we use the direct AV1 OBU decoder instead.
+        #[cfg(feature = "avif-decode")]
+        ImageFormat::Avif => decode_gain_map_av1_obu(source),
+
+        #[cfg(not(feature = "avif-decode"))]
+        ImageFormat::Avif => Err(at!(crate::CodecError::UnsupportedFormat(ImageFormat::Avif))),
+
+        // JXL bare codestreams and JPEG complete files both work through
+        // the standard DecodeRequest path.
+        format => {
+            let mut request = crate::DecodeRequest::new(&source.data)
+                .with_format(format)
+                .with_registry(registry);
+
+            if let Some(lim) = limits {
+                request = request.with_limits(lim);
+            }
+            if let Some(st) = stop {
+                request = request.with_stop(st);
+            }
+
+            let output = request.decode_full_frame()?;
+
+            Ok(zencodec::gainmap::DecodedGainMap::new(
+                output.into_buffer(),
+                source.metadata.clone(),
+            ))
+        }
+    }
+}
+
+/// Decode raw AV1 OBUs into a gain map pixel buffer.
+///
+/// AVIF gain maps store raw AV1 OBUs rather than a complete AVIF container,
+/// so we use `zenavif::decode_av1_obu` directly instead of the standard
+/// decode pipeline.
+#[cfg(feature = "avif-decode")]
+fn decode_gain_map_av1_obu(
+    source: &zencodec::gainmap::GainMapSource,
+) -> crate::error::Result<zencodec::gainmap::DecodedGainMap> {
+    use whereat::at;
+
+    let (pixel_data, width, height, channels) = zenavif::decode_av1_obu(&source.data)
+        .map_err(|e| at!(crate::CodecError::from_codec(ImageFormat::Avif, e)))?;
+
+    // Build a PixelBuffer from the raw decoded bytes.
+    let descriptor = match channels {
+        1 => zenpixels::PixelDescriptor::GRAY8,
+        3 => zenpixels::PixelDescriptor::RGB8_SRGB,
+        4 => zenpixels::PixelDescriptor::RGBA8_SRGB,
+        _ => {
+            return Err(at!(crate::CodecError::InvalidInput(alloc::format!(
+                "unexpected AV1 gain map channel count: {channels}"
+            ))));
+        }
+    };
+
+    let buffer =
+        zenpixels::PixelBuffer::from_vec(pixel_data, width, height, descriptor).map_err(|_| {
+            at!(crate::CodecError::InvalidInput(
+                "failed to create PixelBuffer from AV1 gain map decode".into()
+            ))
+        })?;
+
+    Ok(zencodec::gainmap::DecodedGainMap::new(
+        buffer,
+        source.metadata.clone(),
+    ))
 }
 
 #[cfg(test)]
