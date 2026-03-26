@@ -198,7 +198,7 @@ zencodecs/
 - All 8 APIs zenpipe needs are confirmed present and tested
 
 ### What's NOT implemented yet
-- Pull-based streaming decode (DynStreamingDecoder + 'a lifetime blocked by GAT config borrow — use push_decode instead)
+- Pull-based streaming decode for JPEG/PNG (their StreamDec borrows input data so can't be 'static; use push_decode instead). GIF/AVIF/HEIC streaming decode works via build_streaming_decoder().
 - Color management (moxcms)
 - Fallback chains (structural pieces ready, needs multi-decoder-per-format registry)
 - Registry v2 entries with factories (deferred — current match-based dispatch works)
