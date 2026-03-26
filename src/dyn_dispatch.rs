@@ -43,6 +43,9 @@ pub(crate) struct DecodeParams<'a> {
     pub stop: Option<StopToken>,
     pub preferred: &'a [zenpixels::PixelDescriptor],
     pub decode_policy: Option<zencodec::decode::DecodePolicy>,
+    /// When true, codecs that support gain maps will extract and attach
+    /// gain map data to the `DecodeOutput` extras.
+    pub extract_gain_map: bool,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -145,6 +148,9 @@ pub(crate) fn dyn_push_decode(
             if let Some(dp) = params.decode_policy {
                 job = job.with_policy(dp);
             }
+            if params.extract_gain_map {
+                job = job.with_extract_gain_map(true);
+            }
             job.push_decoder(Cow::Borrowed(params.data), sink, params.preferred)
                 .map_err(|e| at!(CodecError::from_codec(format, e)))
         }};
@@ -236,6 +242,9 @@ pub(crate) fn dyn_animation_frame_decoder(
     if let Some(dp) = params.decode_policy {
         job.set_policy(dp);
     }
+    if params.extract_gain_map {
+        job.set_extract_gain_map(true);
+    }
     let data = Cow::Owned(params.data.to_vec());
     job.into_animation_frame_decoder(data, params.preferred)
         .map_err(|e| wrap_boxed(format, e))
@@ -296,6 +305,9 @@ pub(crate) fn dyn_streaming_decoder(
             if let Some(dp) = params.decode_policy {
                 job = job.with_policy(dp);
             }
+            if params.extract_gain_map {
+                job = job.with_extract_gain_map(true);
+            }
             let dec = job
                 .streaming_decoder(Cow::Owned(params.data.to_vec()), params.preferred)
                 .map_err(|e| at!(CodecError::from_codec(format, e)))?;
@@ -320,16 +332,45 @@ pub(crate) fn dyn_streaming_decoder(
         #[cfg(not(feature = "heic-decode"))]
         ImageFormat::Heic => Err(at!(CodecError::UnsupportedFormat(format))),
 
-        // Codecs whose streaming decoders borrow input data (can't be 'static).
-        // JPEG: ScanlineReader accepts Cow::Owned, config is owned by job.
+        // JPEG/PNG: use job_static(self) which consumes the config, producing
+        // Job<'static>. Combined with Cow::Owned data, the streaming decoder is 'static.
         #[cfg(feature = "jpeg")]
-        ImageFormat::Jpeg => stream_dec!(build_jpeg_decoder(params.codec_config)),
+        ImageFormat::Jpeg => {
+            let mut job = build_jpeg_decoder(params.codec_config).job_static();
+            if let Some(lim) = params.limits {
+                job = job.with_limits(to_resource_limits(lim));
+            }
+            if let Some(ref s) = params.stop {
+                job = job.with_stop(s.clone());
+            }
+            if let Some(dp) = params.decode_policy {
+                job = job.with_policy(dp);
+            }
+            let dec = job
+                .streaming_decoder(Cow::Owned(params.data.to_vec()), params.preferred)
+                .map_err(|e| at!(CodecError::from_codec(format, e)))?;
+            Ok(Box::new(OwnedStreamingDecoderShim(dec)))
+        }
         #[cfg(not(feature = "jpeg"))]
         ImageFormat::Jpeg => Err(at!(CodecError::UnsupportedFormat(format))),
 
-        // PNG: RowDecoder accepts Cow::Owned, config is owned by job.
         #[cfg(feature = "png")]
-        ImageFormat::Png => stream_dec!(build_png_decoder()),
+        ImageFormat::Png => {
+            let mut job = zenpng::PngDecoderConfig::new().job_static();
+            if let Some(lim) = params.limits {
+                job = job.with_limits(to_resource_limits(lim));
+            }
+            if let Some(ref s) = params.stop {
+                job = job.with_stop(s.clone());
+            }
+            if let Some(dp) = params.decode_policy {
+                job = job.with_policy(dp);
+            }
+            let dec = job
+                .streaming_decoder(Cow::Owned(params.data.to_vec()), params.preferred)
+                .map_err(|e| at!(CodecError::from_codec(format, e)))?;
+            Ok(Box::new(OwnedStreamingDecoderShim(dec)))
+        }
         #[cfg(not(feature = "png"))]
         ImageFormat::Png => Err(at!(CodecError::UnsupportedFormat(format))),
 
