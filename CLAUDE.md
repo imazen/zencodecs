@@ -38,6 +38,7 @@ zencodecs/
 ├── src/
 │   ├── lib.rs            # Public API, re-exports
 │   ├── codec_id.rs       # CodecId — identifies specific codec implementations
+│   ├── color.rs          # ICC profile classification, sRGB detection (hash-based)
 │   ├── format_set.rs     # FormatSet — bitflag set of ImageFormat values
 │   ├── quality.rs        # QualityIntent, QualityProfile, calibration tables
 │   ├── policy.rs         # CodecPolicy — per-request killbits/allowlist/preferences
@@ -197,9 +198,20 @@ zencodecs/
 - **`StreamingEncoder`**: Contains `Box<dyn DynEncoder>` + supported pixel descriptors + format
 - All 8 APIs zenpipe needs are confirmed present and tested
 
+### ICC Profile Classification (2026-03-28)
+- **color.rs**: Hash-based sRGB ICC profile detection
+- **`icc_profile_is_srgb(bytes)`**: FNV-1a 64-bit hash lookup against 22 known sRGB profiles (~100ns)
+  - Covers: ICC official (sRGB2014, v4, v5), HP/Lino, Google Android, Facebook, lcms, Ghostscript/Artifex, Kodak, libjxl Compact-ICC
+  - Returns `false` for unrecognized profiles (conservative — no false positives)
+  - Hash table is sorted with compile-time ordering assertion, uses binary search
+- **`SourceColorExt` trait**: Extension trait on `SourceColor` (from zencodec)
+  - `is_srgb()`: Tiered detection — CICP check (exact) → ICC hash (fast) → no metadata assumes sRGB
+- Re-exports: `SourceColor`, `SourceColorExt`, `icc_profile_is_srgb` from crate root
+- 37 tests against real ICC profile files from skcms and Compact-ICC-Profiles
+
 ### What's NOT implemented yet
 - Pull-based streaming decode for JPEG/PNG (their StreamDec borrows input data so can't be 'static; use push_decode instead). GIF/AVIF/HEIC streaming decode works via build_streaming_decoder().
-- Color management (moxcms)
+- Color management transforms (moxcms) — sRGB detection is done, CMS transforms are not
 - Fallback chains (structural pieces ready, needs multi-decoder-per-format registry)
 - Registry v2 entries with factories (deferred — current match-based dispatch works)
 - Gain map encode embedding (with_gain_map builder exists but doesn't wire to actual encode yet)
