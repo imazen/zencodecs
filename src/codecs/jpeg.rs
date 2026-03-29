@@ -43,7 +43,7 @@ fn jpeg_info_to_image_info(info: &zenjpeg::decoder::JpegInfo) -> ImageInfo {
     }
     if let Some(ref exif) = info.exif {
         if let Some(orient) = zenjpeg::lossless::parse_exif_orientation(exif) {
-            ii = ii.with_orientation(zencodec::Orientation::from_exif(orient as u16));
+            ii = ii.with_orientation(zencodec::Orientation::from_exif(orient).unwrap_or_default());
         }
         ii = ii.with_exif(exif.clone());
     }

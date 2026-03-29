@@ -192,7 +192,7 @@ pub use zenpixels_convert::PixelBufferConvertTypedExt;
 pub use zenpng::{PngDecodeJob, PngDecoderConfig, PngEncodeJob, PngEncoderConfig};
 
 #[cfg(feature = "webp")]
-pub use zenwebp::{WebpDecodeJob, WebpDecoderConfig, WebpEncodeJob, WebpEncoderConfig};
+pub use zenwebp::zencodec::{WebpDecodeJob, WebpDecoderConfig, WebpEncodeJob, WebpEncoderConfig};
 
 #[cfg(feature = "gif")]
 pub use zengif::{GifDecodeJob, GifDecoderConfig, GifEncodeJob, GifEncoderConfig};

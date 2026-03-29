@@ -399,8 +399,8 @@ fn build_jpeg_decoder(codec_config: Option<&CodecConfig>) -> zenjpeg::JpegDecode
 fn build_webp_decoder(
     codec_config: Option<&CodecConfig>,
     limits: Option<&Limits>,
-) -> zenwebp::WebpDecoderConfig {
-    let mut config = zenwebp::WebpDecoderConfig::new();
+) -> zenwebp::zencodec::WebpDecoderConfig {
+    let mut config = zenwebp::zencodec::WebpDecoderConfig::new();
     if let Some(cfg) = codec_config.and_then(|c| c.webp_decoder.as_ref()) {
         *config.inner_mut() = cfg.as_ref().clone();
     }

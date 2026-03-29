@@ -13,7 +13,7 @@ use zencodec::decode::{Decode as _, DecodeJob as _, DecoderConfig as _};
 
 /// Probe WebP metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
-    zenwebp::WebpDecoderConfig::new()
+    zenwebp::zencodec::WebpDecoderConfig::new()
         .probe_header(data)
         .map_err(|e| at!(CodecError::from_codec(ImageFormat::WebP, e)))
 }
@@ -26,7 +26,7 @@ pub(crate) fn decode(
     stop: Option<StopToken>,
     decode_policy: Option<zencodec::decode::DecodePolicy>,
 ) -> Result<DecodeOutput> {
-    let mut dec = zenwebp::WebpDecoderConfig::new();
+    let mut dec = zenwebp::zencodec::WebpDecoderConfig::new();
     if let Some(cfg) = codec_config.and_then(|c| c.webp_decoder.as_ref()) {
         *dec.inner_mut() = cfg.as_ref().clone();
     }
@@ -60,28 +60,28 @@ pub(crate) fn build_encoding(
     effort: Option<u32>,
     lossless: bool,
     codec_config: Option<&CodecConfig>,
-) -> zenwebp::WebpEncoderConfig {
+) -> zenwebp::zencodec::WebpEncoderConfig {
     use zencodec::encode::EncoderConfig;
 
     if lossless {
         if let Some(cfg) = codec_config.and_then(|c| c.webp_lossless.as_ref()) {
-            let mut e = zenwebp::WebpEncoderConfig::lossless();
+            let mut e = zenwebp::zencodec::WebpEncoderConfig::lossless();
             *e.inner_mut() =
                 zenwebp::encoder::config::EncoderConfig::Lossless(cfg.as_ref().clone());
             e
         } else {
-            let mut e = zenwebp::WebpEncoderConfig::lossless();
+            let mut e = zenwebp::zencodec::WebpEncoderConfig::lossless();
             if let Some(effort) = effort {
                 e = e.with_generic_effort(effort as i32);
             }
             e
         }
     } else if let Some(cfg) = codec_config.and_then(|c| c.webp_lossy.as_ref()) {
-        let mut e = zenwebp::WebpEncoderConfig::lossy();
+        let mut e = zenwebp::zencodec::WebpEncoderConfig::lossy();
         *e.inner_mut() = zenwebp::encoder::config::EncoderConfig::Lossy(cfg.as_ref().clone());
         e
     } else {
-        let mut e = zenwebp::WebpEncoderConfig::lossy();
+        let mut e = zenwebp::zencodec::WebpEncoderConfig::lossy();
         if let Some(q) = quality {
             e = e.with_generic_quality(q);
         }
