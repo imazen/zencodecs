@@ -134,11 +134,6 @@ impl Default for DecodeJpeg {
 #[node(tags("codec", "png", "lossless", "encode"))]
 pub struct EncodePng {
     #[param(range(0..=100), default = 0, step = 1)]
-    #[param(unit = "", section = "Main", label = "Quality")]
-    #[kv("quality")]
-    pub quality: Option<u32>,
-
-    #[param(range(0..=100), default = 0, step = 1)]
     #[param(unit = "", section = "Main", label = "PNG Quality")]
     #[kv("png.quality")]
     pub png_quality: Option<u32>,
@@ -386,7 +381,7 @@ pub struct AvifEncode {
 pub struct EncodeJxl {
     #[param(range(0.0..=100.0), default = 75.0, identity = 75.0, step = 1.0)]
     #[param(unit = "", section = "Quality", label = "JXL Quality")]
-    #[kv("jxl.quality", "jxl.q", "quality")]
+    #[kv("jxl.quality", "jxl.q")]
     pub jxl_quality: Option<f32>,
 
     #[param(range(0.0..=25.0), default = 1.0, identity = 1.0, step = 0.1)]
@@ -544,7 +539,7 @@ pub struct Quantize {
 
     #[param(default = "best")]
     #[param(section = "Main", label = "Quality")]
-    #[kv("quant.quality", "quality")]
+    #[kv("quant.quality")]
     pub quality: String,
 
     #[param(range(0.0..=1.0), default = 0.5, identity = 0.5, step = 0.05)]
