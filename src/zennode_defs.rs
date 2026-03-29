@@ -105,7 +105,7 @@ pub struct DecodeJpeg {
     #[kv("jpeg.strictness")]
     pub strictness: String,
 
-    #[param(default = true)]
+    #[param(default = false)]
     #[param(section = "Main", label = "Auto Orient")]
     #[kv("jpeg.orient", "jpeg.auto_orient")]
     pub auto_orient: bool,
@@ -120,7 +120,7 @@ impl Default for DecodeJpeg {
     fn default() -> Self {
         Self {
             strictness: String::from("balanced"),
-            auto_orient: true,
+            auto_orient: false,
             max_megapixels: None,
         }
     }
@@ -229,6 +229,14 @@ pub struct EncodeWebpLossless {
     #[kv("webp.effort")]
     pub effort: Option<f32>,
 
+    /// VP8L compression method (0 = fastest, 6 = best).
+    /// Separate from effort — method controls the algorithm tier,
+    /// effort controls quality within that tier.
+    #[param(range(0..=6))]
+    #[param(section = "Main", label = "Method")]
+    #[kv("webp.method")]
+    pub method: Option<u32>,
+
     #[param(range(0..=100))]
     #[param(section = "Main", label = "Near-Lossless")]
     #[kv("webp.near_lossless", "webp.nl")]
@@ -306,9 +314,9 @@ pub struct EncodeGif {
     pub loop_count: String,
 
     #[param(default = true)]
-    #[param(section = "Advanced", label = "Transparency Optimization")]
-    #[kv("gif.transparency")]
-    pub transparency_optimization: Option<bool>,
+    #[param(section = "Advanced", label = "Use Transparency")]
+    #[kv("gif.use_transparency", "gif.transparency")]
+    pub use_transparency: Option<bool>,
 }
 
 impl Default for EncodeGif {
@@ -321,7 +329,7 @@ impl Default for EncodeGif {
             shared_palette: None,
             palette_error_threshold: None,
             loop_count: String::from("infinite"),
-            transparency_optimization: None,
+            use_transparency: None,
         }
     }
 }
@@ -353,20 +361,15 @@ pub struct AvifEncode {
     #[kv("avif.depth")]
     pub bit_depth: Option<String>,
 
-    #[param(default = "444")]
-    #[param(section = "Advanced", label = "Chroma Subsampling")]
-    #[kv("avif.chroma")]
-    pub chroma_subsampling: Option<String>,
-
     #[param(default = "ycbcr")]
     #[param(section = "Advanced", label = "Color Model")]
     #[kv("avif.color_model")]
     pub color_model: Option<String>,
 
     #[param(default = "clean")]
-    #[param(section = "Advanced", label = "Alpha Mode")]
-    #[kv("avif.alpha_mode")]
-    pub alpha_mode: Option<String>,
+    #[param(section = "Advanced", label = "Alpha Color Mode")]
+    #[kv("avif.alpha_color_mode", "avif.alpha_mode")]
+    pub alpha_color_mode: Option<String>,
 
     #[param(default = false)]
     #[param(section = "Advanced")]
@@ -381,14 +384,9 @@ pub struct AvifEncode {
 #[node(id = "zenjxl.encode", group = Encode, role = Encode)]
 #[node(tags("jxl", "jpeg-xl", "encode", "lossy", "lossless", "hdr", "codec"))]
 pub struct EncodeJxl {
-    #[param(range(0..=100), default = 75, step = 1)]
-    #[param(unit = "", section = "Quality", label = "Quality")]
-    #[kv("quality")]
-    pub quality: Option<i32>,
-
     #[param(range(0.0..=100.0), default = 75.0, identity = 75.0, step = 1.0)]
     #[param(unit = "", section = "Quality", label = "JXL Quality")]
-    #[kv("jxl.quality", "jxl.q")]
+    #[kv("jxl.quality", "jxl.q", "quality")]
     pub jxl_quality: Option<f32>,
 
     #[param(range(0.0..=25.0), default = 1.0, identity = 1.0, step = 0.1)]
@@ -449,17 +447,23 @@ pub struct EncodeTiff {
     #[kv("tiff.compression")]
     pub compression: String,
 
-    #[param(default = true)]
+    #[param(default = "horizontal")]
     #[param(section = "Main", label = "Predictor")]
     #[kv("tiff.predictor")]
-    pub predictor: bool,
+    pub predictor: String,
+
+    #[param(default = false)]
+    #[param(section = "Advanced")]
+    #[kv("tiff.big_tiff")]
+    pub big_tiff: bool,
 }
 
 impl Default for EncodeTiff {
     fn default() -> Self {
         Self {
             compression: String::from("lzw"),
-            predictor: true,
+            predictor: String::from("horizontal"),
+            big_tiff: false,
         }
     }
 }
@@ -490,7 +494,7 @@ impl Default for EncodeBmp {
 #[node(id = "heic.decode", group = Decode, role = Decode)]
 #[node(tags("heic", "heif", "hdr", "depth"))]
 pub struct DecodeHeic {
-    #[param(default = true)]
+    #[param(default = false)]
     #[param(section = "Supplements", label = "Extract Gain Map")]
     #[kv("heic.gain_map")]
     pub extract_gain_map: bool,
@@ -500,11 +504,13 @@ pub struct DecodeHeic {
     #[kv("heic.depth")]
     pub extract_depth: bool,
 
+    /// Placeholder — not yet wired to the decoder.
     #[param(default = false)]
     #[param(section = "Supplements", label = "Extract Mattes")]
     #[kv("heic.mattes")]
     pub extract_mattes: bool,
 
+    /// Placeholder — not yet wired to the decoder.
     #[param(default = false)]
     #[param(section = "Main", label = "Decode Thumbnail")]
     #[kv("heic.thumbnail")]
@@ -514,7 +520,7 @@ pub struct DecodeHeic {
 impl Default for DecodeHeic {
     fn default() -> Self {
         Self {
-            extract_gain_map: true,
+            extract_gain_map: false,
             extract_depth: false,
             extract_mattes: false,
             decode_thumbnail: false,
