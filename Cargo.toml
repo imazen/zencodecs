@@ -17,7 +17,7 @@ thiserror = { version = "2.0", default-features = false }
 rgb = { version = "0.8", default-features = false, features = ["as-bytes"] }
 imgref = "1.12"
 bytemuck = { version = "1.25", default-features = false, features = ["extern_crate_alloc"] }
-zencodec = { version = "0.1.5" }
+zencodec = { version = "0.1.8" }
 zenpixels = { version = "0.2.1", default-features = false, features = ["imgref"] }
 zenpixels-convert = { version = "0.2.1", features = ["imgref"] }
 linear-srgb = { version = "0.6.5", default-features = false }
@@ -26,7 +26,7 @@ linear-srgb = { version = "0.6.5", default-features = false }
 ultrahdr-core = { path = "../ultrahdr/ultrahdr-core", version = "0.2.0", optional = true, default-features = false }
 
 # Codecs (all optional, feature-gated)
-zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder", "zencodec"] }
+zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder", "zencodec", "trellis"] }
 zenwebp = { path = "../zenwebp", optional = true, features = ["zencodec"] }
 zengif = { path = "../zengif", optional = true, features = ["zencodec"] }
 zenavif = { path = "../zenavif", optional = true, features = ["zencodec"] }
