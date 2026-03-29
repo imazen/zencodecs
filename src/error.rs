@@ -45,7 +45,7 @@ pub enum CodecError {
     #[error("no suitable encoder found for auto-selection")]
     NoSuitableEncoder,
     /// Color management error.
-    #[cfg(feature = "moxcms")]
+    #[cfg(feature = "cms")]
     #[error("color management error: {0}")]
     ColorManagement(String),
     /// Underlying codec error.

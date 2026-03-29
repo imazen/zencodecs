@@ -88,6 +88,8 @@ whereat::define_at_crate_info!();
 
 pub mod codec_id;
 mod codecs;
+#[cfg(feature = "cms")]
+pub mod cms;
 pub mod color;
 pub mod config;
 pub mod decision;
@@ -148,6 +150,8 @@ pub use zencodec::StopToken;
 
 // Color / ICC profile classification
 pub use color::{SourceColorExt, icc_profile_is_srgb};
+#[cfg(feature = "cms")]
+pub use cms::{CicpValues, CmsMode, PngColorInfo};
 
 // Gain map types (format-agnostic)
 pub use gainmap::decode_gain_map_source;

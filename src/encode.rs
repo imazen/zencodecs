@@ -824,7 +824,7 @@ mod tests {
         );
 
         let jpeg = zenjpeg::JpegEncoderConfig::new().with_generic_quality(75.0);
-        let webp = zenwebp::WebpEncoderConfig::lossy();
+        let webp = zenwebp::zencodec::WebpEncoderConfig::lossy();
 
         let jpeg_out = encode_with(&jpeg, img.as_ref());
         let webp_out = encode_with(&webp, img.as_ref());
