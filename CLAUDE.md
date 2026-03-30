@@ -755,9 +755,36 @@ or similar. Not a full classifier. Document the heuristic precisely.
 | AVIF decode | zenavif | Low | No | No | Needs API convergence |
 | AVIF encode | ravif 0.13 | External | No | No | Own API, quality mapping needed |
 
+## Fuzzing (2026-03-30)
+
+11 fuzz targets in `fuzz/` covering all major entry points:
+- `fuzz_probe`, `fuzz_decode`, `fuzz_exif`, `fuzz_decode_limits` (HIGH priority)
+- `fuzz_gainmap`, `fuzz_depthmap`, `fuzz_push_decode`, `fuzz_animation`, `fuzz_transcode` (MEDIUM)
+- `fuzz_roundtrip`, `fuzz_select` (LOW)
+
+Uses `cargo-fuzz` + `libfuzzer-sys 0.4`, requires nightly. Corpus seeded from 1800+ files
+across sibling crate corpora + external GitHub repos (dvyukov/go-fuzz-corpus, libjpeg-turbo/fuzz).
+
+Key justfile commands: `fuzz-seed`, `fuzz-smoke`, `fuzz-deep`, `fuzz-ci`, `fuzz <target>`.
+
+### Security fixes (2026-03-30)
+- **Fixed**: Integer overflow in JPEG UltraHDR allocation (`codecs/jpeg.rs:190`) — added `checked_mul` + limits enforcement
+- **Fixed**: Integer overflow in depth map resize (`depthmap.rs:521`) — added overflow guard with 64MP cap
+- **Fixed**: EXIF parser uncapped Vec allocation (`exif.rs:573,612`) — capped `with_capacity` to MAX_VEC_PREALLOC=1024
+- **Added**: `Limits::for_fuzz()` and `Limits::for_proxy()` — safe default constructors
+
+### Fuzz run results (2026-03-30, initial 60s runs)
+
+7 findings across 5 targets (3 unique bugs, all in downstream codec crates).
+Crash artifacts in `fuzz/artifacts/` (gitignored, not committed).
+See private notes for details — do not commit vulnerability specifics.
+
+**Clean targets (no findings in 60s):** fuzz_exif, fuzz_decode_limits, fuzz_select, fuzz_transcode, fuzz_roundtrip.
+
 ## Known Issues
 
-(none currently tracked)
+- avif-encode feature broken (zenrav1e build error: missing EncoderConfig fields)
+- jxl-encode feature broken (jxl-encoder build error: butteraugli_iters field)
 
 ## User Feedback Log
 
