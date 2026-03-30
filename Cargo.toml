@@ -74,6 +74,9 @@ jxl-encode = ["dep:zenjxl", "zenjxl/encode"]
 heic-decode = ["dep:heic"]
 bitmaps = ["dep:zenbitmaps"]
 bitmaps-bmp = ["bitmaps", "zenbitmaps/bmp"]
+bitmaps-qoi = ["bitmaps", "zenbitmaps/qoi"]
+bitmaps-tga = ["bitmaps", "zenbitmaps/tga"]
+bitmaps-hdr = ["bitmaps", "zenbitmaps/hdr"]
 tiff = ["dep:zentiff"]
 raw-decode = ["dep:zenraw"]
 raw-decode-exif = ["raw-decode", "zenraw/exif"]
@@ -90,7 +93,7 @@ zennode = ["dep:zennode"]
 cms = ["dep:moxcms"]
 
 # All codecs
-all = ["jpeg", "jpeg-ultrahdr", "webp", "gif", "gif-zenquant", "gif-quantizr", "png", "png-zenquant", "avif-decode", "avif-encode", "jxl-decode", "jxl-encode", "heic-decode", "bitmaps-bmp", "tiff", "raw-decode", "raw-decode-exif", "raw-decode-xmp", "raw-decode-gainmap"]
+all = ["jpeg", "jpeg-ultrahdr", "webp", "gif", "gif-zenquant", "gif-quantizr", "png", "png-zenquant", "avif-decode", "avif-encode", "jxl-decode", "jxl-encode", "heic-decode", "bitmaps", "bitmaps-bmp", "bitmaps-qoi", "bitmaps-tga", "bitmaps-hdr", "tiff", "raw-decode", "raw-decode-exif", "raw-decode-xmp", "raw-decode-gainmap"]
 
 # Calibration harness (all lossy encoders)
 calibrate = ["jpeg", "webp", "png", "avif-decode", "avif-encode", "jxl-decode", "jxl-encode", "std"]

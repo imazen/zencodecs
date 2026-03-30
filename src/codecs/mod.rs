@@ -39,6 +39,15 @@ pub(crate) mod bmp;
 #[cfg(feature = "bitmaps")]
 pub(crate) mod farbfeld;
 
+#[cfg(feature = "bitmaps-qoi")]
+pub(crate) mod qoi;
+
+#[cfg(feature = "bitmaps-tga")]
+pub(crate) mod tga;
+
+#[cfg(feature = "bitmaps-hdr")]
+pub(crate) mod hdr;
+
 #[cfg(feature = "tiff")]
 pub(crate) mod tiff;
 

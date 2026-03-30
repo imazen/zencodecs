@@ -113,6 +113,21 @@ fn build_dyn_decoder_config(
         #[cfg(not(feature = "tiff"))]
         ImageFormat::Tiff => Err(at!(CodecError::UnsupportedFormat(format))),
 
+        #[cfg(feature = "bitmaps-qoi")]
+        ImageFormat::Qoi => Ok(Box::new(zenbitmaps::QoiDecoderConfig::new())),
+        #[cfg(not(feature = "bitmaps-qoi"))]
+        ImageFormat::Qoi => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-tga")]
+        ImageFormat::Tga => Ok(Box::new(zenbitmaps::TgaDecoderConfig::new())),
+        #[cfg(not(feature = "bitmaps-tga"))]
+        ImageFormat::Tga => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-hdr")]
+        ImageFormat::Hdr => Ok(Box::new(zenbitmaps::HdrDecoderConfig::new())),
+        #[cfg(not(feature = "bitmaps-hdr"))]
+        ImageFormat::Hdr => Err(at!(CodecError::UnsupportedFormat(format))),
+
         // RAW/DNG: Custom format from zenraw
         #[cfg(feature = "raw-decode")]
         ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => {
@@ -211,6 +226,21 @@ pub(crate) fn dyn_push_decode(
         ImageFormat::Tiff => push_dec!(zentiff::codec::TiffDecoderCodecConfig::new()),
         #[cfg(not(feature = "tiff"))]
         ImageFormat::Tiff => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-qoi")]
+        ImageFormat::Qoi => push_dec!(zenbitmaps::QoiDecoderConfig::new()),
+        #[cfg(not(feature = "bitmaps-qoi"))]
+        ImageFormat::Qoi => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-tga")]
+        ImageFormat::Tga => push_dec!(zenbitmaps::TgaDecoderConfig::new()),
+        #[cfg(not(feature = "bitmaps-tga"))]
+        ImageFormat::Tga => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-hdr")]
+        ImageFormat::Hdr => push_dec!(zenbitmaps::HdrDecoderConfig::new()),
+        #[cfg(not(feature = "bitmaps-hdr"))]
+        ImageFormat::Hdr => Err(at!(CodecError::UnsupportedFormat(format))),
 
         // RAW/DNG: Custom format from zenraw
         #[cfg(feature = "raw-decode")]

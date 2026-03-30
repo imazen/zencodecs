@@ -329,6 +329,21 @@ pub(crate) fn build_streaming_encoder(
         #[cfg(not(feature = "tiff"))]
         ImageFormat::Tiff => Err(at!(CodecError::UnsupportedFormat(format))),
 
+        #[cfg(feature = "bitmaps-qoi")]
+        ImageFormat::Qoi => crate::codecs::qoi::build_streaming(params),
+        #[cfg(not(feature = "bitmaps-qoi"))]
+        ImageFormat::Qoi => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-tga")]
+        ImageFormat::Tga => crate::codecs::tga::build_streaming(params),
+        #[cfg(not(feature = "bitmaps-tga"))]
+        ImageFormat::Tga => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-hdr")]
+        ImageFormat::Hdr => crate::codecs::hdr::build_streaming(params),
+        #[cfg(not(feature = "bitmaps-hdr"))]
+        ImageFormat::Hdr => Err(at!(CodecError::UnsupportedFormat(format))),
+
         _ => Err(at!(CodecError::UnsupportedFormat(format))),
     }
 }
@@ -392,6 +407,21 @@ pub(crate) fn build_encoder<'a>(
         ImageFormat::Tiff => Ok(crate::codecs::tiff::build_trait_encoder(params)),
         #[cfg(not(feature = "tiff"))]
         ImageFormat::Tiff => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-qoi")]
+        ImageFormat::Qoi => Ok(crate::codecs::qoi::build_trait_encoder(params)),
+        #[cfg(not(feature = "bitmaps-qoi"))]
+        ImageFormat::Qoi => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-tga")]
+        ImageFormat::Tga => Ok(crate::codecs::tga::build_trait_encoder(params)),
+        #[cfg(not(feature = "bitmaps-tga"))]
+        ImageFormat::Tga => Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-hdr")]
+        ImageFormat::Hdr => Ok(crate::codecs::hdr::build_trait_encoder(params)),
+        #[cfg(not(feature = "bitmaps-hdr"))]
+        ImageFormat::Hdr => Err(at!(CodecError::UnsupportedFormat(format))),
 
         _ => Err(at!(CodecError::UnsupportedFormat(format))),
     }
