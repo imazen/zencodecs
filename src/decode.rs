@@ -541,6 +541,21 @@ impl<'a> DecodeRequest<'a> {
             #[cfg(not(feature = "tiff"))]
             ImageFormat::Tiff => Err(at!(CodecError::UnsupportedFormat(format))),
 
+            #[cfg(feature = "bitmaps-qoi")]
+            ImageFormat::Qoi => crate::codecs::qoi::decode(self.data, self.limits, self.stop, dp),
+            #[cfg(not(feature = "bitmaps-qoi"))]
+            ImageFormat::Qoi => Err(at!(CodecError::UnsupportedFormat(format))),
+
+            #[cfg(feature = "bitmaps-tga")]
+            ImageFormat::Tga => crate::codecs::tga::decode(self.data, self.limits, self.stop, dp),
+            #[cfg(not(feature = "bitmaps-tga"))]
+            ImageFormat::Tga => Err(at!(CodecError::UnsupportedFormat(format))),
+
+            #[cfg(feature = "bitmaps-hdr")]
+            ImageFormat::Hdr => crate::codecs::hdr::decode(self.data, self.limits, self.stop, dp),
+            #[cfg(not(feature = "bitmaps-hdr"))]
+            ImageFormat::Hdr => Err(at!(CodecError::UnsupportedFormat(format))),
+
             // RAW/DNG: Custom format from zenraw
             #[cfg(feature = "raw-decode")]
             ImageFormat::Custom(def) if def.name == "dng" || def.name == "raw" => {

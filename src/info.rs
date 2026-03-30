@@ -166,6 +166,9 @@ fn finalize_gain_map_presence(info: &mut ImageInfo) {
         | ImageFormat::Bmp
         | ImageFormat::Pnm
         | ImageFormat::Farbfeld
+        | ImageFormat::Qoi
+        | ImageFormat::Tga
+        | ImageFormat::Hdr
         | ImageFormat::Tiff => {
             info.gain_map = zencodec::gainmap::GainMapPresence::Absent;
             info.supplements.gain_map = false;
@@ -233,6 +236,21 @@ fn probe_codec(data: &[u8], format: ImageFormat) -> Result<ImageInfo> {
         ImageFormat::Tiff => crate::codecs::tiff::probe(data)?,
         #[cfg(not(feature = "tiff"))]
         ImageFormat::Tiff => return Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-qoi")]
+        ImageFormat::Qoi => crate::codecs::qoi::probe(data)?,
+        #[cfg(not(feature = "bitmaps-qoi"))]
+        ImageFormat::Qoi => return Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-tga")]
+        ImageFormat::Tga => crate::codecs::tga::probe(data)?,
+        #[cfg(not(feature = "bitmaps-tga"))]
+        ImageFormat::Tga => return Err(at!(CodecError::UnsupportedFormat(format))),
+
+        #[cfg(feature = "bitmaps-hdr")]
+        ImageFormat::Hdr => crate::codecs::hdr::probe(data)?,
+        #[cfg(not(feature = "bitmaps-hdr"))]
+        ImageFormat::Hdr => return Err(at!(CodecError::UnsupportedFormat(format))),
 
         // RAW/DNG: Custom format from zenraw
         #[cfg(feature = "raw-decode")]
