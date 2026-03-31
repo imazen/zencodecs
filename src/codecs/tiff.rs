@@ -10,10 +10,12 @@ use zencodec::decode::{Decode as _, DecodeJob as _, DecoderConfig as _};
 
 /// Probe TIFF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
-    at_crate!(zentiff::codec::TiffDecoderCodecConfig::new()
-        .job()
-        .probe(data))
-        .map_err_at(|e| CodecError::from_codec(ImageFormat::Tiff, e))
+    at_crate!(
+        zentiff::codec::TiffDecoderCodecConfig::new()
+            .job()
+            .probe(data)
+    )
+    .map_err_at(|e| CodecError::from_codec(ImageFormat::Tiff, e))
 }
 
 /// Decode TIFF to pixels.
@@ -36,8 +38,7 @@ pub(crate) fn decode(
     }
     let decoder = at_crate!(job.decoder(Cow::Borrowed(data), &[]))
         .map_err_at(|e| CodecError::from_codec(ImageFormat::Tiff, e))?;
-    at_crate!(decoder.decode())
-        .map_err_at(|e| CodecError::from_codec(ImageFormat::Tiff, e))
+    at_crate!(decoder.decode()).map_err_at(|e| CodecError::from_codec(ImageFormat::Tiff, e))
 }
 
 // ═══════════════════════════════════════════════════════════════════════

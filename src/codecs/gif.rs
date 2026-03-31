@@ -11,8 +11,7 @@ use zencodec::decode::{Decode, DecodeJob as _, DecoderConfig as _};
 
 /// Probe GIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
-    at_crate!(zengif::GifDecoderConfig::new()
-        .probe_header(data))
+    at_crate!(zengif::GifDecoderConfig::new().probe_header(data))
         .map_err_at(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
 
@@ -36,8 +35,7 @@ pub(crate) fn decode(
     }
     let decoder = at_crate!(job.decoder(Cow::Borrowed(data), &[]))
         .map_err_at(|e| CodecError::from_codec(ImageFormat::Gif, e))?;
-    at_crate!(decoder.decode())
-        .map_err_at(|e| CodecError::from_codec(ImageFormat::Gif, e))
+    at_crate!(decoder.decode()).map_err_at(|e| CodecError::from_codec(ImageFormat::Gif, e))
 }
 
 /// Build a GifEncoderConfig from codec config.

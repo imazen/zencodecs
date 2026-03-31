@@ -117,8 +117,12 @@ pub(crate) fn encode_with_precomputed_gainmap(
             gain_map.width as usize,
             gain_map.height as usize,
         );
-        let result = at_crate!(zenavif::encode_rgb8(img, &gm_enc, crate::StopToken::new(enough::Unstoppable)))
-            .map_err_at(|e| CodecError::from_codec(ImageFormat::Avif, e))?;
+        let result = at_crate!(zenavif::encode_rgb8(
+            img,
+            &gm_enc,
+            crate::StopToken::new(enough::Unstoppable)
+        ))
+        .map_err_at(|e| CodecError::from_codec(ImageFormat::Avif, e))?;
         extract_av1_from_avif(&result.avif_file)?
     };
 
@@ -146,8 +150,8 @@ pub(crate) fn encode_with_precomputed_gainmap(
     }
     job = job.with_canvas_size(width, height);
 
-    let encoder = at_crate!(job.encoder())
-        .map_err_at(|e| CodecError::from_codec(ImageFormat::Avif, e))?;
+    let encoder =
+        at_crate!(job.encoder()).map_err_at(|e| CodecError::from_codec(ImageFormat::Avif, e))?;
 
     let stride = width as usize * descriptor.bytes_per_pixel();
     let adapted = at_crate!(zenpixels_convert::adapt::adapt_for_encode(

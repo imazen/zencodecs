@@ -26,20 +26,20 @@ linear-srgb = { version = "0.6.6", default-features = false }
 ultrahdr-core = { path = "../ultrahdr/ultrahdr-core", version = "0.3.0", optional = true, default-features = false }
 
 # Codecs (all optional, feature-gated)
-zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder", "zencodec", "trellis"] }
-zenwebp = { path = "../zenwebp", optional = true, features = ["zencodec"] }
-zengif = { path = "../zengif", optional = true, features = ["zencodec"] }
-zenavif = { path = "../zenavif", optional = true, features = ["zencodec"] }
-zenavif-parse = { path = "../zenavif-parse", version = "0.5.1", optional = true, features = ["eager"] }
-zenpng = { path = "../zenpng", optional = true, features = ["zencodec"] }
-zenjxl = { path = "../zenjxl", optional = true, default-features = false, features = ["zencodec"] }
-heic = { path = "../heic", optional = true, default-features = false, features = ["zencodec"] }
-zenbitmaps = { path = "../zenbitmaps", optional = true, features = ["zencodec"] }
-zentiff = { path = "../zentiff", optional = true, features = ["zencodec"] }
-zenraw = { path = "../zenraw", optional = true, default-features = false, features = ["rawloader", "std", "zencodec", "exif"] }
+zenjpeg = { version = "0.7.1", path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder", "zencodec", "trellis"] }
+zenwebp = { version = "0.4.0", path = "../zenwebp", optional = true, features = ["zencodec"] }
+zengif = { version = "0.7.0", path = "../zengif", optional = true, features = ["zencodec"] }
+zenavif = { version = "0.1.0", path = "../zenavif", optional = true, features = ["zencodec"] }
+zenavif-parse = { version = "0.5.1", path = "../zenavif-parse", optional = true, features = ["eager"] }
+zenpng = { version = "0.1.0", path = "../zenpng", optional = true, features = ["zencodec"] }
+zenjxl = { version = "0.1.0", path = "../zenjxl", optional = true, default-features = false, features = ["zencodec"] }
+heic = { version = "0.1.0", path = "../heic", optional = true, default-features = false, features = ["zencodec"] }
+zenbitmaps = { version = "0.1.2", path = "../zenbitmaps", optional = true, features = ["zencodec"] }
+zentiff = { version = "0.1.0", path = "../zentiff", optional = true, features = ["zencodec"] }
+zenraw = { version = "0.1.0", path = "../zenraw", optional = true, default-features = false, features = ["rawloader", "std", "zencodec", "exif"] }
 
 # Node definitions (optional)
-zennode = { path = "../zennode/zennode", default-features = false, features = ["derive"], optional = true }
+zennode = { version = "0.1.0", path = "../zennode/zennode", default-features = false, features = ["derive"], optional = true }
 
 # Color management (optional)
 moxcms = { version = "0.8.1", optional = true, default-features = false }
@@ -48,7 +48,7 @@ moxcms = { version = "0.8.1", optional = true, default-features = false }
 png = "0.18"
 zensim-regress = "0.3.0"
 codec-corpus = "1"
-fast-ssim2 = { path = "../fast-ssim2/fast-ssim2", features = ["imgref"] }
+fast-ssim2 = { version = "0.7.1", path = "../fast-ssim2/fast-ssim2", features = ["imgref"] }
 rayon = "1"
 turbojpeg = "1.4"
 

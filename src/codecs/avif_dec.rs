@@ -13,8 +13,7 @@ use zencodec::decode::Decode;
 
 /// Probe AVIF metadata without decoding pixels.
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
-    at_crate!(zenavif::AvifDecoderConfig::new()
-        .probe_header(data))
+    at_crate!(zenavif::AvifDecoderConfig::new().probe_header(data))
         .map_err_at(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }
 
@@ -48,6 +47,5 @@ pub(crate) fn decode(
     }
     let decoder = at_crate!(job.decoder(Cow::Borrowed(data), &[]))
         .map_err_at(|e| CodecError::from_codec(ImageFormat::Avif, e))?;
-    at_crate!(decoder.decode())
-        .map_err_at(|e| CodecError::from_codec(ImageFormat::Avif, e))
+    at_crate!(decoder.decode()).map_err_at(|e| CodecError::from_codec(ImageFormat::Avif, e))
 }

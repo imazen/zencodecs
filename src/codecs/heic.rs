@@ -14,8 +14,7 @@ use zencodec::decode::Decode;
 pub(crate) fn probe(data: &[u8]) -> Result<ImageInfo> {
     let dec = heic::HeicDecoderConfig::new();
     let job = dec.job();
-    at_crate!(job.probe(data))
-        .map_err_at(|e| CodecError::from_codec(ImageFormat::Heic, e))
+    at_crate!(job.probe(data)).map_err_at(|e| CodecError::from_codec(ImageFormat::Heic, e))
 }
 
 /// Decode HEIC to pixels.
@@ -42,6 +41,5 @@ pub(crate) fn decode(
     }
     let decoder = at_crate!(job.decoder(Cow::Borrowed(data), &[]))
         .map_err_at(|e| CodecError::from_codec(ImageFormat::Heic, e))?;
-    at_crate!(decoder.decode())
-        .map_err_at(|e| CodecError::from_codec(ImageFormat::Heic, e))
+    at_crate!(decoder.decode()).map_err_at(|e| CodecError::from_codec(ImageFormat::Heic, e))
 }

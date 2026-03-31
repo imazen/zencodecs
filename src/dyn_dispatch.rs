@@ -361,9 +361,10 @@ pub(crate) fn dyn_streaming_decoder(
             if params.extract_gain_map {
                 job = job.with_extract_gain_map(true);
             }
-            let dec = at_crate!(job
-                .streaming_decoder(Cow::Owned(params.data.to_vec()), params.preferred))
-                .map_err_at(|e| CodecError::from_codec(format, e))?;
+            let dec = at_crate!(
+                job.streaming_decoder(Cow::Owned(params.data.to_vec()), params.preferred)
+            )
+            .map_err_at(|e| CodecError::from_codec(format, e))?;
             Ok(Box::new(OwnedStreamingDecoderShim(dec)))
         }};
     }
@@ -420,9 +421,10 @@ pub(crate) fn dyn_streaming_decoder(
             if let Some(dp) = params.decode_policy {
                 job = job.with_policy(dp);
             }
-            let dec = at_crate!(job
-                .streaming_decoder(Cow::Owned(params.data.to_vec()), params.preferred))
-                .map_err_at(|e| CodecError::from_codec(format, e))?;
+            let dec = at_crate!(
+                job.streaming_decoder(Cow::Owned(params.data.to_vec()), params.preferred)
+            )
+            .map_err_at(|e| CodecError::from_codec(format, e))?;
             Ok(Box::new(OwnedStreamingDecoderShim(dec)))
         }
         #[cfg(not(feature = "png"))]
