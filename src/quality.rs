@@ -625,10 +625,8 @@ mod tests {
 
     #[test]
     fn all_profiles_generic_quality_monotonically_increasing() {
-        let values: alloc::vec::Vec<f32> = ALL_PROFILES
-            .iter()
-            .map(|p| p.generic_quality())
-            .collect();
+        let values: alloc::vec::Vec<f32> =
+            ALL_PROFILES.iter().map(|p| p.generic_quality()).collect();
         for w in values.windows(2) {
             assert!(
                 w[1] > w[0],
@@ -640,66 +638,51 @@ mod tests {
     }
 
     #[test]
-    fn all_profiles_produce_distinct_jpeg_quality() {
+    fn all_profiles_produce_strictly_increasing_jpeg_quality() {
         let values: alloc::vec::Vec<u8> = ALL_PROFILES
             .iter()
             .map(|p| QualityIntent::from_profile(*p).jpeg_quality())
             .collect();
         for w in values.windows(2) {
             assert!(
-                w[1] >= w[0],
-                "JPEG quality must be non-decreasing across profiles: {} -> {}",
+                w[1] > w[0],
+                "JPEG quality must be strictly increasing across profiles: {} -> {}",
                 w[0],
                 w[1]
             );
         }
-        // Verify at least first and last are distinct
-        assert!(
-            values.last().unwrap() > values.first().unwrap(),
-            "JPEG quality must differ between Lowest ({}) and Lossless ({})",
-            values.first().unwrap(),
-            values.last().unwrap()
-        );
     }
 
     #[test]
-    fn all_profiles_produce_distinct_webp_quality() {
+    fn all_profiles_produce_strictly_increasing_webp_quality() {
         let values: alloc::vec::Vec<f32> = ALL_PROFILES
             .iter()
             .map(|p| QualityIntent::from_profile(*p).webp_quality())
             .collect();
         for w in values.windows(2) {
             assert!(
-                w[1] >= w[0],
-                "WebP quality must be non-decreasing across profiles: {} -> {}",
+                w[1] > w[0],
+                "WebP quality must be strictly increasing across profiles: {} -> {}",
                 w[0],
                 w[1]
             );
         }
-        assert!(
-            values.last().unwrap() > values.first().unwrap(),
-            "WebP quality must differ between Lowest and Lossless"
-        );
     }
 
     #[test]
-    fn all_profiles_produce_distinct_avif_quality() {
+    fn all_profiles_produce_strictly_increasing_avif_quality() {
         let values: alloc::vec::Vec<f32> = ALL_PROFILES
             .iter()
             .map(|p| QualityIntent::from_profile(*p).avif_quality())
             .collect();
         for w in values.windows(2) {
             assert!(
-                w[1] >= w[0],
-                "AVIF quality must be non-decreasing across profiles: {} -> {}",
+                w[1] > w[0],
+                "AVIF quality must be strictly increasing across profiles: {} -> {}",
                 w[0],
                 w[1]
             );
         }
-        assert!(
-            values.last().unwrap() > values.first().unwrap(),
-            "AVIF quality must differ between Lowest and Lossless"
-        );
     }
 
     #[test]

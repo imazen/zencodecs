@@ -359,12 +359,16 @@ mod tests {
         };
         let intent = QualityIntent::from_quality(73.0);
         let format = select(&facts, &intent);
-        // Without JXL encode, should get AVIF (if available) or JPEG
-        assert!(
-            format == ImageFormat::Avif
-                || format == ImageFormat::Jpeg
-                || format == ImageFormat::Jxl,
-            "got {format:?}"
+        // Preference order: JXL → AVIF → JPEG → WebP → PNG
+        #[cfg(feature = "jxl-encode")]
+        assert_eq!(format, ImageFormat::Jxl, "JXL should win when compiled in");
+        #[cfg(all(not(feature = "jxl-encode"), feature = "avif-encode"))]
+        assert_eq!(format, ImageFormat::Avif, "AVIF should win when JXL absent");
+        #[cfg(all(not(feature = "jxl-encode"), not(feature = "avif-encode")))]
+        assert_eq!(
+            format,
+            ImageFormat::Jpeg,
+            "JPEG should win when JXL+AVIF absent"
         );
     }
 
@@ -376,10 +380,14 @@ mod tests {
         };
         let intent = QualityIntent::from_quality(73.0);
         let format = select(&facts, &intent);
-        // JPEG should come before AVIF for large images (unless JXL available)
-        assert!(
-            format == ImageFormat::Jpeg || format == ImageFormat::Jxl,
-            "got {format:?}"
+        // Preference order for large: JXL → JPEG → AVIF → WebP → PNG
+        #[cfg(feature = "jxl-encode")]
+        assert_eq!(format, ImageFormat::Jxl, "JXL should win when compiled in");
+        #[cfg(not(feature = "jxl-encode"))]
+        assert_eq!(
+            format,
+            ImageFormat::Jpeg,
+            "JPEG should win for large images when JXL absent"
         );
     }
 
@@ -403,9 +411,18 @@ mod tests {
         };
         let intent = QualityIntent::from_quality(100.0).with_lossless(true);
         let format = select(&facts, &intent);
-        assert!(
-            format == ImageFormat::Jxl || format == ImageFormat::WebP || format == ImageFormat::Png,
-            "got {format:?}"
+        // Preference order for lossless: JXL → WebP → PNG → AVIF
+        #[cfg(feature = "jxl-encode")]
+        assert_eq!(
+            format,
+            ImageFormat::Jxl,
+            "JXL should win lossless when compiled in"
+        );
+        #[cfg(not(feature = "jxl-encode"))]
+        assert_eq!(
+            format,
+            ImageFormat::WebP,
+            "WebP should win lossless when JXL absent"
         );
     }
 
@@ -448,11 +465,18 @@ mod tests {
         };
         let intent = QualityIntent::from_quality(73.0);
         let format = select(&facts, &intent);
-        assert!(
-            format == ImageFormat::Avif
-                || format == ImageFormat::WebP
-                || format == ImageFormat::Gif,
-            "animated should prefer AVIF/WebP/GIF, got {format:?}"
+        // Preference order for animation: AVIF → WebP → GIF
+        #[cfg(feature = "avif-encode")]
+        assert_eq!(
+            format,
+            ImageFormat::Avif,
+            "AVIF should win animated when compiled in"
+        );
+        #[cfg(not(feature = "avif-encode"))]
+        assert_eq!(
+            format,
+            ImageFormat::WebP,
+            "WebP should win animated when AVIF absent"
         );
     }
 
