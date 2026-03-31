@@ -313,4 +313,132 @@ mod tests {
         assert_ne!(BoolKeep::True, BoolKeep::False);
         assert_ne!(BoolKeep::True, BoolKeep::Keep);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Regression: CodecIntent construction for e-commerce quality targets
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn codec_intent_good_profile_for_ecommerce() {
+        // E-commerce use case: Good or High quality, specific format.
+        let intent = CodecIntent {
+            format: Some(FormatChoice::Specific(ImageFormat::Jpeg)),
+            quality_profile: Some(QualityProfile::Good),
+            ..Default::default()
+        };
+        let q = intent.effective_quality();
+        // Good profile should produce quality in the 70-80 range.
+        assert!(
+            (70.0..=80.0).contains(&q),
+            "Good profile effective quality {} should be 70-80 for e-commerce",
+            q
+        );
+    }
+
+    #[test]
+    fn codec_intent_high_profile_for_product_photography() {
+        // Product photography: High quality.
+        let intent = CodecIntent {
+            format: Some(FormatChoice::Specific(ImageFormat::Jpeg)),
+            quality_profile: Some(QualityProfile::High),
+            ..Default::default()
+        };
+        let q = intent.effective_quality();
+        assert!(
+            (85.0..=95.0).contains(&q),
+            "High profile effective quality {} should be 85-95 for product photography",
+            q
+        );
+    }
+
+    #[test]
+    fn codec_intent_dpr_adjustment_propagates() {
+        // Verify DPR adjustment is reflected in effective_quality.
+        let base_intent = CodecIntent {
+            quality_profile: Some(QualityProfile::Good),
+            ..Default::default()
+        };
+        let dpr1_intent = CodecIntent {
+            quality_profile: Some(QualityProfile::Good),
+            quality_dpr: Some(1.0),
+            ..Default::default()
+        };
+        let dpr6_intent = CodecIntent {
+            quality_profile: Some(QualityProfile::Good),
+            quality_dpr: Some(6.0),
+            ..Default::default()
+        };
+
+        let base_q = base_intent.effective_quality();
+        let dpr1_q = dpr1_intent.effective_quality();
+        let dpr6_q = dpr6_intent.effective_quality();
+
+        assert!(
+            dpr1_q > base_q,
+            "DPR=1 ({}) should raise quality above base ({})",
+            dpr1_q,
+            base_q
+        );
+        assert!(
+            dpr6_q < base_q,
+            "DPR=6 ({}) should lower quality below base ({})",
+            dpr6_q,
+            base_q
+        );
+    }
+
+    #[test]
+    fn codec_intent_all_profiles_produce_distinct_effective_quality() {
+        // All 8 profiles should produce distinct, increasing effective_quality values.
+        let profiles = [
+            QualityProfile::Lowest,
+            QualityProfile::Low,
+            QualityProfile::MediumLow,
+            QualityProfile::Medium,
+            QualityProfile::Good,
+            QualityProfile::High,
+            QualityProfile::Highest,
+            QualityProfile::Lossless,
+        ];
+        let values: alloc::vec::Vec<f32> = profiles
+            .iter()
+            .map(|p| {
+                CodecIntent {
+                    quality_profile: Some(*p),
+                    ..Default::default()
+                }
+                .effective_quality()
+            })
+            .collect();
+        for w in values.windows(2) {
+            assert!(
+                w[1] > w[0],
+                "effective_quality must be strictly increasing across profiles: {} -> {}",
+                w[0],
+                w[1]
+            );
+        }
+    }
+
+    #[test]
+    fn codec_intent_per_codec_hints_for_avif() {
+        // Verify per-codec hints can be set for AVIF.
+        let mut intent = CodecIntent {
+            format: Some(FormatChoice::Specific(ImageFormat::Avif)),
+            quality_profile: Some(QualityProfile::High),
+            ..Default::default()
+        };
+        intent.hints.avif.insert("speed".into(), "4".into());
+        intent.hints.avif.insert("quality".into(), "70".into());
+
+        assert_eq!(
+            intent.hints.for_format(ImageFormat::Avif).get("speed"),
+            Some(&"4".to_string())
+        );
+        assert_eq!(
+            intent.hints.for_format(ImageFormat::Avif).get("quality"),
+            Some(&"70".to_string())
+        );
+        assert!(!intent.hints.is_empty());
+    }
 }

@@ -630,4 +630,173 @@ mod tests {
         let result = select_format_from_intent(&intent, &facts, &registry, &policy);
         assert!(result.is_err());
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Regression: AVIF in preference hierarchy for lossy opaque images
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn avif_in_preference_order_for_lossy_opaque_small() {
+        // Verify AVIF is in the preference order for lossy opaque small
+        // images (< 3MP) via build_preference_order.
+        let facts = ImageFacts {
+            pixel_count: 1_000_000,
+            ..Default::default()
+        };
+        let intent = QualityIntent::from_quality(73.0);
+        let order = build_preference_order(&facts, &intent);
+        let formats: alloc::vec::Vec<_> = order.iter().map(|(f, _)| *f).collect();
+        assert!(
+            formats.contains(&ImageFormat::Avif),
+            "AVIF should be in preference order for lossy opaque small images, got: {:?}",
+            formats
+        );
+    }
+
+    #[test]
+    fn avif_in_preference_order_for_lossy_opaque_large() {
+        // For large images (>= 3MP), AVIF should still be in the
+        // preference order, but after JPEG.
+        let facts = ImageFacts {
+            pixel_count: 10_000_000,
+            ..Default::default()
+        };
+        let intent = QualityIntent::from_quality(73.0);
+        let order = build_preference_order(&facts, &intent);
+        let formats: alloc::vec::Vec<_> = order.iter().map(|(f, _)| *f).collect();
+        assert!(
+            formats.contains(&ImageFormat::Avif),
+            "AVIF should be in preference order for lossy opaque large images, got: {:?}",
+            formats
+        );
+        // AVIF should be after JPEG for large images.
+        let jpeg_pos = formats.iter().position(|f| *f == ImageFormat::Jpeg);
+        let avif_pos = formats.iter().position(|f| *f == ImageFormat::Avif);
+        if let (Some(j), Some(a)) = (jpeg_pos, avif_pos) {
+            assert!(
+                a > j,
+                "AVIF (pos {}) should be after JPEG (pos {}) for large images",
+                a,
+                j
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "avif-encode")]
+    fn avif_encode_selectable_for_lossy_opaque() {
+        // When avif-encode feature is compiled in, AVIF should be
+        // selectable via select_format_from_intent for lossy opaque images.
+        let intent = CodecIntent {
+            format: Some(FormatChoice::Specific(ImageFormat::Avif)),
+            quality_profile: Some(crate::quality::QualityProfile::Good),
+            ..Default::default()
+        };
+        let facts = ImageFacts {
+            pixel_count: 1_000_000,
+            ..Default::default()
+        };
+        let registry = AllowedFormats::all();
+        let policy = CodecPolicy::new();
+        let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
+        assert_eq!(decision.format, ImageFormat::Avif);
+    }
+
+    #[test]
+    #[cfg(feature = "avif-encode")]
+    fn avif_auto_selected_for_animated() {
+        // Animated images should prefer AVIF (if avif-encode is available).
+        let facts = ImageFacts {
+            has_animation: true,
+            pixel_count: 500_000,
+            ..Default::default()
+        };
+        let intent = QualityIntent::from_quality(73.0);
+        let format = select(&facts, &intent);
+        assert_eq!(
+            format,
+            ImageFormat::Avif,
+            "AVIF should be preferred for animated lossy images when available"
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Regression: AVIF calibration produces valid quality/speed values
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn avif_calibration_produces_valid_values() {
+        // Verify that AVIF quality and speed values are in valid ranges
+        // across a sweep of generic quality values.
+        for q in (0..=100).step_by(5) {
+            let intent = QualityIntent::from_quality(q as f32);
+            let avif_q = intent.avif_quality();
+            let avif_s = intent.avif_speed();
+
+            assert!(
+                (0.0..=100.0).contains(&avif_q),
+                "AVIF quality {} out of range at generic quality {}",
+                avif_q,
+                q
+            );
+            assert!(
+                avif_s <= 10,
+                "AVIF speed {} out of range at generic quality {}",
+                avif_s,
+                q
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Regression: CodecIntent with specific quality targets
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn codec_intent_with_quality_target_for_ecommerce() {
+        // Verify that a CodecIntent with a specific quality target
+        // produces expected codec-specific values through the full pipeline.
+        let intent = CodecIntent {
+            format: Some(FormatChoice::Auto),
+            quality_profile: Some(crate::quality::QualityProfile::Good),
+            ..Default::default()
+        };
+        let facts = ImageFacts {
+            pixel_count: 1_000_000,
+            ..Default::default()
+        };
+        let registry = AllowedFormats::all();
+        let policy = CodecPolicy::new();
+        let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
+
+        // The decision should carry a quality value matching the Good profile.
+        assert!(
+            (decision.quality.quality - 73.0).abs() < 0.01,
+            "Decision quality {} should match Good profile (73.0)",
+            decision.quality.quality
+        );
+        assert!(!decision.lossless);
+    }
+
+    #[test]
+    fn codec_intent_quality_fallback_used_when_no_profile() {
+        // Verify quality_fallback is used when quality_profile is None.
+        let intent = CodecIntent {
+            format: Some(FormatChoice::Auto),
+            quality_fallback: Some(85.0),
+            ..Default::default()
+        };
+        let facts = ImageFacts {
+            pixel_count: 1_000_000,
+            ..Default::default()
+        };
+        let registry = AllowedFormats::all();
+        let policy = CodecPolicy::new();
+        let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
+        assert!(
+            (decision.quality.quality - 85.0).abs() < 0.01,
+            "Decision quality {} should match fallback (85.0)",
+            decision.quality.quality
+        );
+    }
 }

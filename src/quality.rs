@@ -606,4 +606,408 @@ mod tests {
         let intent = QualityIntent::from_quality(73.0);
         assert!((intent.libwebp_quality() - intent.webp_quality()).abs() < 0.001);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Regression: all profiles produce distinct, monotonically increasing values
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// All 8 QualityProfile variants, ordered from lowest to highest quality.
+    const ALL_PROFILES: [QualityProfile; 8] = [
+        QualityProfile::Lowest,
+        QualityProfile::Low,
+        QualityProfile::MediumLow,
+        QualityProfile::Medium,
+        QualityProfile::Good,
+        QualityProfile::High,
+        QualityProfile::Highest,
+        QualityProfile::Lossless,
+    ];
+
+    #[test]
+    fn all_profiles_generic_quality_monotonically_increasing() {
+        let values: alloc::vec::Vec<f32> = ALL_PROFILES
+            .iter()
+            .map(|p| p.generic_quality())
+            .collect();
+        for w in values.windows(2) {
+            assert!(
+                w[1] > w[0],
+                "generic_quality must be strictly increasing: {} -> {}",
+                w[0],
+                w[1]
+            );
+        }
+    }
+
+    #[test]
+    fn all_profiles_produce_distinct_jpeg_quality() {
+        let values: alloc::vec::Vec<u8> = ALL_PROFILES
+            .iter()
+            .map(|p| QualityIntent::from_profile(*p).jpeg_quality())
+            .collect();
+        for w in values.windows(2) {
+            assert!(
+                w[1] >= w[0],
+                "JPEG quality must be non-decreasing across profiles: {} -> {}",
+                w[0],
+                w[1]
+            );
+        }
+        // Verify at least first and last are distinct
+        assert!(
+            values.last().unwrap() > values.first().unwrap(),
+            "JPEG quality must differ between Lowest ({}) and Lossless ({})",
+            values.first().unwrap(),
+            values.last().unwrap()
+        );
+    }
+
+    #[test]
+    fn all_profiles_produce_distinct_webp_quality() {
+        let values: alloc::vec::Vec<f32> = ALL_PROFILES
+            .iter()
+            .map(|p| QualityIntent::from_profile(*p).webp_quality())
+            .collect();
+        for w in values.windows(2) {
+            assert!(
+                w[1] >= w[0],
+                "WebP quality must be non-decreasing across profiles: {} -> {}",
+                w[0],
+                w[1]
+            );
+        }
+        assert!(
+            values.last().unwrap() > values.first().unwrap(),
+            "WebP quality must differ between Lowest and Lossless"
+        );
+    }
+
+    #[test]
+    fn all_profiles_produce_distinct_avif_quality() {
+        let values: alloc::vec::Vec<f32> = ALL_PROFILES
+            .iter()
+            .map(|p| QualityIntent::from_profile(*p).avif_quality())
+            .collect();
+        for w in values.windows(2) {
+            assert!(
+                w[1] >= w[0],
+                "AVIF quality must be non-decreasing across profiles: {} -> {}",
+                w[0],
+                w[1]
+            );
+        }
+        assert!(
+            values.last().unwrap() > values.first().unwrap(),
+            "AVIF quality must differ between Lowest and Lossless"
+        );
+    }
+
+    #[test]
+    fn all_profiles_produce_monotonic_jxl_distance() {
+        // JXL distance is inverted: lower = better quality.
+        // So distance should be non-increasing across profiles.
+        let values: alloc::vec::Vec<f32> = ALL_PROFILES
+            .iter()
+            .map(|p| QualityIntent::from_profile(*p).jxl_distance())
+            .collect();
+        for w in values.windows(2) {
+            assert!(
+                w[1] <= w[0],
+                "JXL distance must be non-increasing (lower = better) across profiles: {} -> {}",
+                w[0],
+                w[1]
+            );
+        }
+        assert!(
+            values.first().unwrap() > values.last().unwrap(),
+            "JXL distance must differ between Lowest and Lossless"
+        );
+    }
+
+    #[test]
+    fn all_profiles_png_quality_range_valid() {
+        for profile in &ALL_PROFILES {
+            let intent = QualityIntent::from_profile(*profile);
+            let (min, max) = intent.png_quality_range();
+            assert!(
+                min <= max,
+                "PNG quality range min ({}) > max ({}) for profile {:?}",
+                min,
+                max,
+                profile
+            );
+        }
+        // Verify min quality increases across profiles
+        let mins: alloc::vec::Vec<u8> = ALL_PROFILES
+            .iter()
+            .map(|p| QualityIntent::from_profile(*p).png_quality_range().0)
+            .collect();
+        for w in mins.windows(2) {
+            assert!(
+                w[1] >= w[0],
+                "PNG min quality must be non-decreasing across profiles: {} -> {}",
+                w[0],
+                w[1]
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Regression: calibration table monotonicity
+    // ═══════════════════════════════════════════════════════════════════
+
+    fn assert_table_sorted_by_generic_quality(table: &[AnchorPoint], name: &str) {
+        for w in table.windows(2) {
+            assert!(
+                w[1].0 > w[0].0,
+                "{name}: generic quality keys must be strictly increasing: {} -> {}",
+                w[0].0,
+                w[1].0
+            );
+        }
+    }
+
+    fn assert_table_values_non_decreasing(table: &[AnchorPoint], name: &str) {
+        for w in table.windows(2) {
+            assert!(
+                w[1].1 >= w[0].1,
+                "{name}: native values must be non-decreasing: {} -> {}",
+                w[0].1,
+                w[1].1
+            );
+        }
+    }
+
+    fn assert_table_values_non_increasing(table: &[AnchorPoint], name: &str) {
+        for w in table.windows(2) {
+            assert!(
+                w[1].1 <= w[0].1,
+                "{name}: native values must be non-increasing: {} -> {}",
+                w[0].1,
+                w[1].1
+            );
+        }
+    }
+
+    #[test]
+    fn calibration_table_jpeg_monotonic() {
+        assert_table_sorted_by_generic_quality(&JPEG_TABLE, "JPEG_TABLE");
+        assert_table_values_non_decreasing(&JPEG_TABLE, "JPEG_TABLE");
+    }
+
+    #[test]
+    fn calibration_table_webp_monotonic() {
+        assert_table_sorted_by_generic_quality(&WEBP_TABLE, "WEBP_TABLE");
+        assert_table_values_non_decreasing(&WEBP_TABLE, "WEBP_TABLE");
+    }
+
+    #[test]
+    fn calibration_table_webp_method_monotonic() {
+        assert_table_sorted_by_generic_quality(&WEBP_METHOD_TABLE, "WEBP_METHOD_TABLE");
+        assert_table_values_non_decreasing(&WEBP_METHOD_TABLE, "WEBP_METHOD_TABLE");
+    }
+
+    #[test]
+    fn calibration_table_avif_monotonic() {
+        assert_table_sorted_by_generic_quality(&AVIF_TABLE, "AVIF_TABLE");
+        assert_table_values_non_decreasing(&AVIF_TABLE, "AVIF_TABLE");
+    }
+
+    #[test]
+    fn calibration_table_avif_speed_monotonic() {
+        // AVIF speed is inverted: lower = slower + better.
+        // Higher generic quality should produce lower (or equal) speed values.
+        assert_table_sorted_by_generic_quality(&AVIF_SPEED_TABLE, "AVIF_SPEED_TABLE");
+        assert_table_values_non_increasing(&AVIF_SPEED_TABLE, "AVIF_SPEED_TABLE");
+    }
+
+    #[test]
+    fn calibration_table_jxl_distance_monotonic() {
+        // JXL distance is inverted: lower = better quality.
+        assert_table_sorted_by_generic_quality(&JXL_DISTANCE_TABLE, "JXL_DISTANCE_TABLE");
+        assert_table_values_non_increasing(&JXL_DISTANCE_TABLE, "JXL_DISTANCE_TABLE");
+    }
+
+    #[test]
+    fn calibration_table_jxl_effort_monotonic() {
+        assert_table_sorted_by_generic_quality(&JXL_EFFORT_TABLE, "JXL_EFFORT_TABLE");
+        assert_table_values_non_decreasing(&JXL_EFFORT_TABLE, "JXL_EFFORT_TABLE");
+    }
+
+    #[test]
+    fn calibration_table_png_min_monotonic() {
+        assert_table_sorted_by_generic_quality(&PNG_MIN_TABLE, "PNG_MIN_TABLE");
+        assert_table_values_non_decreasing(&PNG_MIN_TABLE, "PNG_MIN_TABLE");
+    }
+
+    #[test]
+    fn calibration_table_png_max_monotonic() {
+        assert_table_sorted_by_generic_quality(&PNG_MAX_TABLE, "PNG_MAX_TABLE");
+        assert_table_values_non_decreasing(&PNG_MAX_TABLE, "PNG_MAX_TABLE");
+    }
+
+    #[test]
+    fn calibration_table_png_min_le_max_at_all_anchors() {
+        assert_eq!(
+            PNG_MIN_TABLE.len(),
+            PNG_MAX_TABLE.len(),
+            "PNG min/max tables must have same length"
+        );
+        for (min_anchor, max_anchor) in PNG_MIN_TABLE.iter().zip(PNG_MAX_TABLE.iter()) {
+            assert!(
+                (min_anchor.0 - max_anchor.0).abs() < 0.001,
+                "PNG min/max tables must have matching generic quality keys"
+            );
+            assert!(
+                min_anchor.1 <= max_anchor.1,
+                "PNG min ({}) must be <= max ({}) at generic quality {}",
+                min_anchor.1,
+                max_anchor.1,
+                min_anchor.0
+            );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Regression: DPR adjustment across all profiles
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn dpr_1_raises_quality_for_all_non_lossless_profiles() {
+        // DPR 1.0 means artifacts are magnified 3x -- quality should increase.
+        for profile in &ALL_PROFILES[..7] {
+            // Skip Lossless (always 100)
+            let base = profile.generic_quality();
+            let adjusted = adjust_quality_for_dpr(base, 1.0);
+            assert!(
+                adjusted > base,
+                "DPR=1 should raise quality for {:?}: base={}, adjusted={}",
+                profile,
+                base,
+                adjusted
+            );
+        }
+    }
+
+    #[test]
+    fn dpr_3_is_neutral_for_all_profiles() {
+        // DPR 3.0 is baseline -- no adjustment.
+        for profile in &ALL_PROFILES[..7] {
+            let base = profile.generic_quality();
+            let adjusted = adjust_quality_for_dpr(base, 3.0);
+            assert!(
+                (adjusted - base).abs() < 0.01,
+                "DPR=3 should be neutral for {:?}: base={}, adjusted={}",
+                profile,
+                base,
+                adjusted
+            );
+        }
+    }
+
+    #[test]
+    fn dpr_6_lowers_quality_for_all_non_lossless_profiles() {
+        // DPR 6.0 means pixels are tiny -- quality can decrease.
+        for profile in &ALL_PROFILES[..7] {
+            let base = profile.generic_quality();
+            let adjusted = adjust_quality_for_dpr(base, 6.0);
+            assert!(
+                adjusted < base,
+                "DPR=6 should lower quality for {:?}: base={}, adjusted={}",
+                profile,
+                base,
+                adjusted
+            );
+        }
+    }
+
+    #[test]
+    fn dpr_adjusted_quality_stays_in_valid_range() {
+        let dpr_values = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0];
+        for profile in &ALL_PROFILES {
+            let base = profile.generic_quality();
+            for &dpr in &dpr_values {
+                let adjusted = adjust_quality_for_dpr(base, dpr);
+                assert!(
+                    (5.0..=99.0).contains(&adjusted),
+                    "DPR={} adjusted quality out of range for {:?}: {}",
+                    dpr,
+                    profile,
+                    adjusted
+                );
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Regression: e-commerce quality profiles produce reasonable ranges
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn good_profile_jpeg_quality_in_ecommerce_range() {
+        // E-commerce typically uses JPEG quality 65-85.
+        // "Good" profile should produce a value in a reasonable range.
+        let intent = QualityIntent::from_profile(QualityProfile::Good);
+        let q = intent.jpeg_quality();
+        assert!(
+            (65..=85).contains(&q),
+            "Good profile JPEG quality {} should be in e-commerce range 65-85",
+            q
+        );
+    }
+
+    #[test]
+    fn high_profile_jpeg_quality_above_good() {
+        // "High" should produce notably higher JPEG quality than "Good".
+        let good = QualityIntent::from_profile(QualityProfile::Good).jpeg_quality();
+        let high = QualityIntent::from_profile(QualityProfile::High).jpeg_quality();
+        assert!(
+            high > good,
+            "High ({}) should produce higher JPEG quality than Good ({})",
+            high,
+            good
+        );
+        // High should be >=85 for e-commerce "high quality" use cases.
+        assert!(
+            high >= 85,
+            "High profile JPEG quality {} should be >= 85 for product photography",
+            high
+        );
+    }
+
+    #[test]
+    fn good_profile_avif_quality_reasonable() {
+        // Good profile should produce AVIF quality in a useful range (40-70).
+        let intent = QualityIntent::from_profile(QualityProfile::Good);
+        let q = intent.avif_quality();
+        assert!(
+            (40.0..=70.0).contains(&q),
+            "Good profile AVIF quality {} should be in range 40-70",
+            q
+        );
+    }
+
+    #[test]
+    fn good_profile_webp_quality_reasonable() {
+        // Good profile should produce WebP quality in a useful range (65-85).
+        let intent = QualityIntent::from_profile(QualityProfile::Good);
+        let q = intent.webp_quality();
+        assert!(
+            (65.0..=85.0).contains(&q),
+            "Good profile WebP quality {} should be in range 65-85",
+            q
+        );
+    }
+
+    #[test]
+    fn good_profile_jxl_distance_reasonable() {
+        // Good profile should produce JXL distance in a useful range (1.0-4.0).
+        let intent = QualityIntent::from_profile(QualityProfile::Good);
+        let d = intent.jxl_distance();
+        assert!(
+            (1.0..=4.0).contains(&d),
+            "Good profile JXL distance {} should be in range 1.0-4.0",
+            d
+        );
+    }
 }

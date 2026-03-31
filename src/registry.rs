@@ -254,4 +254,102 @@ mod tests {
         assert!(!ImageFormat::Jpeg.supports_alpha());
         assert!(ImageFormat::Png.supports_alpha());
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Regression: AVIF in AllowedFormats and FormatSet
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn avif_in_format_set_all() {
+        // AVIF should always be present in FormatSet::all(), regardless
+        // of whether AVIF codecs are compiled in.
+        let all = FormatSet::all();
+        assert!(
+            all.contains(ImageFormat::Avif),
+            "AVIF must be present in FormatSet::all()"
+        );
+    }
+
+    #[test]
+    fn avif_in_modern_web_format_set() {
+        let modern = FormatSet::modern_web();
+        assert!(
+            modern.contains(ImageFormat::Avif),
+            "AVIF must be present in FormatSet::modern_web()"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "avif-decode")]
+    fn avif_decode_in_compiled_decode() {
+        let af = AllowedFormats::all();
+        assert!(
+            af.can_decode(ImageFormat::Avif),
+            "AVIF decoding should be available when avif-decode feature is enabled"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "avif-encode")]
+    fn avif_encode_in_compiled_encode() {
+        let af = AllowedFormats::all();
+        assert!(
+            af.can_encode(ImageFormat::Avif),
+            "AVIF encoding should be available when avif-encode feature is enabled"
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "avif-decode", feature = "avif-encode"))]
+    fn avif_in_both_decodable_and_encodable() {
+        let af = AllowedFormats::all();
+        let decodable: alloc::vec::Vec<_> = af.decodable_formats().collect();
+        let encodable: alloc::vec::Vec<_> = af.encodable_formats().collect();
+        assert!(
+            decodable.contains(&ImageFormat::Avif),
+            "AVIF should be in decodable_formats when avif-decode is enabled"
+        );
+        assert!(
+            encodable.contains(&ImageFormat::Avif),
+            "AVIF should be in encodable_formats when avif-encode is enabled"
+        );
+    }
+
+    #[test]
+    #[cfg(not(feature = "avif-encode"))]
+    fn avif_encode_not_available_without_feature() {
+        let af = AllowedFormats::all();
+        assert!(
+            !af.can_encode(ImageFormat::Avif),
+            "AVIF encoding should not be available without avif-encode feature"
+        );
+    }
+
+    #[test]
+    fn allowed_formats_all_includes_expected_formats() {
+        // AllowedFormats::all() should include all formats that are compiled in.
+        // Verify a representative set of core formats.
+        let af = AllowedFormats::all();
+
+        #[cfg(feature = "jpeg")]
+        {
+            assert!(af.can_decode(ImageFormat::Jpeg));
+            assert!(af.can_encode(ImageFormat::Jpeg));
+        }
+        #[cfg(feature = "png")]
+        {
+            assert!(af.can_decode(ImageFormat::Png));
+            assert!(af.can_encode(ImageFormat::Png));
+        }
+        #[cfg(feature = "webp")]
+        {
+            assert!(af.can_decode(ImageFormat::WebP));
+            assert!(af.can_encode(ImageFormat::WebP));
+        }
+        #[cfg(feature = "gif")]
+        {
+            assert!(af.can_decode(ImageFormat::Gif));
+            assert!(af.can_encode(ImageFormat::Gif));
+        }
+    }
 }
