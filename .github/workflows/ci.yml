@@ -24,31 +24,15 @@ jobs:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-26-intel, windows-latest, windows-11-arm]
     steps:
       - uses: actions/checkout@v6
-      - name: Configure git for private repos
-        run: git config --global url."https://x-access-token:${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Patch path deps to git refs
+      - name: Patch path deps for CI
         shell: bash
         run: |
-          sed \
-            -e 's|path = "\.\./zencodec"|git = "https://github.com/imazen/zencodec"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels-convert"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenjpeg/zenjpeg"|git = "https://github.com/imazen/zenjpeg"|g' \
-            -e 's|path = "\.\./zenwebp"|git = "https://github.com/imazen/zenwebp"|g' \
-            -e 's|path = "\.\./zengif"|git = "https://github.com/imazen/zengif"|g' \
-            -e 's|path = "\.\./zenavif"|git = "https://github.com/imazen/zenavif"|g' \
-            -e 's|path = "\.\./zenpng"|git = "https://github.com/imazen/zenpng"|g' \
-            -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
-            -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
-            -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
-            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
-            -e '/path = "\.\./heic-decoder-rs"/d' \
-            Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
-      - name: Build
-        run: cargo build
-      - name: Test
+          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          # zenjxl 0.1.0 not yet published; use git until released
+          sed -i 's|zenjxl = { version = "0.1.0"|zenjxl = { git = "https://github.com/imazen/zenjxl"|g' Cargo.toml
+      - name: Test (default features)
         run: cargo test
 
   features:
@@ -57,49 +41,36 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-26-intel, windows-latest, windows-11-arm]
+        os: [ubuntu-latest, macos-26-intel, windows-latest]
     steps:
       - uses: actions/checkout@v6
-      - name: Configure git for private repos
-        run: git config --global url."https://x-access-token:${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           key: features
-      - name: Patch path deps to git refs
+      - name: Patch path deps for CI
         shell: bash
         run: |
-          sed \
-            -e 's|path = "\.\./zencodec"|git = "https://github.com/imazen/zencodec"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels-convert"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenjpeg/zenjpeg"|git = "https://github.com/imazen/zenjpeg"|g' \
-            -e 's|path = "\.\./zenwebp"|git = "https://github.com/imazen/zenwebp"|g' \
-            -e 's|path = "\.\./zengif"|git = "https://github.com/imazen/zengif"|g' \
-            -e 's|path = "\.\./zenavif"|git = "https://github.com/imazen/zenavif"|g' \
-            -e 's|path = "\.\./zenpng"|git = "https://github.com/imazen/zenpng"|g' \
-            -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
-            -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
-            -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
-            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
-            -e '/path = "\.\./heic-decoder-rs"/d' \
-            Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
-      - name: Test (std only, no codecs)
-        run: cargo test --no-default-features --features std
+          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          sed -i 's|zenjxl = { version = "0.1.0"|zenjxl = { git = "https://github.com/imazen/zenjxl"|g' Cargo.toml
+      - name: Test (no default features)
+        run: cargo test --no-default-features
       - name: Test (jpeg + png)
         run: cargo test --no-default-features --features "jpeg,png"
-      - name: Test (web codecs without quantizers)
-        run: cargo test --no-default-features --features "jpeg,webp,gif,png"
-      - name: Test (avif + jxl encode)
-        run: cargo test --features "avif-encode,jxl-encode"
+      - name: Test (web codecs)
+        run: cargo test --no-default-features --features "jpeg,webp,gif,gif-zenquant,png,png-zenquant"
+      - name: Test (avif + jxl decode)
+        run: cargo test --no-default-features --features "avif-decode,jxl-decode"
+      - name: Test (default features)
+        run: cargo test
+      - name: Test (default + tiff + bitmaps)
+        run: cargo test --features "tiff,bitmaps"
 
   i686:
     name: Test (i686 cross)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Configure git for private repos
-        run: git config --global url."https://x-access-token:${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: i686-unknown-linux-gnu
@@ -107,24 +78,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: cross-i686
-      - name: Patch path deps to git refs
+      - name: Patch path deps for CI
         shell: bash
         run: |
-          sed \
-            -e 's|path = "\.\./zencodec"|git = "https://github.com/imazen/zencodec"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels-convert"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenjpeg/zenjpeg"|git = "https://github.com/imazen/zenjpeg"|g' \
-            -e 's|path = "\.\./zenwebp"|git = "https://github.com/imazen/zenwebp"|g' \
-            -e 's|path = "\.\./zengif"|git = "https://github.com/imazen/zengif"|g' \
-            -e 's|path = "\.\./zenavif"|git = "https://github.com/imazen/zenavif"|g' \
-            -e 's|path = "\.\./zenpng"|git = "https://github.com/imazen/zenpng"|g' \
-            -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
-            -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
-            -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
-            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
-            -e '/path = "\.\./heic-decoder-rs"/d' \
-            Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
+          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          sed -i 's|zenjxl = { version = "0.1.0"|zenjxl = { git = "https://github.com/imazen/zenjxl"|g' Cargo.toml
       - name: Test (i686)
         run: cross test --target i686-unknown-linux-gnu
 
@@ -133,32 +91,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Configure git for private repos
-        run: git config --global url."https://x-access-token:${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Patch path deps to git refs
+      - name: Patch path deps for CI
         shell: bash
         run: |
-          sed \
-            -e 's|path = "\.\./zencodec"|git = "https://github.com/imazen/zencodec"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels-convert"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenjpeg/zenjpeg"|git = "https://github.com/imazen/zenjpeg"|g' \
-            -e 's|path = "\.\./zenwebp"|git = "https://github.com/imazen/zenwebp"|g' \
-            -e 's|path = "\.\./zengif"|git = "https://github.com/imazen/zengif"|g' \
-            -e 's|path = "\.\./zenavif"|git = "https://github.com/imazen/zenavif"|g' \
-            -e 's|path = "\.\./zenpng"|git = "https://github.com/imazen/zenpng"|g' \
-            -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
-            -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
-            -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
-            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
-            -e '/path = "\.\./heic-decoder-rs"/d' \
-            Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
-      - name: Clippy
+          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          sed -i 's|zenjxl = { version = "0.1.0"|zenjxl = { git = "https://github.com/imazen/zenjxl"|g' Cargo.toml
+      - name: Clippy (default features)
         run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy (no default features)
+        run: cargo clippy --no-default-features --all-targets -- -D warnings
 
   fmt:
     name: Format
@@ -176,62 +121,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Configure git for private repos
-        run: git config --global url."https://x-access-token:${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-hack
       - uses: Swatinem/rust-cache@v2
-      - name: Patch path deps to git refs
+      - name: Patch path deps for CI
         shell: bash
         run: |
-          sed \
-            -e 's|path = "\.\./zencodec"|git = "https://github.com/imazen/zencodec"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels-convert"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenjpeg/zenjpeg"|git = "https://github.com/imazen/zenjpeg"|g' \
-            -e 's|path = "\.\./zenwebp"|git = "https://github.com/imazen/zenwebp"|g' \
-            -e 's|path = "\.\./zengif"|git = "https://github.com/imazen/zengif"|g' \
-            -e 's|path = "\.\./zenavif"|git = "https://github.com/imazen/zenavif"|g' \
-            -e 's|path = "\.\./zenpng"|git = "https://github.com/imazen/zenpng"|g' \
-            -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
-            -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
-            -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
-            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
-            -e '/path = "\.\./heic-decoder-rs"/d' \
-            Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
-      - name: Check MSRV
+          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          sed -i 's|zenjxl = { version = "0.1.0"|zenjxl = { git = "https://github.com/imazen/zenjxl"|g' Cargo.toml
+      - name: Check MSRV (default features)
         run: cargo hack check --rust-version
+      - name: Check MSRV (no default features)
+        run: cargo hack check --rust-version --no-default-features
 
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Configure git for private repos
-        run: git config --global url."https://x-access-token:${{ secrets.GH_PAT }}@github.com/".insteadOf "https://github.com/"
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: Swatinem/rust-cache@v2
-      - name: Patch path deps to git refs
+      - name: Patch path deps for CI
         shell: bash
         run: |
-          sed \
-            -e 's|path = "\.\./zencodec"|git = "https://github.com/imazen/zencodec"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenpixels/zenpixels-convert"|git = "https://github.com/imazen/zenpixels"|g' \
-            -e 's|path = "\.\./zenjpeg/zenjpeg"|git = "https://github.com/imazen/zenjpeg"|g' \
-            -e 's|path = "\.\./zenwebp"|git = "https://github.com/imazen/zenwebp"|g' \
-            -e 's|path = "\.\./zengif"|git = "https://github.com/imazen/zengif"|g' \
-            -e 's|path = "\.\./zenavif"|git = "https://github.com/imazen/zenavif"|g' \
-            -e 's|path = "\.\./zenpng"|git = "https://github.com/imazen/zenpng"|g' \
-            -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
-            -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
-            -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
-            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
-            -e '/path = "\.\./heic-decoder-rs"/d' \
-            Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
-      - name: Generate coverage (all features)
-        run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          sed -i 's|zenjxl = { version = "0.1.0"|zenjxl = { git = "https://github.com/imazen/zenjxl"|g' Cargo.toml
+      - name: Generate coverage (default features)
+        run: cargo llvm-cov --lcov --output-path lcov.info
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:

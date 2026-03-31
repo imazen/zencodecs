@@ -131,6 +131,7 @@ name = "quality_calibrate"
 required-features = ["calibrate"]
 
 [package.metadata.superwork.ci]
-strategy = "git_url"
-delete = ["heic", "fast-ssim2"]
+strategy = "strip_path"
+# zenjxl 0.1.0 not yet published; override with git URL until released
+git_url_override = ["zenjxl"]
 
