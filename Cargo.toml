@@ -53,7 +53,7 @@ rayon = "1"
 turbojpeg = "1.4"
 
 [features]
-default = ["jpeg", "webp", "gif", "gif-zenquant", "png", "png-zenquant", "avif-decode", "jxl-decode", "heic-decode", "bitmaps-bmp"]
+default = ["jpeg", "webp", "gif", "gif-zenquant", "png", "png-zenquant", "avif-decode", "jxl-decode", "heic-decode", "bitmaps-bmp", "zennode"]
 std = []
 
 # Individual codec features

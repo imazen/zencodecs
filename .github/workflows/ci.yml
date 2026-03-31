@@ -43,6 +43,7 @@ jobs:
             -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
             -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
             -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
+            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
             -e '/path = "\.\./heic-decoder-rs"/d' \
             Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
       - name: Build
@@ -80,6 +81,7 @@ jobs:
             -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
             -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
             -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
+            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
             -e '/path = "\.\./heic-decoder-rs"/d' \
             Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
       - name: Test (std only, no codecs)
@@ -88,6 +90,8 @@ jobs:
         run: cargo test --no-default-features --features "jpeg,png"
       - name: Test (web codecs without quantizers)
         run: cargo test --no-default-features --features "jpeg,webp,gif,png"
+      - name: Test (avif + jxl encode)
+        run: cargo test --features "avif-encode,jxl-encode"
 
   i686:
     name: Test (i686 cross)
@@ -118,6 +122,7 @@ jobs:
             -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
             -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
             -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
+            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
             -e '/path = "\.\./heic-decoder-rs"/d' \
             Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
       - name: Test (i686)
@@ -149,6 +154,7 @@ jobs:
             -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
             -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
             -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
+            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
             -e '/path = "\.\./heic-decoder-rs"/d' \
             Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
       - name: Clippy
@@ -190,6 +196,7 @@ jobs:
             -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
             -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
             -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
+            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
             -e '/path = "\.\./heic-decoder-rs"/d' \
             Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
       - name: Check MSRV
@@ -220,10 +227,11 @@ jobs:
             -e 's|path = "\.\./zenjxl"|git = "https://github.com/imazen/zenjxl"|g' \
             -e 's|path = "\.\./zenresize"|git = "https://github.com/imazen/zenresize"|g' \
             -e 's|path = "\.\./zensim/zensim-regress"|git = "https://github.com/imazen/zensim"|g' \
+            -e 's|path = "\.\./zennode/zennode"|git = "https://github.com/imazen/zennode"|g' \
             -e '/path = "\.\./heic-decoder-rs"/d' \
             Cargo.toml > Cargo.toml.ci && mv Cargo.toml.ci Cargo.toml
-      - name: Generate coverage
-        run: cargo llvm-cov --lcov --output-path lcov.info
+      - name: Generate coverage (all features)
+        run: cargo llvm-cov --all-features --lcov --output-path lcov.info
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:
