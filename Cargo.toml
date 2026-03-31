@@ -11,8 +11,8 @@ repository = "https://github.com/imazen/zencodecs"
 
 [dependencies]
 # Core (always available)
-enough = "0.4.2"
-whereat = "0.1.4"
+enough = "0.4.3"
+whereat = "0.1.5"
 thiserror = { version = "2.0", default-features = false }
 rgb = { version = "0.8", default-features = false, features = ["as-bytes"] }
 imgref = "1.12"
@@ -20,7 +20,7 @@ bytemuck = { version = "1.25", default-features = false, features = ["extern_cra
 zencodec = { version = "0.1.11" }
 zenpixels = { version = "0.2.1", default-features = false, features = ["imgref"] }
 zenpixels-convert = { version = "0.2.1", features = ["imgref"] }
-linear-srgb = { version = "0.6.5", default-features = false }
+linear-srgb = { version = "0.6.6", default-features = false }
 
 # UltraHDR container types (optional, for re-exporting container/MPF types)
 ultrahdr-core = { path = "../ultrahdr/ultrahdr-core", version = "0.3.0", optional = true, default-features = false }
@@ -30,7 +30,7 @@ zenjpeg = { path = "../zenjpeg/zenjpeg", optional = true, features = ["decoder",
 zenwebp = { path = "../zenwebp", optional = true, features = ["zencodec"] }
 zengif = { path = "../zengif", optional = true, features = ["zencodec"] }
 zenavif = { path = "../zenavif", optional = true, features = ["zencodec"] }
-zenavif-parse = { path = "../zenavif-parse", version = "0.5.0", optional = true, features = ["eager"] }
+zenavif-parse = { path = "../zenavif-parse", version = "0.5.1", optional = true, features = ["eager"] }
 zenpng = { path = "../zenpng", optional = true, features = ["zencodec"] }
 zenjxl = { path = "../zenjxl", optional = true, default-features = false, features = ["zencodec"] }
 heic = { path = "../heic", optional = true, default-features = false, features = ["zencodec"] }
