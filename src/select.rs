@@ -520,6 +520,7 @@ mod tests {
             format: Some(FormatChoice::Auto),
             ..Default::default()
         };
+        // Lossy opaque small image — no alpha, no animation, not lossless
         let facts = ImageFacts {
             pixel_count: 1_000_000,
             ..Default::default()
@@ -527,8 +528,54 @@ mod tests {
         let registry = AllowedFormats::all();
         let policy = CodecPolicy::new();
         let decision = select_format_from_intent(&intent, &facts, &registry, &policy).unwrap();
-        // Auto should select something reasonable
+        // Trace must be non-empty
         assert!(!decision.trace.is_empty());
+        // Quality must be in a reasonable range (default is 73.0)
+        assert!(
+            decision.quality.quality > 0.0 && decision.quality.quality <= 100.0,
+            "quality {} is out of range (0, 100]",
+            decision.quality.quality
+        );
+        // Format must be a known valid format (not garbage)
+        let known_formats = [
+            ImageFormat::Jpeg,
+            ImageFormat::Png,
+            ImageFormat::WebP,
+            ImageFormat::Gif,
+            ImageFormat::Avif,
+            ImageFormat::Jxl,
+            ImageFormat::Bmp,
+            ImageFormat::Tiff,
+            ImageFormat::Pnm,
+            ImageFormat::Farbfeld,
+            ImageFormat::Heic,
+        ];
+        assert!(
+            known_formats.contains(&decision.format),
+            "auto-selected format {:?} is not a known valid format",
+            decision.format
+        );
+        // Under default features (no jxl-encode, no avif-encode):
+        // preference order for lossy opaque small is JXL → AVIF → JPEG → WebP → PNG
+        // so JPEG should win.
+        #[cfg(feature = "jxl-encode")]
+        assert_eq!(
+            decision.format,
+            ImageFormat::Jxl,
+            "JXL should win auto-select when jxl-encode is compiled in"
+        );
+        #[cfg(all(not(feature = "jxl-encode"), feature = "avif-encode"))]
+        assert_eq!(
+            decision.format,
+            ImageFormat::Avif,
+            "AVIF should win auto-select when jxl-encode absent and avif-encode is compiled in"
+        );
+        #[cfg(all(not(feature = "jxl-encode"), not(feature = "avif-encode")))]
+        assert_eq!(
+            decision.format,
+            ImageFormat::Jpeg,
+            "JPEG should win auto-select for lossy opaque small image under default features"
+        );
     }
 
     #[test]

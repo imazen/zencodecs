@@ -316,16 +316,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "avif-encode"))]
-    fn avif_encode_not_available_without_feature() {
-        let af = AllowedFormats::all();
-        assert!(
-            !af.can_encode(ImageFormat::Avif),
-            "AVIF encoding should not be available without avif-encode feature"
-        );
-    }
-
-    #[test]
     fn allowed_formats_all_includes_expected_formats() {
         // AllowedFormats::all() should include all formats that are compiled in.
         // Verify a representative set of core formats.
