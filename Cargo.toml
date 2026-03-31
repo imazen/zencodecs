@@ -46,7 +46,7 @@ moxcms = { version = "0.8.1", optional = true, default-features = false }
 
 [dev-dependencies]
 png = "0.18"
-zensim-regress = "0.2.3"
+zensim-regress = "0.3.0"
 codec-corpus = "1"
 fast-ssim2 = { path = "../fast-ssim2/fast-ssim2", features = ["imgref"] }
 rayon = "1"
