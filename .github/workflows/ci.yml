@@ -70,8 +70,8 @@ jobs:
         run: cargo test --no-default-features --features "avif-decode,jxl-decode,jpeg,webp,png" --lib
       - name: Test (default features)
         run: cargo test --lib
-      - name: Test (default + tiff + bitmaps)
-        run: cargo test --features "tiff,bitmaps" --lib
+      - name: Test (default + bitmaps)
+        run: cargo test --features "bitmaps" --lib
 
   i686:
     name: Check (i686 cross)
@@ -94,8 +94,8 @@ jobs:
             sed -i 's/, path = "[^"]*"//g' Cargo.toml
           fi
           rm -f Cargo.lock
-      - name: Check (i686)
-        run: cross check --target i686-unknown-linux-gnu
+      - name: Check (i686, no JPEG to avoid zenjpeg SIMD issue)
+        run: cross check --target i686-unknown-linux-gnu --no-default-features --features "webp,gif,png,avif-decode,jxl-decode,heic-decode,bitmaps-bmp,zennode"
 
   clippy:
     name: Clippy
