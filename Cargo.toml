@@ -20,7 +20,7 @@ bytemuck = { version = "1.25", default-features = false, features = ["extern_cra
 zencodec = { version = "0.1.12" }
 zenpixels = { version = "0.2.2", default-features = false, features = ["imgref"] }
 zenpixels-convert = { version = "0.2.2", features = ["imgref"] }
-linear-srgb = { version = "0.6.6", default-features = false }
+linear-srgb = { version = "0.6.7", default-features = false }
 
 # Codecs (all optional, feature-gated)
 zenjpeg = { version = "0.7.1", optional = true, features = ["decoder", "zencodec", "trellis"] }
