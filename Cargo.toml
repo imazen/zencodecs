@@ -12,15 +12,15 @@ repository = "https://github.com/imazen/zencodecs"
 [dependencies]
 # Core (always available)
 enough = "0.4.3"
-whereat = "0.1.5"
+whereat = { version = "0.1.5", path = "../whereat" }
 thiserror = { version = "2.0", default-features = false }
 rgb = { version = "0.8", default-features = false, features = ["as-bytes"] }
 imgref = "1.12"
 bytemuck = { version = "1.25", default-features = false, features = ["extern_crate_alloc"] }
-zencodec = { version = "0.1.11" }
-zenpixels = { version = "0.2.2", default-features = false, features = ["imgref"] }
-zenpixels-convert = { version = "0.2.2", features = ["imgref"] }
-linear-srgb = { version = "0.6.6", default-features = false }
+zencodec = { version = "0.1.11" , path = "../zencodec" }
+zenpixels = { version = "0.2.2", default-features = false, features = ["imgref"] , path = "../zenpixels/zenpixels" }
+zenpixels-convert = { version = "0.2.2", features = ["imgref"] , path = "../zenpixels/zenpixels-convert" }
+linear-srgb = { version = "0.6.6", default-features = false , path = "../linear-srgb" }
 
 # UltraHDR container types (optional, for re-exporting container/MPF types)
 ultrahdr-core = { path = "../ultrahdr/ultrahdr-core", version = "0.4.0", optional = true, default-features = false }
@@ -42,11 +42,11 @@ zenraw = { version = "0.1.0", path = "../zenraw", optional = true, default-featu
 zennode = { version = "0.1.0", path = "../zennode/zennode", default-features = false, features = ["derive"], optional = true }
 
 # Color management (optional)
-moxcms = { version = "0.8.1", optional = true, default-features = false }
+moxcms = { version = "*", optional = true, default-features = false , path = "../../moxcms" }
 
 [dev-dependencies]
 png = "0.18"
-zensim-regress = "0.3.0"
+zensim-regress = { version = "0.3.0", path = "../zensim/zensim-regress" }
 codec-corpus = "1"
 fast-ssim2 = { version = "0.7.1", path = "../fast-ssim2/fast-ssim2", features = ["imgref"] }
 rayon = "1"
