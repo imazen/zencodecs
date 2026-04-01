@@ -12,43 +12,43 @@ repository = "https://github.com/imazen/zencodecs"
 [dependencies]
 # Core (always available)
 enough = "0.4.3"
-whereat = { version = "0.1.5"}
+whereat = { version = "0.1.5", path = "../whereat" }
 thiserror = { version = "2.0", default-features = false }
 rgb = { version = "0.8", default-features = false, features = ["as-bytes"] }
 imgref = "1.12"
 bytemuck = { version = "1.25", default-features = false, features = ["extern_crate_alloc"] }
-zencodec = { version = "0.1.11" }
-zenpixels = { version = "0.2.2", default-features = false, features = ["imgref"] }
-zenpixels-convert = { version = "0.2.2", features = ["imgref"] }
-linear-srgb = { version = "0.6.6", default-features = false }
+zencodec = { version = "0.1.11" , path = "../zencodec" }
+zenpixels = { version = "0.2.2", default-features = false, features = ["imgref"] , path = "../zenpixels/zenpixels" }
+zenpixels-convert = { version = "0.2.2", features = ["imgref"] , path = "../zenpixels/zenpixels-convert" }
+linear-srgb = { version = "0.6.6", default-features = false , path = "../linear-srgb" }
 
 # UltraHDR container types (optional, for re-exporting container/MPF types)
-ultrahdr-core = { version = "0.4.0", optional = true, default-features = false }
+ultrahdr-core = { version = "0.4.0", optional = true, default-features = false , path = "../ultrahdr/ultrahdr-core" }
 
 # Codecs (all optional, feature-gated)
-zenjpeg = { version = "0.7.1", optional = true, features = ["decoder", "zencodec", "trellis"] }
-zenwebp = { version = "0.4.0", optional = true, features = ["zencodec"] }
-zengif = { version = "0.7.0", optional = true, features = ["zencodec"] }
-zenavif = { version = "0.1.0", optional = true, features = ["zencodec"] }
-zenavif-parse = { version = "0.5.1", optional = true, features = ["eager"] }
-zenpng = { version = "0.1.0", optional = true, features = ["zencodec"] }
-zenjxl = { version = "0.1.0", optional = true, default-features = false, features = ["zencodec"] }
-heic = { version = "0.1.0", optional = true, default-features = false, features = ["zencodec"] }
-zenbitmaps = { version = "0.1.2", optional = true, features = ["zencodec"] }
-zentiff = { version = "0.1.0", optional = true, features = ["zencodec"] }
-zenraw = { version = "0.1.0", optional = true, default-features = false, features = ["rawloader", "std", "zencodec", "exif"] }
+zenjpeg = { version = "0.7.1", optional = true, features = ["decoder", "zencodec", "trellis"] , path = "../zenjpeg/zenjpeg" }
+zenwebp = { version = "0.4.0", optional = true, features = ["zencodec"] , path = "../zenwebp" }
+zengif = { version = "0.7.0", optional = true, features = ["zencodec"] , path = "../zengif" }
+zenavif = { version = "0.1.0", optional = true, features = ["zencodec"] , path = "../zenavif" }
+zenavif-parse = { version = "0.5.1", optional = true, features = ["eager"] , path = "../zenavif-parse" }
+zenpng = { version = "0.1.0", optional = true, features = ["zencodec"] , path = "../zenpng" }
+zenjxl = { version = "0.1.0", optional = true, default-features = false, features = ["zencodec"] , path = "../zenjxl" }
+heic = { version = "0.1.0", optional = true, default-features = false, features = ["zencodec"] , path = "../heic" }
+zenbitmaps = { version = "0.1.2", optional = true, features = ["zencodec"] , path = "../zenbitmaps" }
+zentiff = { version = "0.1.0", optional = true, features = ["zencodec"] , path = "../zentiff" }
+zenraw = { version = "0.1.0", optional = true, default-features = false, features = ["rawloader", "std", "zencodec", "exif"] , path = "../zenraw" }
 
 # Node definitions (optional)
-zennode = { version = "0.1.0", default-features = false, features = ["derive"], optional = true }
+zennode = { version = "0.1.0", default-features = false, features = ["derive"], optional = true , path = "../zennode/zennode" }
 
 # Color management (optional)
-moxcms = { version = "*", optional = true, default-features = false }
+moxcms = { version = "*", optional = true, default-features = false , path = "../../moxcms" }
 
 [dev-dependencies]
 png = "0.18"
-zensim-regress = { version = "0.3.0"}
+zensim-regress = { version = "0.3.0", path = "../zensim/zensim-regress" }
 codec-corpus = "1"
-fast-ssim2 = { version = "0.7.1", features = ["imgref"] }
+fast-ssim2 = { version = "0.7.1", features = ["imgref"] , path = "../fast-ssim2/fast-ssim2" }
 rayon = "1"
 turbojpeg = "1.4"
 
@@ -129,9 +129,6 @@ required-features = ["std"]
 [[example]]
 name = "quality_calibrate"
 required-features = ["calibrate"]
-
-[patch.crates-io]
-zencodec = { path = "../zencodec" }
 
 [package.metadata.superwork.ci]
 strategy = "strip_path"
