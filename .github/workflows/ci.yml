@@ -29,7 +29,11 @@ jobs:
       - name: Patch path deps for CI
         shell: bash
         run: |
-          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' 's/, path = "[^"]*"//g' Cargo.toml
+          else
+            sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          fi
           rm -f Cargo.lock
       - name: Test (default features)
         run: cargo test --lib
@@ -50,12 +54,16 @@ jobs:
       - name: Patch path deps for CI
         shell: bash
         run: |
-          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' 's/, path = "[^"]*"//g' Cargo.toml
+          else
+            sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          fi
           rm -f Cargo.lock
       - name: Check (no default features)
         run: cargo check --no-default-features
-      - name: Test (jpeg + png)
-        run: cargo test --no-default-features --features "jpeg,png" --lib
+      - name: Test (jpeg + webp + png)
+        run: cargo test --no-default-features --features "jpeg,webp,png" --lib
       - name: Test (web codecs)
         run: cargo test --no-default-features --features "jpeg,webp,gif,gif-zenquant,png,png-zenquant" --lib
       - name: Test (avif + jxl decode)
@@ -80,7 +88,11 @@ jobs:
       - name: Patch path deps for CI
         shell: bash
         run: |
-          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' 's/, path = "[^"]*"//g' Cargo.toml
+          else
+            sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          fi
           rm -f Cargo.lock
       - name: Check (i686)
         run: cross check --target i686-unknown-linux-gnu
@@ -97,7 +109,11 @@ jobs:
       - name: Patch path deps for CI
         shell: bash
         run: |
-          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' 's/, path = "[^"]*"//g' Cargo.toml
+          else
+            sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          fi
           rm -f Cargo.lock
       - name: Clippy (default features)
         run: cargo clippy --lib -- -D warnings
@@ -124,7 +140,11 @@ jobs:
       - name: Patch path deps for CI
         shell: bash
         run: |
-          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' 's/, path = "[^"]*"//g' Cargo.toml
+          else
+            sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          fi
           rm -f Cargo.lock
       - name: Check MSRV (default features)
         run: cargo hack check --rust-version
@@ -142,7 +162,11 @@ jobs:
       - name: Patch path deps for CI
         shell: bash
         run: |
-          sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' 's/, path = "[^"]*"//g' Cargo.toml
+          else
+            sed -i 's/, path = "[^"]*"//g' Cargo.toml
+          fi
           rm -f Cargo.lock
       - name: Generate coverage (default features)
         run: cargo llvm-cov --lib --lcov --output-path lcov.info
