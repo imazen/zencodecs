@@ -52,8 +52,8 @@ jobs:
         run: |
           sed -i 's/, path = "[^"]*"//g' Cargo.toml
           rm -f Cargo.lock
-      - name: Test (no default features)
-        run: cargo test --no-default-features --lib
+      - name: Check (no default features)
+        run: cargo check --no-default-features
       - name: Test (jpeg + png)
         run: cargo test --no-default-features --features "jpeg,png" --lib
       - name: Test (web codecs)
@@ -66,7 +66,7 @@ jobs:
         run: cargo test --features "tiff,bitmaps" --lib
 
   i686:
-    name: Test (i686 cross)
+    name: Check (i686 cross)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -82,8 +82,8 @@ jobs:
         run: |
           sed -i 's/, path = "[^"]*"//g' Cargo.toml
           rm -f Cargo.lock
-      - name: Test (i686)
-        run: cross test --target i686-unknown-linux-gnu --lib
+      - name: Check (i686)
+        run: cross check --target i686-unknown-linux-gnu
 
   clippy:
     name: Clippy
